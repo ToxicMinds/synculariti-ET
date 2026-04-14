@@ -4,7 +4,7 @@
 var SB_URL  = 'https://yleswxfenmuzmxeekxkg.supabase.co';
 var SB_KEY  = 'sb_publishable_qJGOiVaWDrd9Fq6EUJvGUg_a8VrWCUx';
 var GROQ    = '/api/groq';
-var GOCARDLESS = '/api/gocardless';
+var ENABLE_BANKING = '/api/enablebanking';
 var REST    = SB_URL + '/rest/v1/expenses';
 var EKASA   = '/ekasa-proxy/receipt/find';
 

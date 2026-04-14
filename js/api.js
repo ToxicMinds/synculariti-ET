@@ -277,31 +277,31 @@ async function categoriseImage(b64, mime) {
 }
 
 /* ═══════════════════════════════════════════════
-   BANKS (GOCARDLESS INTEGRATION)
+   BANKS (ENABLE BANKING INTEGRATION)
 ═══════════════════════════════════════════════ */
 async function loadBanks() {
   var el = document.getElementById('bank-picker-list');
   el.innerHTML = '<span class="spin"></span>';
   
-  dbg('GoCardless API Call', {action:'institutions'}, true);
+  dbg('Enable Banking API Call', {action:'institutions'}, true);
   try {
-    var r = await fetch(GOCARDLESS, { method:'POST', body:JSON.stringify({action:'institutions', country:'SK'}) });
+    var r = await fetch(ENABLE_BANKING, { method:'POST', body:JSON.stringify({action:'institutions', country:'SK'}) });
     var banks = await r.json();
-    dbg('GoCardless API Response', banks, true);
+    dbg('Enable Banking API Response', banks, true);
     if(!r.ok) throw new Error(banks.error || 'Failed to load banks');
     
     var html = '<div style="max-height:60vh;overflow-y:auto;padding-right:8px">';
     banks.forEach(function(b) {
-      if (b.transaction_total_days === '0') return;
+      // Filter for banks that support account information
       html += '<div class="bank-item" style="cursor:pointer" onclick="connectBank(\''+b.id+'\', \''+esc(b.name)+'\')">'+
-              '<div class="bank-info"><div class="bank-name">'+esc(b.name)+'</div><div class="bank-status">'+b.bic+'</div></div>'+
+              '<div class="bank-info"><div class="bank-name">'+esc(b.name)+'</div><div class="bank-status">'+(b.country||'SK')+'</div></div>'+
               '<button class="btn-scan" style="padding:4px 10px;font-size:11px">Connect</button>'+
               '</div>';
     });
     html += '</div>';
     el.innerHTML = html;
   } catch(e) {
-    dbg('Nordigen error', e, true);
+    dbg('Enable Banking error', e, true);
     el.innerHTML = '<div class="status-box error">'+esc(e.message)+'</div>';
   }
 }
@@ -312,72 +312,93 @@ async function connectBank(instId, instName) {
   
   var redirectUri = window.location.origin + window.location.pathname;
   
-  var payload = { action:'create_requisition', institution_id: instId, redirect_uri: redirectUri };
-  dbg('GoCardless API Call (Create Requisition)', payload, true);
+  var payload = { action:'start_session', institution_id: instId, redirect_uri: redirectUri };
+  dbg('Enable Banking API Call (Start Session)', payload, true);
   
   try {
-    var r = await fetch(GOCARDLESS, { method:'POST', body:JSON.stringify(payload) });
+    var r = await fetch(ENABLE_BANKING, { method:'POST', body:JSON.stringify(payload) });
     var res = await r.json();
-    dbg('Nordigen API Response', res, true);
-    if(!r.ok) throw new Error(res.error || 'Requisition failed');
+    dbg('Enable Banking API Response', res, true);
+    if(!r.ok) throw new Error(res.error || 'Connection failed');
     
-    localStorage.setItem('sf_nord_pending', JSON.stringify({id: instId, name: instName, ref: res.reference||''}));
-    window.location.href = res.link;
+    localStorage.setItem('sf_eb_pending', JSON.stringify({id: instId, name: instName}));
+    window.location.href = res.url; // Use 'url' for Enable Banking redirect
   } catch(e) {
-    dbg('Nordigen connect error', e, true);
+    dbg('Enable Banking connect error', e, true);
     el.innerHTML = '<div class="status-box error">'+esc(e.message)+'</div>';
   }
 }
 
-async function handleNordigenCallback(reqId) {
-  document.getElementById('cards').innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center"><span class="spin"></span> Completing bank connection...</div>';
+async function handleEnableBankingCallback(sessionId) {
+  document.getElementById('cards').innerHTML = '<div class="card" style="grid-column:1/-1;text-align:center"><span class="spin"></span> Finalizing banking feed...</div>';
   
-  var payload = { action:'get_requisition', requisition_id: reqId };
-  dbg('GoCardless API Call (Get Requisition)', payload, true);
+  var payload = { action:'get_session', session_id: sessionId };
+  dbg('Enable Banking API Call (Get Session)', payload, true);
   try {
-    var pending = JSON.parse(localStorage.getItem('sf_nord_pending')) || {name: 'Connected Bank'};
+    var pending = JSON.parse(localStorage.getItem('sf_eb_pending')) || {name: 'Connected Bank'};
     
-    var r = await fetch(GOCARDLESS, { method:'POST', body:JSON.stringify(payload) });
+    var r = await fetch(ENABLE_BANKING, { method:'POST', body:JSON.stringify(payload) });
     var res = await r.json();
-    dbg('Nordigen API Response', res, true);
+    dbg('Enable Banking API Response', res, true);
     
-    if (res.status === 'CR' || res.status === 'LN') {
-      var b = { institution_id: pending.id, name: pending.name, requisition_id: reqId, accounts: res.accounts, linked_at: today() };
-      var exists = BANKS.findIndex(function(x){return x.requisition_id === reqId});
+    if (res.status === 'AUTHORIZED') {
+      // Get actual accounts linked to this session
+      var accPayload = { action:'get_accounts', session_id: sessionId };
+      var accRes = await fetch(ENABLE_BANKING, { method:'POST', body:JSON.stringify(accPayload) });
+      var accData = await accRes.json();
+      
+      var b = { 
+        institution_id: pending.id, 
+        name: pending.name, 
+        session_id: sessionId, 
+        accounts: accData.accounts || [], 
+        linked_at: today() 
+      };
+      
+      var exists = BANKS.findIndex(function(x){return x.session_id === sessionId});
       if(exists < 0) BANKS.push(b); else BANKS[exists] = b;
+      
       await sbSaveState();
-      flash('Bank connected successfully!', false);
+      flash('Bank feed live!', false);
     } else {
-      throw new Error('Bank connection not completed (Status: '+res.status+')');
+      throw new Error('Bank connection not authorized (Status: '+res.status+')');
     }
   } catch(e) {
-    dbg('Nordigen callback error', e, true);
+    dbg('Enable Banking callback error', e, true);
     flash('Bank error: '+e.message, true);
   }
-  localStorage.removeItem('sf_nord_pending');
+  localStorage.removeItem('sf_eb_pending');
   renderAll();
   renderBankSync();
 }
 
-async function syncBank(reqId) {
-  var bank = BANKS.find(function(b){return b.requisition_id===reqId});
+async function syncBank(sessionId) {
+  var bank = BANKS.find(function(b){return b.session_id===sessionId});
   if(!bank || !bank.accounts || bank.accounts.length===0) return;
   
   busy=true; setSyncing('s');
-  var payload = {action:'get_transactions', account_id: bank.accounts[0]};
-  dbg('GoCardless API Call (Get Transactions)', payload, true);
+  // Enable Banking often needs fetching per-account. We'll grab the first one.
+  var payload = {action:'get_transactions', session_id: sessionId, account_id: bank.accounts[0].resourceId};
+  dbg('Enable Banking API Call (Get Transactions)', payload, true);
   
   try {
-    var r = await fetch(GOCARDLESS, { method:'POST', body:JSON.stringify(payload) });
+    var r = await fetch(ENABLE_BANKING, { method:'POST', body:JSON.stringify(payload) });
     var res = await r.json();
-    dbg('Nordigen API Response', res, true);
+    dbg('Enable Banking API Response', res, true);
     if(!r.ok) throw new Error(res.error || 'Failed to fetch transactions');
     
-    var txs = (res.transactions.booked || []).concat(res.transactions.pending || []);
+    // Enable Banking response structure: { transactions: [...] }
+    var txs = res.transactions || [];
     txs.sort(function(a,b){ return new Date(b.bookingDate||b.valueDate) - new Date(a.bookingDate||a.valueDate); });
     
-    var promptData = txs.slice(0, 15).map(function(t) {
-      return { id: t.transactionId, date: t.bookingDate||t.valueDate, amount: t.transactionAmount.amount, currency: t.transactionAmount.currency, info: (t.remittanceInformationUnstructured||'')+' '+(t.creditorName||'') };
+    var promptData = txs.slice(0, 20).map(function(t) {
+      return { 
+        id: t.transactionId, 
+        date: t.bookingDate||t.valueDate, 
+        amount: t.transactionAmount.amount, 
+        currency: t.transactionAmount.currency, 
+        info: (t.remittanceInformationUnstructured||'')+' '+(t.creditorName||'') 
+      };
     });
     
     var gPayload = {

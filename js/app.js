@@ -45,12 +45,12 @@ async function init() {
   initMonths();
   renderAll();
 
-  /* Handle Nordigen OAuth callback (?ref=requisition_id) */
+  /* Handle Enable Banking OAuth callback (?session_id=...) */
   var urlParams = new URLSearchParams(window.location.search);
-  var nordRef = urlParams.get('ref');
-  if(nordRef) {
+  var ebSession = urlParams.get('session_id') || urlParams.get('code');
+  if(ebSession) {
     window.history.replaceState({}, document.title, window.location.pathname);
-    handleNordigenCallback(nordRef);
+    handleEnableBankingCallback(ebSession);
   }
 
   setInterval(async function(){
