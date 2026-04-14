@@ -162,32 +162,44 @@ function flash(msg,isErr) {
   setTimeout(function(){f.textContent='';},4000);
 }
 
-function showReview(store,dateStr,items,totalInput) {
-  closeScanner();
-  var m=document.getElementById('review-modal');
-  m.classList.add('open');
-  document.getElementById('rev-store').textContent=store;
-  document.getElementById('rev-date').value=dateStr||today();
-  document.getElementById('rev-t').textContent=totalInput?fmt(totalInput):'Auto';
+function showReview(store, dateStr, items, totalInput) {
+  // We no longer close the scanner, we just switch to the review step inside the same modal
+  showStep('step-review');
   
-  var list=document.getElementById('rev-items');
-  if(!items||!items.length){list.innerHTML='<div class="te">No items extracted.</div>';return;}
+  var storeEl = document.getElementById('r-store');
+  if (storeEl) storeEl.textContent = store;
   
-  list.innerHTML = items.map(function(it,i){
-    var catOpts = CATS.map(function(c){return '<option '+(c===it.category?'selected':'')+'>'+c+'</option>'}).join('');
-    return '<div class="pitem">'+
-      '<input type="checkbox" id="rcb_'+i+'" checked>'+
-      '<div class="pinm">'+esc(it.name)+'</div>'+
-      '<div class="picat"><select id="rcat_'+i+'">'+catOpts+'</select></div>'+
-      '<div class="piam">'+fmt(it.amount)+'<input type="hidden" id="ramt_'+i+'" value="'+it.amount+'"></div>'+
-      '<input type="hidden" id="rnm_'+i+'" value="'+esc(it.name)+'">'+
+  var dateEl = document.getElementById('sdate');
+  if (dateEl) dateEl.value = dateStr || today();
+  
+  var totalEl = document.getElementById('r-total');
+  if (totalEl) totalEl.textContent = totalInput ? 'Total: €' + fmt(totalInput) : 'Total: Auto';
+  
+  var list = document.getElementById('r-items');
+  if (!list) return;
+  
+  if (!items || !items.length) {
+    list.innerHTML = '<div class="te" style="padding:20px;color:var(--muted)">No items extracted.</div>';
+    return;
+  }
+  
+  list.innerHTML = items.map(function(it, i) {
+    var catOpts = CATS.map(function(c) {
+      return '<option ' + (c === it.category ? 'selected' : '') + '>' + c + '</option>';
+    }).join('');
+    
+    return '<div class="pitem">' +
+      '<input type="checkbox" id="rcb_' + i + '" checked style="width:20px;height:20px">' +
+      '<div class="pinm" style="flex:1;font-size:13px">' + esc(it.name) + '</div>' +
+      '<div class="picat"><select id="rcat_' + i + '" style="font-size:11px;padding:2px">' + catOpts + '</select></div>' +
+      '<div class="piam" style="font-family:var(--mono);width:60px;text-align:right">€' + fmt(it.amount) + 
+      '<input type="hidden" id="ramt_' + i + '" value="' + it.amount + '">' +
+      '</div>' +
+      '<input type="hidden" id="rnm_' + i + '" value="' + esc(it.name) + '">' +
       '</div>';
   }).join('');
-  
-  var sel=document.getElementById('rev-who');
-  sel.options[0].textContent=NAMES.u1; sel.options[1].textContent=NAMES.u2;
 }
-function cancelReview() { document.getElementById('review-modal').classList.remove('open'); }
+function cancelReview() { showStep('step-qr'); startQRCamera(); }
 
 /* ═══════════════════════════════════════════════
    SETTINGS & MODALS
