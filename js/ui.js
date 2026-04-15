@@ -142,9 +142,9 @@ function renderLog(){
   var tot=rows.reduce(function(s,e){return s+Number(e.amount);},0);
   tb.innerHTML=rows.map(function(e){
     return '<tr>'+
-      '<td style="text-align:left;white-space:nowrap">'+
-        '<button class="db" style="color:var(--info)" onclick="startEdit(\''+e.id+'\')">✎</button>'+
-        '<button class="db" onclick="deleteExp(\''+e.id+'\')">×</button>'+
+      '<td class="act-col">'+
+        '<button class="db db-edit" title="Edit" onclick="startEdit(\''+e.id+'\')">✎</button>'+
+        '<button class="db db-del" title="Delete" onclick="deleteExp(\''+e.id+'\')">🗑</button>'+
       '</td>'+
       '<td style="font-family:var(--mono);font-size:12px;color:var(--muted)">'+fmtDate(e.date)+'</td>'+
       '<td><span class="pill '+(e.who===NAMES.u1?'pn':'pz')+'">'+esc(e.who)+'</span></td>'+
