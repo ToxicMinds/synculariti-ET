@@ -4,50 +4,50 @@
 
 
 async function init() {
+  // 1. BOOT: Initialize Supabase
   const booted = await sysBootSupabase();
   if (!booted) {
     flash("Connection Error. Please refresh.", true);
     return;
   }
 
-  // Handle Auth Session
-  if (supabaseClient) {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    
-    if (!session) {
-      document.getElementById('auth-modal').classList.add('open');
-      document.getElementById('app').style.display = 'none';
-      return;
-    }
-
-    SESSION_JWT = session.access_token;
-    
-    // Fetch Household for this user
-    try {
-      const { data: userData, error: userError } = await supabaseClient
-        .from('app_users')
-        .select('household_id')
-        .eq('id', session.user.id)
-        .maybeSingle(); // Use maybeSingle to avoid 406/PGRST116 errors
-        
-      if (userError) throw userError;
-      if (userData && userData.household_id) {
-        HOUSEHOLD_ID = userData.household_id;
-      }
-    } catch (e) {
-      console.warn("Household mapping lookup failed - likely a new user.", e);
-    }
-  }
-
-  applyTranslations();
-
-  if (!HOUSEHOLD_ID) {
-    document.getElementById('auth-modal').classList.remove('open');
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('onboarding-modal').classList.add('open');
+  // 2. AUTH: Check for Session
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    document.getElementById('auth-modal').classList.add('open');
+    document.getElementById('app').style.display = 'none';
     return;
   }
+  SESSION_JWT = session.access_token;
 
+  // 3. HOUSEHOLD: Resolve Mapping
+  try {
+    const { data: userData, error: userError } = await supabaseClient
+      .from('app_users')
+      .select('household_id')
+      .eq('id', session.user.id)
+      .maybeSingle();
+      
+    if (userError) throw userError;
+    if (userData && userData.household_id) {
+      HOUSEHOLD_ID = userData.household_id;
+    }
+  } catch (e) {
+    console.warn("Household lookup failed:", e.message);
+  }
+
+  // Handle Translations early
+  applyTranslations();
+  document.getElementById('auth-modal').classList.remove('open');
+  document.getElementById('app').style.display = 'block';
+
+  // 4. READY or ONBOARD:
+  if (!HOUSEHOLD_ID) {
+    document.getElementById('onboarding-modal').classList.add('open');
+    return; 
+  }
+
+  // 5. DATA LOAD:
   setSyncing('s');
   try {
     var cState = await sbLoadState();

@@ -148,11 +148,21 @@ async function sysBootSupabase() {
     if(window.supabase) {
       supabaseClient = window.supabase.createClient(SB_URL, SB_KEY);
     }
-    return true;
+    return !!supabaseClient;
   } catch(e) {
     console.error("Critical: SDK boot failed", e);
     return false;
   }
+}
+
+function sbH(extra) {
+  var h = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SESSION_JWT,
+    'Content-Type': 'application/json'
+  };
+  if(extra) Object.assign(h, extra);
+  return h;
 }
 
 /* ═══════════════════════════════════════════════

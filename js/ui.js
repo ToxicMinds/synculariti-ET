@@ -823,29 +823,21 @@ async function provisionHousehold(name) {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) throw new Error("No active session");
     
-    // 1. Check if mapping already exists (e.g. if trigger worked)
-    const { data: existingMap } = await supabaseClient
-      .from('app_users')
-      .select('household_id')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    if (existingMap && existingMap.household_id) {
-      HOUSEHOLD_ID = existingMap.household_id;
-      return true; 
-    }
-
-    // 2. Create Household Row 
+    // 1. Create Household Row 
+    // We include created_by so our RLS SELECT policy works immediately
     const { data: hh, error: hErr } = await supabaseClient
       .from('households')
-      .insert({ name: name })
+      .insert({ 
+        name: name,
+        created_by: session.user.id 
+      })
       .select()
       .single();
     
     if (hErr) throw hErr;
-    if (!hh) throw new Error("Household creation returned no data");
+    if (!hh) throw new Error("Household creation failed (no data)");
 
-    // 3. Link User to Household 
+    // 2. Link User to Household 
     const { error: mErr } = await supabaseClient
       .from('app_users')
       .insert({ id: session.user.id, household_id: hh.id });
@@ -855,8 +847,8 @@ async function provisionHousehold(name) {
     HOUSEHOLD_ID = hh.id;
     return true;
   } catch(e) {
-    console.error("Manual provisioning failed", e);
-    throw e; // Propagate to finishOB
+    console.error("Provisioning failed:", e.message);
+    throw e;
   }
 }
 
