@@ -695,25 +695,46 @@ async function finishOB() {
 }
 
 async function provisionHousehold(name) {
-  // If the trigger failed, we manually create a household row and mapping
+  if (!supabaseClient) throw new Error("Storage engine not ready");
+  
   try {
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) return;
+    if (!session) throw new Error("No active session");
     
-    // Check if mapping exists
-    const { data: map } = await supabaseClient.from('app_users').select('household_id').eq('id', session.user.id).single();
-    if (map) {
-      HOUSEHOLD_ID = map.household_id;
-      return; 
+    // 1. Check if mapping already exists (e.g. if trigger worked)
+    const { data: existingMap } = await supabaseClient
+      .from('app_users')
+      .select('household_id')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    if (existingMap && existingMap.household_id) {
+      HOUSEHOLD_ID = existingMap.household_id;
+      return true; 
     }
 
-    // Create fresh
-    const { data: hh, error: hErr } = await supabaseClient.from('households').insert({ name: name }).select().single();
+    // 2. Create Household Row 
+    const { data: hh, error: hErr } = await supabaseClient
+      .from('households')
+      .insert({ name: name })
+      .select()
+      .single();
+    
     if (hErr) throw hErr;
-    await supabaseClient.from('app_users').insert({ id: session.user.id, household_id: hh.id });
+    if (!hh) throw new Error("Household creation returned no data");
+
+    // 3. Link User to Household 
+    const { error: mErr } = await supabaseClient
+      .from('app_users')
+      .insert({ id: session.user.id, household_id: hh.id });
+    
+    if (mErr) throw mErr;
+
     HOUSEHOLD_ID = hh.id;
+    return true;
   } catch(e) {
     console.error("Manual provisioning failed", e);
+    throw e; // Propagate to finishOB
   }
 }
 
