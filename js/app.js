@@ -14,6 +14,7 @@ async function init() {
       RULES   = cState.rules   || RULES;
       GOALS   = cState.goals   || GOALS;
       BANKS   = cState.banks   || BANKS;
+      GCAL    = cState.gcal    || GCAL;
       CATS = Object.keys(BUDGETS);
       TOTAL_B = CATS.reduce(function(s,k){return s+Number(BUDGETS[k])},0);
       localStorage.setItem('sf_names',   JSON.stringify(NAMES));
@@ -23,6 +24,7 @@ async function init() {
       localStorage.setItem('sf_rules',   JSON.stringify(RULES));
       localStorage.setItem('sf_goals',   JSON.stringify(GOALS));
       localStorage.setItem('sf_banks',   JSON.stringify(BANKS));
+      localStorage.setItem('sf_gcal',    JSON.stringify(GCAL));
       applyNamesUI(); applyCatsUI();
     }
     expenses = await sbSelect();
@@ -48,9 +50,21 @@ async function init() {
   /* Handle Enable Banking OAuth callback (?session_id=...) */
   var urlParams = new URLSearchParams(window.location.search);
   var ebSession = urlParams.get('session_id') || urlParams.get('code');
-  if(ebSession) {
+  if(ebSession && window.location.pathname.indexOf('google') === -1 && !urlParams.get('gcal_success')) {
     window.history.replaceState({}, document.title, window.location.pathname);
     handleEnableBankingCallback(ebSession);
+  }
+
+  /* Handle Google Calendar OAuth Callback */
+  var gcalSuccess = urlParams.get('gcal_success');
+  var gcalToken = urlParams.get('token');
+  if (gcalSuccess === 'true' && gcalToken) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    GCAL.enabled = true;
+    GCAL.token = gcalToken;
+    localStorage.setItem('sf_gcal', JSON.stringify(GCAL));
+    sbSaveState().catch(e => console.error("Could not persist GCAL token globally", e));
+    alert('Google Calendar has been successfully connected!');
   }
 
   setInterval(async function(){
@@ -66,11 +80,12 @@ async function init() {
           JSON.stringify(s.memory)  !== JSON.stringify(MEMORY)  ||
           JSON.stringify(s.rules)   !== JSON.stringify(RULES)   ||
           JSON.stringify(s.goals)   !== JSON.stringify(GOALS)   ||
-          JSON.stringify(s.banks)   !== JSON.stringify(BANKS)
+          JSON.stringify(s.banks)   !== JSON.stringify(BANKS)   ||
+          JSON.stringify(s.gcal)    !== JSON.stringify(GCAL)
         );
         if(changed) {
           NAMES=s.names||NAMES; INCOME=s.income||INCOME; BUDGETS=s.budgets||BUDGETS;
-          MEMORY=s.memory||MEMORY; RULES=s.rules||RULES; GOALS=s.goals||GOALS; BANKS=s.banks||BANKS;
+          MEMORY=s.memory||MEMORY; RULES=s.rules||RULES; GOALS=s.goals||GOALS; BANKS=s.banks||BANKS; GCAL=s.gcal||GCAL;
           CATS=Object.keys(BUDGETS); TOTAL_B=CATS.reduce(function(a,k){return a+Number(BUDGETS[k])},0);
           applyNamesUI(); applyCatsUI(); renderAll();
         }

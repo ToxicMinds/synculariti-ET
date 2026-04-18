@@ -284,6 +284,7 @@ function openSettings() {
   applyNamesUI();
   renderSettingsRules();
   renderBudgetsGrid();
+  renderIntegrations();
 }
 
 function closeSettings() {
@@ -405,6 +406,31 @@ function openBankPicker() {
 }
 
 function connectGoogleCalendar() {
-  alert('Redirecting to Google Calendar OAuth endpoint (api/google-calendar.js)...');
   window.location.href = '/api/google-calendar?action=auth';
+}
+
+function disconnectGoogleCalendar() {
+  if(!confirm('Disconnect Google Calendar?')) return;
+  GCAL.enabled = false;
+  GCAL.token = null;
+  localStorage.setItem('sf_gcal', JSON.stringify(GCAL));
+  sbSaveState().catch(()=>{});
+  renderIntegrations();
+}
+
+function renderIntegrations() {
+  var btn = document.getElementById('btn-gcal-connect');
+  if(!btn) return;
+  
+  if (GCAL && GCAL.enabled) {
+    btn.textContent = 'Connected (Disconnect)';
+    btn.style.background = 'var(--bg)';
+    btn.style.color = 'var(--text)';
+    btn.onclick = disconnectGoogleCalendar;
+  } else {
+    btn.textContent = 'Connect';
+    btn.style.background = 'var(--nikhil-light)';
+    btn.style.color = 'var(--nikhil)';
+    btn.onclick = connectGoogleCalendar;
+  }
 }

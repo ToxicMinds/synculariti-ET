@@ -28,6 +28,7 @@ var MEMORY  = JSON.parse(localStorage.getItem('sf_memory')) || {};
 var RULES   = JSON.parse(localStorage.getItem('sf_rules'))  || []; /* [{id,pattern,category}] */
 var GOALS   = JSON.parse(localStorage.getItem('sf_goals'))  || []; /* [{id,name,target,saved,deadline}] */
 var BANKS   = JSON.parse(localStorage.getItem('sf_banks'))  || []; /* [{institution_id,name,requisition_id}] */
+var GCAL    = JSON.parse(localStorage.getItem('sf_gcal'))   || { enabled: false, token: null };
 
 /* ═══════════════════════════════════════════════
    STATE
@@ -104,7 +105,8 @@ async function sbSaveState() {
   dbg('Supabase SAVE STATE', {}, true);
   var configObj = {
     names: NAMES, income: INCOME, budgets: BUDGETS,
-    memory: MEMORY, rules: RULES, goals: GOALS, banks: BANKS
+    memory: MEMORY, rules: RULES, goals: GOALS, banks: BANKS,
+    gcal: GCAL
   };
   var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.global', {
     method:'PATCH', headers:sbH({'Prefer':'return=minimal'}), body:JSON.stringify({config: configObj})
