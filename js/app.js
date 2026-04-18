@@ -2,6 +2,7 @@
    MAIN APP INSTANCE & BINDINGS
 ═══════════════════════════════════════════════ */
 
+
 async function init() {
   const booted = await sysBootSupabase();
   if (!booted) {
@@ -27,21 +28,25 @@ async function init() {
         .from('app_users')
         .select('household_id')
         .eq('id', session.user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid 406/PGRST116 errors
         
       if (userError) throw userError;
       if (userData && userData.household_id) {
         HOUSEHOLD_ID = userData.household_id;
       }
     } catch (e) {
-      console.error("Household mapping failed", e);
-      // Fallback to a default if absolutely necessary, but usually auth handles it via triggers
+      console.warn("Household mapping lookup failed - likely a new user.", e);
     }
   }
 
-  document.getElementById('auth-modal').classList.remove('open');
-  document.getElementById('app').style.display = 'block';
   applyTranslations();
+
+  if (!HOUSEHOLD_ID) {
+    document.getElementById('auth-modal').classList.remove('open');
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('onboarding-modal').classList.add('open');
+    return;
+  }
 
   setSyncing('s');
   try {

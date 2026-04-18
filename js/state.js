@@ -242,10 +242,11 @@ async function sbUpdate(id, row) {
 }
 
 async function sbLoadState() {
+  if (!HOUSEHOLD_ID) return null;
   dbg('Supabase LOAD STATE', {}, true);
-  var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.' + HOUSEHOLD_ID + '&select=config', {headers:sbH()});
-  var b = await r.json();
+  var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.' + encodeURIComponent(HOUSEHOLD_ID) + '&select=config', {headers:sbH()});
   if(!r.ok) return null;
+  var b = await r.json();
   if(b && b.length > 0) return b[0].config;
   return null;
 }
