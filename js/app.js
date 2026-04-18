@@ -79,6 +79,10 @@ async function init() {
 
     expenses = await sbSelect();
     dbg('Loaded '+expenses.length+' rows');
+    
+    // Load Recurring
+    await sbSelectRecurring();
+    
     setSyncing('ok');
   } catch(e) {
     setSyncing('e');
@@ -138,7 +142,16 @@ async function init() {
           MEMORY=s.memory||MEMORY; RULES=s.rules||RULES; GOALS=s.goals||GOALS; BANKS=s.banks||BANKS; GCAL=s.gcal||GCAL;
           CATS=Object.keys(BUDGETS); TOTAL_B=CATS.reduce(function(a,k){return a+Number(BUDGETS[k])},0);
           applyNamesUI(); applyCatsUI(); renderAll();
-        }
+          const projected = getProjectedRecurring(expenses);
+  const projEl = document.getElementById('projected-savings-val');
+  if (projEl) {
+    const totInc = Object.values(INCOME).reduce((a,b)=>a+Number(b), 0);
+    const totExp = expenses.reduce((a,b)=>a+Number(b.amount), 0);
+    const projSavings = totInc - (totExp + projected);
+    projEl.textContent = (projSavings < 0 ? '-' : '') + '€' + Math.abs(projSavings).toFixed(2);
+    projEl.className = 'cv ' + (projSavings < 0 ? 'bad' : 'good');
+  }
+}
       }
       if(JSON.stringify(r)!==JSON.stringify(expenses)){expenses=r;initMonths();renderAll();}
     }catch(e){}

@@ -484,3 +484,46 @@ async function generateInsights(month) {
     document.getElementById('insights-body').innerHTML = '<div class="status-box error">'+esc(e.message)+'</div>';
   }
 }
+
+/* ═══════════════════════════════════════════════
+   AI BULK PROCESSING (BANK STATEMENTS)
+═══════════════════════════════════════════════ */
+async function aiProcessBulkTransactions(text) {
+  var prompt = 
+    'Analyze this bank statement text or CSV content. Extract EVERY valid transaction.\n' +
+    'Each transaction must have: date (YYYY-MM-DD), who (e.g. Nik), amount (positive number), category, description.\n\n' +
+    'Rules:\n' +
+    '- Current Categories: ' + CATS.join(', ') + '\n' +
+    '- Default "who" to: ' + (NAMES.u1 || 'You') + '\n' +
+    '- Clean descriptions (e.g. "TESCO STORES 1234" -> "Tesco")\n\n' +
+    'Input Text:\n' + text + '\n\n' +
+    'Return ONLY a JSON array of objects: [{"date":"...","who":"...","amount":12.34,"category":"...","description":"..."}]';
+
+  var payload = {
+    model: 'llama-3.3-70b-versatile',
+    max_tokens: 4000,
+    temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: 'You are a bank statement parser. Always respond with a JSON object containing a "transactions" array.' },
+      { role: 'user', content: prompt }
+    ]
+  };
+
+  dbg('Groq API Call (Bulk Statement)', {length: text.length}, true);
+
+  const res = await fetch(GROQ, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const rb = await res.json();
+  if (!res.ok) throw new Error(rb.error ? rb.error.message : 'Groq error');
+
+  const content = rb.choices[0].message.content.trim();
+  const parsed = JSON.parse(content);
+  const txs = parsed.transactions || parsed;
+  
+  return Array.isArray(txs) ? txs : [];
+}
+

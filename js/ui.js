@@ -221,9 +221,15 @@ function renderCards(){
   const rc = rem < 0 ? 'bad' : rem < TOTAL_B * 0.2 ? 'warn' : 'good';
   const sc = svgs < 0 ? 'bad' : 'good';
 
+  const totalIncome = Object.values(INCOME).reduce((a,b)=>a+Number(b), 0);
+  const projected = getProjectedRecurring(all);
+  const projSavings = totalIncome - (tot + projected);
+  const psc = projSavings < 0 ? 'bad' : 'good';
+  
   let html = `
     <div class="card"><div class="cl">${t('Total spent')}</div><div class="cv">${fmt(tot)}</div><div class="cs">${pct}% of €${TOTAL_B} budget</div></div>
     <div class="card"><div class="cl">${t('Remaining')}</div><div class="cv ${rc}">${(rem < 0 ? '-' : '') + fmt(Math.abs(rem))}</div><div class="cs">${rem < 0 ? t('Over budget') : t('Left this month')}</div></div>
+    <div class="card"><div class="cl">Proj. Savings</div><div class="cv ${psc}">${(projSavings < 0 ? '-' : '') + fmt(Math.abs(projSavings))}</div><div class="cs">incl. €${projected} expected</div></div>
   `;
 
   userKeys.forEach((k, i) => {
@@ -873,3 +879,146 @@ function toggleTheme() {
   }
   if(typeof renderCards === 'function') renderCards();
 }
+
+/* ═══════════════════════════════════════════════
+   RECURRING BILLS UI
+═══════════════════════════════════════════════ */
+async function openSettings() {
+  document.getElementById('settings-modal').classList.add('open');
+  await renderRecurring();
+}
+
+async function renderRecurring() {
+  const list = document.getElementById('set-recurring-list');
+  if (!list) return;
+  list.innerHTML = '<span class="spin"></span>';
+  
+  const recs = await sbSelectRecurring();
+  if (recs.length === 0) {
+    list.innerHTML = '<div style="font-size:12px; color:var(--muted)">No recurring bills added.</div>';
+    return;
+  }
+  
+  list.innerHTML = recs.map(r => `
+    <div class="bank-item">
+      <div class="bank-info">
+        <div class="bank-name">${esc(r.name)}</div>
+        <div class="bank-status">€${r.amount} - ${r.category} - Day ${r.day_of_month} (${r.who})</div>
+      </div>
+      <button class="db db-del" onclick="deleteRecurringUI('${r.id}')">&times;</button>
+    </div>
+  `).join('');
+}
+
+async function addRecurringUI() {
+  const name = prompt("Bill Name (e.g. Netflix):");
+  if (!name) return;
+  const amt = prompt("Amount (€):", "15.00");
+  const cat = prompt("Category:", "Entertainment");
+  const day = prompt("Day of Month (1-31):", "1");
+  const who = prompt("Who pays? (e.g. Nik):", NAMES.u1 || "You");
+  
+  try {
+    await sbSaveRecurring({
+      name,
+      amount: parseFloat(amt),
+      category: cat,
+      day_of_month: parseInt(day),
+      who
+    });
+    renderRecurring();
+    renderCards();
+  } catch(e) { flash("Failed to save recurring bill", true); }
+}
+
+async function deleteRecurringUI(id) {
+  if (!confirm("Delete this recurring bill?")) return;
+  await sbDeleteRecurring(id);
+  renderRecurring();
+  renderCards();
+}
+
+/* ═══════════════════════════════════════════════
+   AI STATEMENT ANALYZER UI
+═══════════════════════════════════════════════ */
+let analyzedTransactions = [];
+
+function openAnalyzer() {
+  document.getElementById('analyzer-modal').classList.add('open');
+}
+function closeAnalyzer() {
+  document.getElementById('analyzer-modal').classList.remove('open');
+  document.getElementById('analyzer-results').style.display = 'none';
+  document.getElementById('analyzer-input').value = '';
+}
+
+function onStatementFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    document.getElementById('analyzer-input').value = evt.target.result;
+    flash("File loaded into analyzer!");
+  };
+  reader.readAsText(file);
+}
+
+async function processStatementAI() {
+  const text = document.getElementById('analyzer-input').value.trim();
+  if (!text) { flash("Please paste transactions or upload a file", true); return; }
+  
+  const btn = document.getElementById('lbl-btn-analyze');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Analyzing...';
+  
+  try {
+    // Process via Groq AI
+    analyzedTransactions = await aiProcessBulkTransactions(text);
+    
+    document.getElementById('analyzer-results').style.display = 'block';
+    const list = document.getElementById('analyzer-list');
+    list.innerHTML = analyzedTransactions.map((t, idx) => `
+      <div class="pitem">
+        <input type="checkbox" checked id="ana-${idx}">
+        <div class="pinm">
+          <strong>${t.description}</strong><br>
+          <small>${t.date} | ${t.who}</small>
+        </div>
+        <div class="piam">€${t.amount}</div>
+        <div class="picat">
+          <select id="ana-cat-${idx}">
+            ${CATS.map(c => `<option ${c===t.category ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    `).join('');
+    
+  } catch(e) {
+    flash("AI Analysis failed: " + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analyze with Groq AI";
+  }
+}
+
+async function confirmAnalyzerResults() {
+  const toSave = [];
+  analyzedTransactions.forEach((t, idx) => {
+    if (document.getElementById(`ana-${idx}`).checked) {
+      t.category = document.getElementById(`ana-cat-${idx}`).value;
+      toSave.push(t);
+    }
+  });
+  
+  if (toSave.length === 0) return;
+  
+  flash(`Importing ${toSave.length} transactions...`);
+  for (const t of toSave) {
+    await sbInsert(t);
+  }
+  
+  closeAnalyzer();
+  renderAll();
+  flash("Successfully imported all verified transactions!", false);
+}
+

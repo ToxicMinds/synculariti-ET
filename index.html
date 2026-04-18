@@ -241,6 +241,15 @@
 
   <div style="margin-bottom:1.5rem">
     <div class="pgtitle">
+      <span id="lbl-set-recurring">Recurring Bills (Monthly)</span>
+      <button class="btn-g" id="lbl-btn-add-recurring" style="padding:2px 8px;font-size:11px" onclick="addRecurringUI()">+ Add Bill</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="lbl-set-recurring-sub">Automated monthly entries (Rent, Netflix, etc.)</div>
+    <div id="set-recurring-list"></div>
+  </div>
+
+  <div style="margin-bottom:1.5rem">
+    <div class="pgtitle">
       <span id="lbl-set-integrations">Integrations</span>
     </div>
     <div style="display:flex; justify-content:space-between; align-items:center; border: 1px solid var(--border); padding: 10px; border-radius: var(--r);">
@@ -280,6 +289,7 @@
     <div class="topbar-r">
       <div class="sync"><div class="dot s" id="sdot"></div><span id="slbl">loading</span></div>
       <select class="msel" id="msel" onchange="renderAll()"></select>
+      <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="openAnalyzer()" title="AI Statement Analyzer">🧠</button>
       <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="openInsights()" title="Financial AI Advisor">💡</button>
       <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="window.print()" title="Print / Export PDF">🖨</button>
       <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="toggleTheme()" title="Toggle Light/Dark Theme">🌗</button>
@@ -429,8 +439,44 @@
 </div>
 
 
+<!-- ══ STATEMENT ANALYZER MODAL ══ -->
+<div class="mbk" id="analyzer-modal">
+<div class="modal" style="max-width:640px">
+  <button class="mclose" onclick="closeAnalyzer()">&#x2715;</button>
+  <div class="mtitle" id="lbl-analyzer-title">🧠 AI Statement Analyzer</div>
+  <div class="msub" id="lbl-analyzer-sub">Paste transactions from your bank app or upload a CSV file. Groq AI will categorize everything automatically.</div>
+  
+  <div class="tw" style="padding:1rem; margin-bottom:1rem">
+    <textarea id="analyzer-input" placeholder="Paste transactions here... 
+Example:
+Yesterday - Starbucks - 5.40
+15/04 - Rent - 800.00" style="width:100%; height:150px; font-family:var(--mono); font-size:12px; border:1px solid var(--border); border-radius:var(--r); padding:10px; background:var(--bg); color:var(--text); outline:none;"></textarea>
+    
+    <div class="or-row" id="lbl-analyzer-or">OR UPLOAD FILE</div>
+    
+    <label class="uzone" id="analyzer-dropzone" style="display:block">
+      <input type="file" id="analyzer-file-input" accept=".csv,.txt" style="display:none" onchange="onStatementFileSelect(event)">
+      <strong>📄 Choose CSV or TXT file</strong>
+      <p>Professional bank exports are supported</p>
+    </label>
+  </div>
+
+  <div class="cbar">
+    <button class="btn btn-p" id="lbl-btn-analyze" onclick="processStatementAI()" style="margin-top:0">Analyze with Groq AI</button>
+    <button class="btn btn-g" onclick="closeAnalyzer()">Cancel</button>
+  </div>
+  
+  <div id="analyzer-results" style="margin-top:1.5rem; display:none;">
+    <div class="pgtitle">Analysis Results</div>
+    <div id="analyzer-list" style="margin-bottom:1rem"></div>
+    <button class="btn btn-p" onclick="confirmAnalyzerResults()">Import Verified Transactions</button>
+  </div>
+</div>
+</div>
+
 <script src="./js/state.js"></script>
 <script src="./js/api.js"></script>
+<script src="./js/logic-recurring.js"></script>
 <script src="./js/ui.js"></script>
 <script src="./js/app.js"></script>
 <script>
