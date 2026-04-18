@@ -434,3 +434,27 @@ function renderIntegrations() {
     btn.onclick = connectGoogleCalendar;
   }
 }
+
+/* ═══════════════════════════════════════════════
+   APP LOCK MECHANICS
+═══════════════════════════════════════════════ */
+var APP_PIN = '2026'; // Fast hardcoded PIN
+
+function verifyAppPin() {
+  var v = document.getElementById('pin-input').value;
+  var err = document.getElementById('pin-error');
+  if (v === APP_PIN) {
+    sessionStorage.setItem('sf_unlocked', '1');
+    document.getElementById('pin-modal').classList.remove('open');
+    err.textContent = '';
+  } else {
+    document.getElementById('pin-input').value = '';
+    err.textContent = 'Incorrect PIN';
+  }
+}
+
+function enforceAppLock() {
+  if (sessionStorage.getItem('sf_unlocked') !== '1') {
+    document.getElementById('pin-modal').classList.add('open');
+  }
+}

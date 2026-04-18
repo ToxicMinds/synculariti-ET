@@ -23,6 +23,18 @@
 <button id="dbgtog" onclick="toggleDbg()">dbg</button>
 <div id="dbgpanel"></div>
 
+<!-- ══ PIN LOCK MODAL ══ -->
+<div class="mbk" id="pin-modal" style="background:var(--bg); z-index:9999;">
+  <div class="modal" style="max-width:320px; text-align:center;">
+    <div style="font-size:40px; margin-bottom:10px;">🔒</div>
+    <div class="mtitle">Private Access</div>
+    <div class="msub" style="margin-bottom:1.25rem">Enter PIN to unlock</div>
+    <input type="password" id="pin-input" style="text-align:center; letter-spacing:8px; font-size:24px; font-family:var(--mono); margin-bottom:0.5rem;" maxlength="4" placeholder="••••" onkeyup="if(event.key==='Enter')verifyAppPin()">
+    <div id="pin-error" style="color:var(--danger); font-size:12px; height:16px; margin-bottom:0.5rem;"></div>
+    <button class="btn btn-p" onclick="verifyAppPin()" style="margin-top:0">Unlock</button>
+  </div>
+</div>
+
 <!-- ══ SCANNER MODAL ══ -->
 <div class="mbk" id="scan-modal">
 <div class="modal">

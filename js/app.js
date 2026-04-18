@@ -3,6 +3,7 @@
 ═══════════════════════════════════════════════ */
 
 async function init() {
+  enforceAppLock();
   setSyncing('s');
   try {
     var cState = await sbLoadState();
