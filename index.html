@@ -301,14 +301,42 @@
       <div class="card"><div class="cl">Status</div><div class="cv" style="font-size:14px"><span class="spin"></span> Connecting…</div></div>
     </div>
     
+    <div class="th" style="margin-bottom:1rem; border:none; padding:0">
+        <div class="tt" id="lbl-analytics-title">Advanced Analytics</div>
+        <div class="fi">
+            <button class="btn-g" style="padding:2px 8px;font-size:11px" onclick="toggleAnalysisMode()" id="analysisToggleBtn">6-Month Trends</button>
+        </div>
+    </div>
+    
     <div class="charts-wrap" id="charts-wrap" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom:1.25rem;">
-      <div class="card" style="padding-top:1rem; min-height: 250px; position:relative;">
-        <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)">Spent by User</div>
-        <div style="position:relative; height: 200px; width:100%"><canvas id="chart-users"></canvas></div>
+      <!-- Standard Monthly Charts -->
+      <div id="monthly-charts" style="display:contents">
+          <div class="card" style="padding-top:1rem; min-height: 250px; position:relative;">
+            <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)" id="lbl-chart-spent-user">Spent by User</div>
+            <div style="position:relative; height: 200px; width:100%"><canvas id="chart-users"></canvas></div>
+          </div>
+          <div class="card" style="padding-top:1rem; min-height: 250px; position:relative;">
+            <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)" id="lbl-chart-cat-break">Category Breakdown</div>
+            <div style="position:relative; height: 200px; width:100%"><canvas id="chart-cats"></canvas></div>
+          </div>
       </div>
-      <div class="card" style="padding-top:1rem; min-height: 250px; position:relative;">
-        <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)">Category Breakdown</div>
-        <div style="position:relative; height: 200px; width:100%"><canvas id="chart-categories"></canvas></div>
+
+      <!-- Advanced Analysis Charts (Hidden by default) -->
+      <div id="advanced-charts" style="display:none; grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; width:100%">
+          <div class="card" style="padding-top:1rem; min-height: 300px; position:relative; grid-column: 1 / -1">
+            <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)">6-Month Spending Trends</div>
+            <div style="position:relative; height: 250px; width:100%"><canvas id="chart-trends"></canvas></div>
+          </div>
+          <div class="card" style="padding-top:1rem; min-height: 250px; position:relative;">
+            <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)">Spending Heatmap (Daily Hotspots)</div>
+            <div id="heatmap-container" style="height:200px; display:flex; align-items:center; justify-content:center">
+                <span class="spin"></span>
+            </div>
+          </div>
+          <div class="card" style="padding-top:1rem; min-height: 250px; position:relative;">
+            <div style="text-align:center; font-weight:500; margin-bottom:8px; font-size:13px; color:var(--muted)">Category Concentration</div>
+            <div style="position:relative; height: 200px; width:100%"><canvas id="chart-radar"></canvas></div>
+          </div>
       </div>
     </div>
 

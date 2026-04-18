@@ -135,12 +135,26 @@ function renderAll(){
 }
 
 var viewMode = 'log'; // 'log' or 'calendar'
+var analysisMode = 'monthly'; // 'monthly' or 'advanced'
+
 function toggleViewMode() {
   viewMode = viewMode === 'log' ? 'calendar' : 'log';
   document.getElementById('viewToggleBtn').textContent = viewMode === 'log' ? 'List View' : 'Calendar View';
   document.getElementById('log-container').style.display = viewMode === 'log' ? 'block' : 'none';
   document.getElementById('calendar-container').style.display = viewMode === 'log' ? 'none' : 'block';
   renderAll();
+}
+
+function toggleAnalysisMode() {
+  analysisMode = analysisMode === 'monthly' ? 'advanced' : 'monthly';
+  document.getElementById('analysisToggleBtn').textContent = analysisMode === 'monthly' ? '6-Month Trends' : 'Monthly View';
+  document.getElementById('monthly-charts').style.display = analysisMode === 'monthly' ? 'contents' : 'none';
+  document.getElementById('advanced-charts').style.display = analysisMode === 'monthly' ? 'none' : 'grid';
+  if (analysisMode === 'advanced') {
+    renderTrends();
+    renderRadar();
+    renderHeatmap();
+  }
 }
 
 async function renderCalendar() {
@@ -479,13 +493,28 @@ function renderGoals() {
   
   list.innerHTML = GOALS.map(function(g) {
     var p = Math.min(100, Math.round((g.saved / g.target) * 100));
-    var dl = g.deadline ? 'Target: '+new Date(g.deadline).toLocaleDateString('en-GB') : '';
-    return '<div class="goal-row">'+
-           '<div class="goal-top"><div class="goal-name">'+esc(g.name)+'</div>'+
-           '<div class="goal-amt">€'+fmt(g.saved)+' / €'+fmt(g.target)+' <button class="db" style="margin-left:8px" onclick="deleteGoal(\''+g.id+'\')">×</button></div></div>'+
-           '<div class="goal-track"><div class="goal-fill" style="width:'+p+'%"></div></div>'+
-           '<div class="goal-dleft">'+p+'% funded '+(dl?' • '+dl:'')+'</div>'+
-           '</div>';
+    var dl = g.deadline ? t('Target') + ': ' + new Date(g.deadline).toLocaleDateString(LANG === 'sk' ? 'sk-SK' : 'en-GB') : '';
+    
+    // Premium Goal Card with visual accent
+    const color = p >= 100 ? 'var(--accent)' : (p > 50 ? 'var(--info)' : 'var(--muted)');
+
+    return `
+      <div class="panel" style="border-left: 4px solid ${color}; padding: 1rem; margin-bottom: 0.75rem;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 0.5rem;">
+          <div>
+            <div style="font-weight:600; font-size:14px; color:var(--text)">${esc(g.name)}</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;">${p}% ${t('Remaining')} • ${dl}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--mono); font-size:14px; font-weight:600; color:${color}">€${fmt(g.saved)}</div>
+            <div style="font-size:10px; color:var(--muted)">of €${fmt(g.target)}</div>
+          </div>
+        </div>
+        <div class="goal-track" style="height:8px; background:var(--bg); border-radius:10px;">
+          <div class="goal-fill" style="width:${p}%; background:${color}; border-radius:10px; transition:width 1s cubic-bezier(0.34, 1.56, 0.64, 1)"></div>
+        </div>
+        <button class="db-del" style="position:absolute; top:8px; right:8px; font-size:14px; border:none; background:none; cursor:pointer;" onclick="deleteGoal('${g.id}')">&times;</button>
+      </div>`;
   }).join('');
 }
 
@@ -1021,4 +1050,134 @@ async function confirmAnalyzerResults() {
   renderAll();
   flash("Successfully imported all verified transactions!", false);
 }
+
+/* ═══════════════════════════════════════════════
+   ADVANCED ANALYTICS (ROADMAP PHASE 3)
+═══════════════════════════════════════════════ */
+let chartTrends, chartRadar;
+
+function renderTrends() {
+  const ctx = document.getElementById('chart-trends')?.getContext('2d');
+  if (!ctx || typeof Chart === 'undefined') return;
+
+  const labels = [];
+  const spendData = [];
+  const incomeData = [];
+
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mStr = d.toISOString().slice(0, 7);
+    labels.push(d.toLocaleString(LANG === 'sk' ? 'sk-SK' : 'en-US', { month: 'short' }));
+    
+    const mExpenses = expenses.filter(e => e.date && e.date.startsWith(mStr));
+    const mTotal = mExpenses.reduce((s, e) => s + Number(e.amount), 0);
+    spendData.push(mTotal);
+    
+    incomeData.push(Object.values(INCOME).reduce((a, b) => a + Number(b), 0));
+  }
+
+  if (chartTrends) chartTrends.destroy();
+  chartTrends = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: t('Spent'),
+          data: spendData,
+          borderColor: 'var(--accent)',
+          backgroundColor: 'rgba(37, 99, 235, 0.1)',
+          fill: true,
+          tension: 0.4
+        },
+        {
+          label: t('Income') || 'Income',
+          data: incomeData,
+          borderColor: 'var(--info)',
+          borderDash: [5, 5],
+          tension: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderRadar() {
+  const ctx = document.getElementById('chart-radar')?.getContext('2d');
+  if (!ctx || typeof Chart === 'undefined') return;
+
+  const catTotals = {};
+  const m = curMonth();
+  expenses.filter(e => e.date && e.date.startsWith(m)).forEach(e => {
+    catTotals[e.category] = (catTotals[e.category] || 0) + Number(e.amount);
+  });
+
+  const labels = CATS;
+  const data = labels.map(c => catTotals[c] || 0);
+
+  if (chartRadar) chartRadar.destroy();
+  chartRadar = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: t('Current Month'),
+        data: data,
+        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+        borderColor: 'var(--nikhil)',
+        pointBackgroundColor: 'var(--nikhil)'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          angleLines: { color: 'rgba(0,0,0,0.1)' },
+          grid: { color: 'rgba(0,0,0,0.1)' },
+          suggestedMin: 0
+        }
+      }
+    }
+  });
+}
+
+function renderHeatmap() {
+  const container = document.getElementById('heatmap-container');
+  if (!container) return;
+
+  const m = curMonth();
+  const dateParts = m.split('-');
+  const daysInMonth = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]), 0).getDate();
+  const daySpend = new Array(daysInMonth).fill(0);
+
+  expenses.filter(e => e.date && e.date.startsWith(m)).forEach(e => {
+    const d = parseInt(e.date.split('-')[2]);
+    if (d > 0 && d <= daysInMonth) daySpend[d - 1] += Number(e.amount);
+  });
+
+  const max = Math.max(...daySpend, 1);
+  
+  let html = '<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; width:100%">';
+  daySpend.forEach((s, i) => {
+    const alpha = Math.min(1, s / (max * 0.7));
+    const color = s > 0 ? `rgba(59, 130, 246, ${Math.max(0.1, alpha)})` : 'var(--bg)';
+    html += `<div title="Day ${i+1}: €${s.toFixed(2)}" style="height:24px; border-radius:3px; background:${color}; border:1px solid var(--border)"></div>`;
+  });
+  html += '</div>';
+  
+  container.innerHTML = html;
+}
+
 
