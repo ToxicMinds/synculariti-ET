@@ -509,7 +509,7 @@ async function syncAllToGCal() {
   const status = document.getElementById('gcal-status');
   status.textContent = "Syncing... 0%";
   
-  // Clone to avoid mutation during loop
+  // Clone to avoid mutation
   const toSync = [...expenses];
   let success = 0;
   
@@ -517,7 +517,6 @@ async function syncAllToGCal() {
     await syncToGCal(toSync[i]);
     success++;
     status.textContent = `Syncing... ${Math.round((success / toSync.length) * 100)}%`;
-    // Tiny delay to prevent browser locking
     if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
   }
   

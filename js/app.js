@@ -175,6 +175,7 @@ async function addExpense() {
       await sbInsert(row);
       row.created_at=new Date().toISOString();
       expenses.unshift(row);
+      syncToGCal(row); // Auto-sync to GCal
       document.getElementById('famt').value='';
       document.getElementById('fdesc').value='';
       initMonths(); document.getElementById('msel').value=date.slice(0,7);
@@ -335,8 +336,8 @@ async function confirmReview() {
         await sbInsert(row);
         row.created_at = new Date().toISOString();
         expenses.unshift(row);
+        syncToGCal(row); // Auto-sync to GCal
         addedCount++;
-        await syncToGCal(row);
         
         if (MEMORY[nm] !== cat) {
           MEMORY[nm] = cat;
