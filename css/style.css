@@ -218,3 +218,38 @@ tbody tr:last-child td{border-bottom:none}
   table{font-size:11px}
   .tw{border:1px solid #ccc;border-radius:0}
 }
+
+/* ── calendar ── */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.calendar-day {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: background 0.2s;
+  min-height: 80px;
+  position: relative;
+}
+.calendar-day:hover {
+  background: var(--bg);
+}
+.calendar-day.has-invoice {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.calendar-day .day-num {
+  font-size: 14px;
+  font-weight: 500;
+}
+.calendar-day .inv-amt {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+}

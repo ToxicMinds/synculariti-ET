@@ -100,7 +100,81 @@ function renderAll(){
   renderBudget();
   renderGoals();
   renderBankSync();
-  renderLog();
+  if (viewMode === 'log') {
+    renderLog();
+  } else {
+    renderCalendar();
+  }
+}
+
+var viewMode = 'log'; // 'log' or 'calendar'
+function toggleViewMode() {
+  viewMode = viewMode === 'log' ? 'calendar' : 'log';
+  document.getElementById('viewToggleBtn').textContent = viewMode === 'log' ? 'List View' : 'Calendar View';
+  document.getElementById('log-container').style.display = viewMode === 'log' ? 'block' : 'none';
+  document.getElementById('calendar-container').style.display = viewMode === 'log' ? 'none' : 'block';
+  renderAll();
+}
+
+async function renderCalendar() {
+  var monthEl = document.getElementById('calendar-grid');
+  if(!monthEl) return;
+  var month = curMonth(); // e.g., "2023-04"
+  
+  if (!month) return;
+  var parts = month.split('-');
+  var y = parseInt(parts[0]);
+  var m = parseInt(parts[1]);
+  
+  var daysInMonth = new Date(y, m, 0).getDate();
+  
+  monthEl.innerHTML = '<div style="grid-column:1/-1; text-align:center;"><span class="spin"></span></div>';
+  
+  try {
+    var invoices = await fetch(REST_INVOICES + '?date=gte.' + month + '-01&date=lte.' + month + '-' + daysInMonth, {headers:sbH()})
+      .then(r => r.json());
+      
+    var html = '';
+    // Basic grid logic (skipping start-of-month padding for brevity, just listing day boxes)
+    for(var d=1; d<=daysInMonth; d++) {
+      var dateStr = month + '-' + String(d).padStart(2,'0');
+      var dayInvs = invoices.filter(i => i.date === dateStr);
+      
+      var cls = dayInvs.length > 0 ? 'calendar-day has-invoice' : 'calendar-day';
+      var sum = dayInvs.reduce((acc, i) => acc + (parseFloat(i.total_amount)||0), 0);
+      var inner = '<div class="day-num">' + d + '</div>';
+      
+      // If total is 0, we can map to expenses sum if we had it, but for UI sake show invoice count or nothing if old method
+      if(dayInvs.length > 0) {
+        inner += '<div class="inv-amt">' + dayInvs.length + ' inv</div>';
+      }
+      
+      html += '<div class="' + cls + '" onclick="showDayDetails(\'' + dateStr + '\')">' + inner + '</div>';
+    }
+    monthEl.innerHTML = html;
+  } catch(e) {
+    monthEl.innerHTML = '<div style="grid-column:1/-1; color: var(--danger)">Failed to load invoices.</div>';
+  }
+}
+
+function showDayDetails(dateStr) {
+  // Simple prompt/alert for now
+  // Real implementation would render #calendar-details with child expenses
+  var exps = expenses.filter(e => e.date === dateStr && e.invoice_id);
+  if(exps.length===0) {
+    document.getElementById('calendar-details').innerHTML = '<div class="te">No invoice details for ' + dateStr + '</div>';
+    return;
+  }
+  var html = '<div style="font-weight:500;margin-bottom:8px;">Details for ' + dateStr + '</div>';
+  html += '<div style="background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:10px;">';
+  exps.forEach(e => {
+    html += '<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:4px 0;">';
+    html += '<span>' + esc(e.description||'Item') + '</span>';
+    html += '<span style="font-family:var(--mono);">€' + fmt(e.amount) + '</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('calendar-details').innerHTML = html;
 }
 
 function renderCards(){
@@ -328,4 +402,9 @@ function renderBudgetsGrid() {
 function openBankPicker() {
   document.getElementById('bank-picker-modal').classList.add('open');
   loadBanks();
+}
+
+function connectGoogleCalendar() {
+  alert('Redirecting to Google Calendar OAuth endpoint (api/google-calendar.js)...');
+  window.location.href = '/api/google-calendar?action=auth';
 }

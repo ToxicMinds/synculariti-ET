@@ -6,6 +6,7 @@ var SB_KEY  = 'sb_publishable_qJGOiVaWDrd9Fq6EUJvGUg_a8VrWCUx';
 var GROQ    = '/api/groq';
 var ENABLE_BANKING = '/api/enablebanking';
 var REST    = SB_URL + '/rest/v1/expenses';
+var REST_INVOICES = SB_URL + '/rest/v1/invoices';
 var EKASA   = '/ekasa-proxy/receipt/find';
 
 /* ═══════════════════════════════════════════════
@@ -58,11 +59,23 @@ async function sbSelect() {
   return JSON.parse(b);
 }
 async function sbInsert(row) {
-  dbg('INSERT id='+row.id, row, true);
+  dbg('INSERT expense (invoice_id=' + (row.invoice_id || 'null') + ') id='+row.id, row, true);
   var r = await fetch(REST, {method:'POST', headers:sbH({'Prefer':'return=minimal'}), body:JSON.stringify(row)});
   var b = await r.text();
   dbg('INSERT '+r.status, b ? b.slice(0,80) : 'OK', true);
   if (!r.ok) throw new Error('Save failed '+r.status+': '+b.slice(0,300));
+}
+
+async function sbCreateInvoice(invoice) {
+  dbg('CREATE invoice', invoice, true);
+  var r = await fetch(REST_INVOICES, {
+    method: 'POST',
+    headers: sbH({'Prefer': 'return=representation'}),
+    body: JSON.stringify(invoice)
+  });
+  var data = await r.json();
+  if (!r.ok) throw new Error(data.error?.message || 'Invoice creation failed');
+  return data[0];
 }
 async function sbDelete(id) {
   dbg('DELETE id='+id, {}, true);
