@@ -131,7 +131,7 @@ async function renderCalendar() {
   monthEl.innerHTML = '<div style="grid-column:1/-1; text-align:center;"><span class="spin"></span></div>';
   
   try {
-    var invoices = await fetch(REST_INVOICES + '?date=gte.' + month + '-01&date=lte.' + month + '-' + daysInMonth, {headers:sbH()})
+    var invoices = await fetch(REST_INVOICES + '?household_id=eq.' + HOUSEHOLD_ID + '&date=gte.' + month + '-01&date=lte.' + month + '-' + daysInMonth, {headers:sbH()})
       .then(r => r.json());
       
     var html = '';
@@ -212,7 +212,8 @@ function updateCharts(nik, zuz, catTotals) {
   var ctxC = document.getElementById('chart-categories');
   if(!ctxU || !ctxC || typeof Chart === 'undefined') return;
   
-  Chart.defaults.color = '#94a3b8';
+  var isDark = document.body.getAttribute('data-theme') === 'dark';
+  Chart.defaults.color = isDark ? '#94a3b8' : '#64748b';
   Chart.defaults.font.family = "'Outfit', sans-serif";
 
   if(chartUsers) chartUsers.destroy();
@@ -517,4 +518,19 @@ function enforceAppLock() {
   if (sessionStorage.getItem('sf_unlocked') !== '1') {
     document.getElementById('pin-modal').classList.add('open');
   }
+}
+
+/* ═══════════════════════════════════════════════
+   THEMING
+═══════════════════════════════════════════════ */
+function toggleTheme() {
+  var b = document.body;
+  if(b.getAttribute('data-theme') === 'dark') {
+    b.removeAttribute('data-theme');
+    localStorage.setItem('sf_theme', 'light');
+  } else {
+    b.setAttribute('data-theme', 'dark');
+    localStorage.setItem('sf_theme', 'dark');
+  }
+  if(typeof renderCards === 'function') renderCards();
 }

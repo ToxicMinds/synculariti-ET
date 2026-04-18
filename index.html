@@ -22,7 +22,15 @@
 <script src="./jsqr.min.js"></script>
 <link rel="stylesheet" href="./css/style.css">
 </head>
-<body>
+<body style="-webkit-font-smoothing: antialiased;">
+<script>
+  (function(){
+    var t = localStorage.getItem('sf_theme');
+    if(t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)){
+      document.body.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
 
 <button id="dbgtog" onclick="toggleDbg()">dbg</button>
 <div id="dbgpanel"></div>
@@ -198,6 +206,7 @@
       <select class="msel" id="msel" onchange="renderAll()"></select>
       <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="openInsights()" title="Financial AI Advisor">💡</button>
       <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="window.print()" title="Print / Export PDF">🖨</button>
+      <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1" onclick="toggleTheme()" title="Toggle Light/Dark Theme">🌗</button>
       <button class="btn-g" style="padding:4px 8px;border-radius:4px;line-height:1;margin-left:2px" onclick="openSettings()">&#9881;&#65039;</button>
     </div>
   </div>

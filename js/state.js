@@ -8,6 +8,7 @@ var ENABLE_BANKING = '/api/enablebanking';
 var REST    = SB_URL + '/rest/v1/expenses';
 var REST_INVOICES = SB_URL + '/rest/v1/invoices';
 var EKASA   = '/ekasa-proxy/receipt/find';
+var HOUSEHOLD_ID = localStorage.getItem('sf_household_id') || 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
 
 /* ═══════════════════════════════════════════════
    CONSTANTS & STATE DYNAMICS
@@ -53,13 +54,14 @@ function sbH(extra) {
 }
 async function sbSelect() {
   dbg('Supabase SELECT', {}, true); /* enhanced debug */
-  var r = await fetch(REST+'?select=*&order=date.desc,created_at.desc', {headers:sbH()});
+  var r = await fetch(REST+'?household_id=eq.'+HOUSEHOLD_ID+'&select=*&order=date.desc,created_at.desc', {headers:sbH()});
   var b = await r.text();
   dbg('SELECT '+r.status, b.slice(0, 100), true);
   if (!r.ok) throw new Error('Load failed '+r.status+': '+b.slice(0,300));
   return JSON.parse(b);
 }
 async function sbInsert(row) {
+  row.household_id = HOUSEHOLD_ID;
   dbg('INSERT expense (invoice_id=' + (row.invoice_id || 'null') + ') id='+row.id, row, true);
   var r = await fetch(REST, {method:'POST', headers:sbH({'Prefer':'return=minimal'}), body:JSON.stringify(row)});
   var b = await r.text();
@@ -68,6 +70,7 @@ async function sbInsert(row) {
 }
 
 async function sbCreateInvoice(invoice) {
+  invoice.household_id = HOUSEHOLD_ID;
   dbg('CREATE invoice', invoice, true);
   var r = await fetch(REST_INVOICES, {
     method: 'POST',
@@ -80,14 +83,14 @@ async function sbCreateInvoice(invoice) {
 }
 async function sbDelete(id) {
   dbg('DELETE id='+id, {}, true);
-  var r = await fetch(REST+'?id=eq.'+encodeURIComponent(id), {method:'DELETE', headers:sbH({'Prefer':'return=minimal'})});
+  var r = await fetch(REST+'?id=eq.'+encodeURIComponent(id)+'&household_id=eq.'+HOUSEHOLD_ID, {method:'DELETE', headers:sbH({'Prefer':'return=minimal'})});
   var b = await r.text();
   dbg('DELETE '+r.status, b ? b.slice(0,80) : 'OK', true);
   if (!r.ok) throw new Error('Delete failed '+r.status+': '+b.slice(0,300));
 }
 async function sbUpdate(id, row) {
   dbg('UPDATE id='+id, row, true);
-  var r = await fetch(REST+'?id=eq.'+encodeURIComponent(id), {
+  var r = await fetch(REST+'?id=eq.'+encodeURIComponent(id)+'&household_id=eq.'+HOUSEHOLD_ID, {
     method:'PATCH', headers:sbH({'Prefer':'return=minimal'}), body:JSON.stringify(row)
   });
   if (!r.ok) throw new Error('Update failed '+r.status);
@@ -95,7 +98,7 @@ async function sbUpdate(id, row) {
 
 async function sbLoadState() {
   dbg('Supabase LOAD STATE', {}, true);
-  var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.global&select=config', {headers:sbH()});
+  var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.' + HOUSEHOLD_ID + '&select=config', {headers:sbH()});
   var b = await r.json();
   if(!r.ok) return null;
   if(b && b.length > 0) return b[0].config;
@@ -108,7 +111,7 @@ async function sbSaveState() {
     memory: MEMORY, rules: RULES, goals: GOALS, banks: BANKS,
     gcal: GCAL
   };
-  var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.global', {
+  var r = await fetch(SB_URL + '/rest/v1/app_state?id=eq.' + HOUSEHOLD_ID, {
     method:'PATCH', headers:sbH({'Prefer':'return=minimal'}), body:JSON.stringify({config: configObj})
   });
   if(!r.ok) throw new Error('State sync failed');
