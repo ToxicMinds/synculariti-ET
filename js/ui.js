@@ -7,8 +7,10 @@ function esc(s) {
 }
 function today() { var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fmtDate(s) {
-  if(!s)return''; var p=s.split('-');
-  return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+  if (!s) return "";
+  const p = String(s).split("-");
+  if (p.length !== 3) return s;
+  return `${p[2].padStart(2, '0')}/${p[1].padStart(2, '0')}/${p[0]}`;
 }
 function fmt(n) { return Number(n).toFixed(2); }
 function checkEkasa(b64, mime) {
@@ -172,22 +174,30 @@ async function renderCalendar() {
   monthEl.innerHTML = '<div style="grid-column:1/-1; text-align:center;"><span class="spin"></span></div>';
   
   try {
-    var invoices = await fetch(REST_INVOICES + '?household_id=eq.' + HOUSEHOLD_ID + '&date=gte.' + month + '-01&date=lte.' + month + '-' + daysInMonth, {headers:sbH()})
+    const start = month + '-01';
+    const end = month + '-' + daysInMonth;
+    
+    // Fetch Invoices
+    const invoices = await fetch(REST_INVOICES + '?household_id=eq.' + HOUSEHOLD_ID + '&date=gte.' + start + '&date=lte.' + end, {headers:sbH()})
       .then(r => r.json());
       
+    // Filter local expenses for this month
+    const monthExpenses = expenses.filter(e => e.date && e.date.startsWith(month));
+
     var html = '';
-    // Basic grid logic (skipping start-of-month padding for brevity, just listing day boxes)
     for(var d=1; d<=daysInMonth; d++) {
       var dateStr = month + '-' + String(d).padStart(2,'0');
       var dayInvs = invoices.filter(i => i.date === dateStr);
+      var dayExps = monthExpenses.filter(e => e.date === dateStr);
       
-      var cls = dayInvs.length > 0 ? 'calendar-day has-invoice' : 'calendar-day';
-      var sum = dayInvs.reduce((acc, i) => acc + (parseFloat(i.total_amount)||0), 0);
+      const hasSomething = dayInvs.length > 0 || dayExps.length > 0;
+      var cls = hasSomething ? 'calendar-day has-invoice' : 'calendar-day';
+      
       var inner = '<div class="day-num">' + d + '</div>';
       
-      // If total is 0, we can map to expenses sum if we had it, but for UI sake show invoice count or nothing if old method
-      if(dayInvs.length > 0) {
-        inner += '<div class="inv-amt">' + dayInvs.length + ' inv</div>';
+      if(dayInvs.length > 0 || dayExps.length > 0) {
+        const count = dayInvs.length + dayExps.length;
+        inner += `<div class="inv-amt">${count} ${count === 1 ? 'entry' : 'entries'}</div>`;
       }
       
       html += '<div class="' + cls + '" onclick="showDayDetails(\'' + dateStr + '\')">' + inner + '</div>';
@@ -206,7 +216,7 @@ function showDayDetails(dateStr) {
     document.getElementById('calendar-details').innerHTML = '<div class="te">No invoice details for ' + dateStr + '</div>';
     return;
   }
-  var html = '<div style="font-weight:500;margin-bottom:8px;">Details for ' + dateStr + '</div>';
+  var html = '<div style="font-weight:500;margin-bottom:8px;">' + t('Details for') + ' ' + fmtDate(dateStr) + '</div>';
   html += '<div style="background:var(--bg); border:1px solid var(--border); border-radius:var(--r); padding:10px;">';
   exps.forEach(e => {
     html += '<div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding:4px 0;">';

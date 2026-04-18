@@ -13,6 +13,15 @@ var SESSION_JWT = null;
 var supabaseClient = null;
 var LANG = localStorage.getItem('sf_lang') || 'en';
 
+// Central Date Formatter (dd/mm/yyyy)
+function dtf(iso) {
+  if (!iso) return '';
+  const parts = iso.split('-');
+  if (parts.length !== 3) return iso;
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
 const DICT = {
   en: {
     'Add expense': 'Add expense',
