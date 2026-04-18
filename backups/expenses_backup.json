@@ -1,0 +1,362 @@
+[
+    {
+        "id": "ex_mo12of8vg0wp8",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "1.72",
+        "description": "Hrušky Abate Fetel  ",
+        "created_at": "2026-04-16 06:02:30.278092+00"
+    },
+    {
+        "id": "ex_mo12oey5c5ele",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "0.65",
+        "description": "Červená cibuľa      ",
+        "created_at": "2026-04-16 06:02:29.896087+00"
+    },
+    {
+        "id": "ex_mo12oemxm115l",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "1.69",
+        "description": "Citróny 500g        ",
+        "created_at": "2026-04-16 06:02:29.484413+00"
+    },
+    {
+        "id": "ex_mo12oec7e7s5q",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "1.69",
+        "description": "Feferónky mix 100g  ",
+        "created_at": "2026-04-16 06:02:29.107412+00"
+    },
+    {
+        "id": "ex_mo12oe1eu0y25",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "1.39",
+        "description": "Mladý špenát 125g   ",
+        "created_at": "2026-04-16 06:02:28.709663+00"
+    },
+    {
+        "id": "ex_mo12odteq0j4m",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "10.36",
+        "description": "Morč. mleté z pŕs   ",
+        "created_at": "2026-04-16 06:02:28.419782+00"
+    },
+    {
+        "id": "ex_mo12odlogcqfn",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "5.72",
+        "description": "Kurac. prsné rezne  ",
+        "created_at": "2026-04-16 06:02:28.143893+00"
+    },
+    {
+        "id": "ex_mo12od66j0dxu",
+        "who": "Nik",
+        "date": "2026-04-16",
+        "category": "Groceries",
+        "amount": "3.49",
+        "description": "Sezónna kytica      ",
+        "created_at": "2026-04-16 06:02:27.730648+00"
+    },
+    {
+        "id": "ex_mo09asyus049h",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Health",
+        "amount": "3.33",
+        "description": "3014530 kolagénové tabletky innovit 60 ks 1000mg",
+        "created_at": "2026-04-15 16:20:06.67775+00"
+    },
+    {
+        "id": "ex_mo09asnftreuo",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Kids",
+        "amount": "0.76",
+        "description": "2549464 skákacia hmota rôz. farby",
+        "created_at": "2026-04-15 16:20:06.269107+00"
+    },
+    {
+        "id": "ex_mo09asbrjx4ro",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Health",
+        "amount": "4.44",
+        "description": "3215420 innovit gumové cukríky biotica 60ks",
+        "created_at": "2026-04-15 16:20:05.84984+00"
+    },
+    {
+        "id": "ex_mo09as0c1dqqq",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Other",
+        "amount": "0.56",
+        "description": "2552929 miska pod kvetináč recyk. 19cm čierna",
+        "created_at": "2026-04-15 16:20:05.44179+00"
+    },
+    {
+        "id": "ex_mo09arovd88f7",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Groceries",
+        "amount": "1.99",
+        "description": "2558447 milka choco minis 4x6 ks 150g",
+        "created_at": "2026-04-15 16:20:05.032363+00"
+    },
+    {
+        "id": "ex_mo09ardeemdcq",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Groceries",
+        "amount": "1.99",
+        "description": "2550528 koláčiky milka cake+choc 5 ks 175g",
+        "created_at": "2026-04-15 16:20:04.618698+00"
+    },
+    {
+        "id": "ex_mo09ar1wokhor",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Pets",
+        "amount": "0.89",
+        "description": "3206715 purrfections kapsičky pre mačky",
+        "created_at": "2026-04-15 16:20:04.200364+00"
+    },
+    {
+        "id": "ex_mo09aqq6lo4yq",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Pets",
+        "amount": "3.29",
+        "description": "2579082 felix party mix 200g original cl/1",
+        "created_at": "2026-04-15 16:20:03.778362+00"
+    },
+    {
+        "id": "ex_mo09aqep8sk0b",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Clothing",
+        "amount": "2.99",
+        "description": "3208945 betty's cool čelenka modrá",
+        "created_at": "2026-04-15 16:20:03.370607+00"
+    },
+    {
+        "id": "ex_mo09aq3h88xgb",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Kids",
+        "amount": "14.95",
+        "description": "3015376 smashers dino island vaj. s prekv. rôz.",
+        "created_at": "2026-04-15 16:20:02.962004+00"
+    },
+    {
+        "id": "ex_mo09aprwjz4a9",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Groceries",
+        "amount": "1.49",
+        "description": "2559435 haribo chamallows 175 g rubino",
+        "created_at": "2026-04-15 16:20:02.546689+00"
+    },
+    {
+        "id": "ex_mo09apg9r1u9k",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Groceries",
+        "amount": "3.69",
+        "description": "3007233 haribo sweet or sour 350 g v mal. balen.",
+        "created_at": "2026-04-15 16:20:02.142021+00"
+    },
+    {
+        "id": "ex_mo09ap4pll17k",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Other",
+        "amount": "0.99",
+        "description": "3204439 kvetináč toledo recyklovaný 16cm rôz.",
+        "created_at": "2026-04-15 16:20:01.713172+00"
+    },
+    {
+        "id": "ex_mo09aolsf43qy",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Kids",
+        "amount": "5.95",
+        "description": "3203292 diy slime potion maker",
+        "created_at": "2026-04-15 16:20:01.25872+00"
+    },
+    {
+        "id": "ex_mo00gmy7zrd1n",
+        "who": "Nik",
+        "date": "2026-04-15",
+        "category": "Dining out",
+        "amount": "7.90",
+        "description": "Fragolino",
+        "created_at": "2026-04-15 12:12:42.533541+00"
+    },
+    {
+        "id": "ex_mnz2fgmb52202",
+        "who": "Zuzana",
+        "date": "2026-04-14",
+        "category": "Groceries",
+        "amount": "26.00",
+        "description": "Lidl",
+        "created_at": "2026-04-14 20:20:00.723568+00"
+    },
+    {
+        "id": "ex_mnyy87gyya27u",
+        "who": "Nikhil",
+        "date": "2026-04-14",
+        "category": "Dining out",
+        "amount": "13.00",
+        "description": "Vienna lunch",
+        "created_at": "2026-04-14 18:22:22.159147+00"
+    },
+    {
+        "id": "mnxj2bgdo1m8",
+        "who": "Nik",
+        "date": "2026-04-13",
+        "category": "Z-Bottles",
+        "amount": "-4.05",
+        "description": "35790164 (Z-Bottles)",
+        "created_at": "2026-04-13 18:30:08.197343+00"
+    },
+    {
+        "id": "mnxj2bgdfaje",
+        "who": "Nik",
+        "date": "2026-04-13",
+        "category": "Groceries",
+        "amount": "16.49",
+        "description": "35790164 (Groceries)",
+        "created_at": "2026-04-13 18:30:08.132968+00"
+    },
+    {
+        "id": "mnxfatyof1qc",
+        "who": "Nik",
+        "date": "2026-04-13",
+        "category": "Dining out",
+        "amount": "4.60",
+        "description": "Snack",
+        "created_at": "2026-04-13 16:44:47.388953+00"
+    },
+    {
+        "id": "mnxfaarf95w8",
+        "who": "Nik",
+        "date": "2026-04-13",
+        "category": "Dining out",
+        "amount": "16.10",
+        "description": "Vienna lunch",
+        "created_at": "2026-04-13 16:44:22.593506+00"
+    },
+    {
+        "id": "mnwx9dqod6va",
+        "who": "Nik",
+        "date": "2026-04-13",
+        "category": "Kids",
+        "amount": "43.00",
+        "description": "",
+        "created_at": "2026-04-13 08:19:46.62392+00"
+    },
+    {
+        "id": "mnwauth55h8l",
+        "who": "Zuzana",
+        "date": "2026-04-12",
+        "category": "Kids",
+        "amount": "39.00",
+        "description": "Clothes",
+        "created_at": "2026-04-12 21:52:35.618222+00"
+    },
+    {
+        "id": "mnvgko1m5954",
+        "who": "Zuzana",
+        "date": "2026-04-09",
+        "category": "Utilities",
+        "amount": "7.00",
+        "description": "4ka",
+        "created_at": "2026-04-12 07:44:53.567096+00"
+    },
+    {
+        "id": "mnvgj0egyrnc",
+        "who": "Zuzana",
+        "date": "2026-04-06",
+        "category": "Entertainment",
+        "amount": "5.50",
+        "description": "Tiger",
+        "created_at": "2026-04-12 07:43:36.257793+00"
+    },
+    {
+        "id": "mnvgi6h87nku",
+        "who": "Zuzana",
+        "date": "2026-04-11",
+        "category": "Utilities",
+        "amount": "633.00",
+        "description": "Mortgage",
+        "created_at": "2026-04-12 07:42:57.420512+00"
+    },
+    {
+        "id": "mnvgg6624frt",
+        "who": "Zuzana",
+        "date": "2026-04-11",
+        "category": "Utilities",
+        "amount": "47.00",
+        "description": "ZSE",
+        "created_at": "2026-04-12 07:41:23.707338+00"
+    },
+    {
+        "id": "mnvger05tznc",
+        "who": "Zuzana",
+        "date": "2026-04-10",
+        "category": "Kindergarten",
+        "amount": "61.00",
+        "description": "Kindergarten food",
+        "created_at": "2026-04-12 07:40:17.401553+00"
+    },
+    {
+        "id": "mnvgehrk5wuj",
+        "who": "Zuzana",
+        "date": "2026-04-10",
+        "category": "Kindergarten",
+        "amount": "57.00",
+        "description": "Kindergarten",
+        "created_at": "2026-04-12 07:40:05.435292+00"
+    },
+    {
+        "id": "mnvge8g913qr",
+        "who": "Zuzana",
+        "date": "2026-04-09",
+        "category": "Kindergarten",
+        "amount": "57.00",
+        "description": "Kindergarten",
+        "created_at": "2026-04-12 07:39:53.368716+00"
+    },
+    {
+        "id": "mnvgcue22pow",
+        "who": "Zuzana",
+        "date": "2026-04-10",
+        "category": "Other",
+        "amount": "299.01",
+        "description": "Karcher",
+        "created_at": "2026-04-12 07:38:48.481342+00"
+    },
+    {
+        "id": "mnvg6rf4ggv1",
+        "who": "Zuzana",
+        "date": "2026-04-10",
+        "category": "Groceries",
+        "amount": "10.00",
+        "description": "Eggs from Suhel",
+        "created_at": "2026-04-12 07:34:04.782334+00"
+    }
+]

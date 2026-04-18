@@ -251,6 +251,22 @@ async function confirmReview() {
   busy = true; setSyncing('s');
   
   try {
+    var storeEl = document.getElementById('r-store');
+    var storeName = storeEl?.textContent?.trim();
+    var invoiceId = null;
+    
+    // If scanning receipt, create parent invoice
+    if (storeName && storeName !== 'Unknown') {
+      var invoice = await sbCreateInvoice({
+        who: swho,
+        merchant_name: storeName,
+        date: dateStr,
+        total_amount: 0 // We aren't setting strict total amount for now, relying on sum of expenses
+      });
+      invoiceId = invoice.id;
+      dbg('Created invoice: ' + invoice.id);
+    }
+
     for (var i=0; i<items.length; i++) {
       var cb = document.getElementById('rcb_'+i);
       if(cb && cb.checked) {
@@ -259,7 +275,7 @@ async function confirmReview() {
         var nm  = document.getElementById('rnm_'+i).value;
         if(isNaN(amt)||!nm) continue;
         
-        var row = {id:uid(), who:swho, date:dateStr, category:cat, amount:amt, description:nm};
+        var row = {id:uid(), who:swho, date:dateStr, category:cat, amount:amt, description:nm, invoice_id: invoiceId};
         await sbInsert(row);
         row.created_at = new Date().toISOString();
         expenses.unshift(row);

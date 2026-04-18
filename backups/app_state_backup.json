@@ -1,0 +1,66 @@
+[
+    {
+        "id": "global",
+        "config": {
+            "banks": [],
+            "goals": [],
+            "names": {
+                "u1": "Nik",
+                "u2": "Zuzana"
+            },
+            "rules": [],
+            "income": {
+                "u1": 4200,
+                "u2": 1400
+            },
+            "memory": {
+                "Menu A": "Dining out",
+                "Menu polievka 2": "Dining out",
+                "BioTech jahoda 70g  ": "Groceries",
+                "Kinder chocolate300g": "Groceries",
+                "KinderKinderini100g ": "Groceries",
+                "Lay's ChilliLime250g": "Groceries",
+                "BioTech tyči.ban70g ": "Groceries",
+                "Citróny 500g        ": "Groceries",
+                "Feferónky mix 100g  ": "Groceries",
+                "Hrušky Abate Fetel  ": "Groceries",
+                "Kurac. prsné rezne  ": "Groceries",
+                "Sezónna kytica      ": "Groceries",
+                "Soltino araš. 500g  ": "Groceries",
+                "Záloha PET       JZO": "Z-Bottles",
+                "tyčinka pistác.70g  ": "Groceries",
+                "Mladý špenát 125g   ": "Groceries",
+                "Morč. mleté z pŕs   ": "Groceries",
+                "Červená cibuľa      ": "Groceries",
+                "3203292 diy slime potion maker": "Kids",
+                "2549464 skákacia hmota rôz. farby": "Kids",
+                "3208945 betty's cool čelenka modrá": "Clothing",
+                "2558447 milka choco minis 4x6 ks 150g": "Groceries",
+                "2559435 haribo chamallows 175 g rubino": "Groceries",
+                "3206715 purrfections kapsičky pre mačky": "Pets",
+                "2579082 felix party mix 200g original cl/1": "Pets",
+                "2550528 koláčiky milka cake+choc 5 ks 175g": "Groceries",
+                "3215420 innovit gumové cukríky biotica 60ks": "Health",
+                "2552929 miska pod kvetináč recyk. 19cm čierna": "Other",
+                "3007233 haribo sweet or sour 350 g v mal. balen.": "Groceries",
+                "3015376 smashers dino island vaj. s prekv. rôz.": "Kids",
+                "3204439 kvetináč toledo recyklovaný 16cm rôz.": "Other",
+                "3014530 kolagénové tabletky innovit 60 ks 1000mg": "Health"
+            },
+            "budgets": {
+                "Kids": 50,
+                "Pets": 50,
+                "Other": 100,
+                "Health": 10,
+                "Clothing": 150,
+                "Groceries": 800,
+                "Transport": 280,
+                "Utilities": 65,
+                "Z-Bottles": 10,
+                "Dining out": 100,
+                "Kindergarten": 100,
+                "Entertainment": 500
+            }
+        }
+    }
+]
