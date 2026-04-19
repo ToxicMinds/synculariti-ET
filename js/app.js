@@ -77,11 +77,6 @@ async function init() {
       return; // Stop here, onboarding will finish and reload
     }
 
-    if (!HOUSEHOLD_ID) {
-      console.warn("No Household ID resolved.");
-      return;
-    }
-
     expenses = await sbSelect();
     dbg('Loaded '+expenses.length+' rows');
     
@@ -93,9 +88,12 @@ async function init() {
     setSyncing('e');
     dbg('INIT: '+e.message, e, true);
     document.getElementById('cards').innerHTML =
-      '<div class="card" style="grid-column:1/-1"><div class="cl" style="color:var(--danger)">Connection error</div>'+
-      '<div style="font-size:13px;margin-top:6px">'+esc(e.message)+'</div></div>';
-    toggleDbg();
+      '<div class="card" style="grid-column:1/-1; text-align:center; padding:2rem">' +
+      '<div style="font-size:32px; margin-bottom:12px">⚠️</div>' +
+      '<div class="cl" style="color:var(--danger); font-size:14px; text-transform:none; letter-spacing:0">Connection Error</div>' +
+      '<div style="font-size:13px; color:var(--muted); margin:8px 0 16px">' + esc(e.message) + '</div>' +
+      '<button class="btn btn-p" style="width:auto; padding:8px 24px" onclick="location.reload()">🔄 Retry</button>' +
+      '</div>';
   }
   
   if (document.getElementById('fdate')) {

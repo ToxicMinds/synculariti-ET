@@ -155,16 +155,6 @@ async function sysBootSupabase() {
   }
 }
 
-function sbH(extra) {
-  var h = {
-    'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + SESSION_JWT,
-    'Content-Type': 'application/json'
-  };
-  if(extra) Object.assign(h, extra);
-  return h;
-}
-
 /* ═══════════════════════════════════════════════
    CONSTANTS & STATE DYNAMICS
 ═══════════════════════════════════════════════ */

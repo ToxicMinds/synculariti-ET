@@ -39,25 +39,33 @@ function setSyncing(st) {
   else if(st==='e'){d.className='dot e';l.textContent='error';}
   else{d.className='dot';l.textContent='live';}
 }
+// Map user index to CSS classes for pills and buttons
+const USER_BTN_CLS  = ['an', 'az', 'a3', 'a4'];
+const USER_PILL_CLS = ['pn', 'pz', 'p3', 'p4'];
+function userPillClass(name) {
+  const idx = Object.values(NAMES).indexOf(name);
+  return USER_PILL_CLS[idx] !== undefined ? USER_PILL_CLS[idx] : 'pc';
+}
+
 function applyNamesUI() {
   const userKeys = Object.keys(NAMES);
   const isSingle = userKeys.length === 1;
 
-  // 1. Add Expense Toggle Buttons
+  // 1. Add Expense Toggle Buttons (dynamic colors)
   const toggleContainer = document.getElementById('user-toggles-container');
   if (toggleContainer) {
     toggleContainer.innerHTML = userKeys.map((key, i) => `
-      <button class="wbtn ${who === NAMES[key] ? 'active' : ''}" 
+      <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${who === NAMES[key] ? 'active' : ''}" 
               data-user-id="${key}"
               onclick="setWho(NAMES['${key}'])">${esc(NAMES[key])}</button>
     `).join('');
   }
 
-  // 2. Filter Toggles
+  // 2. Filter Toggles (dynamic colors)
   const filterContainer = document.getElementById('filter-user-toggles');
   if (filterContainer) {
     filterContainer.innerHTML = userKeys.map((key, i) => `
-      <button class="wbtn ${swho === NAMES[key] ? 'active' : ''}" 
+      <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${swho === NAMES[key] ? 'active' : ''}" 
               data-user-id="${key}"
               onclick="setSWho(NAMES['${key}'])">${esc(NAMES[key])}</button>
     `).join('');
@@ -209,31 +217,37 @@ async function renderCalendar() {
 }
 
 function showDayDetails(dateStr) {
-  // Filter for all expenses on this date (manual or invoice-based)
+  // Highlight selected day on calendar
+  document.querySelectorAll('.calendar-day').forEach(d => d.classList.remove('selected'));
+  const dayEls = document.querySelectorAll('.calendar-day');
+  dayEls.forEach(d => { if (d.getAttribute('onclick') && d.getAttribute('onclick').includes(dateStr)) d.classList.add('selected'); });
+
   var exps = expenses.filter(e => e.date === dateStr);
-  
   if (exps.length === 0) {
-    document.getElementById('calendar-details').innerHTML = 
+    document.getElementById('calendar-details').innerHTML =
       `<div class="te" style="padding:20px; color:var(--muted)">${t('No entries for')} ${fmtDate(dateStr)}</div>`;
     return;
   }
 
-  var html = `<div style="font-weight:600; font-size:15px; margin-bottom:12px; color:var(--text)">${t('Details for')} ${fmtDate(dateStr)}</div>`;
+  const dayTotal = exps.reduce((s, e) => s + Number(e.amount), 0);
+  var html = `<div style="font-weight:600; font-size:15px; margin-bottom:12px; color:var(--text)">${t('Details for')} ${fmtDate(dateStr)} <span style="font-family:var(--mono); color:var(--muted); font-size:13px;">· €${fmt(dayTotal)}</span></div>`;
   html += '<div style="display:flex; flex-direction:column; gap:8px;">';
-  
+
   exps.forEach(e => {
+    const pillCls = userPillClass(e.who);
     html += `
-      <div class="panel" style="padding:10px; display:flex; justify-content:space-between; align-items:center; background:var(--bg-light); border:1px solid var(--border)">
+      <div class="panel" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">
         <div>
           <div style="font-weight:600; font-size:13px;">${esc(e.description || 'Expense')}</div>
-          <div style="font-size:10px; color:var(--muted); margin-top:2px;">
-            <span class="pill pc" style="padding:2px 6px">${esc(e.category)}</span> • ${esc(e.who)}
+          <div style="font-size:11px; color:var(--muted); margin-top:3px;">
+            <span class="pill pc" style="padding:2px 6px">${esc(e.category)}</span>
+            &nbsp;<span class="pill ${pillCls}" style="padding:2px 6px">${esc(e.who)}</span>
           </div>
         </div>
-        <div style="font-family:var(--mono); font-weight:700; color:var(--text)">€${fmt(e.amount)}</div>
+        <div style="font-family:var(--mono); font-weight:700; font-size:15px; color:var(--text)">€${fmt(e.amount)}</div>
       </div>`;
   });
-  
+
   html += '</div>';
   document.getElementById('calendar-details').innerHTML = html;
 }
@@ -248,49 +262,72 @@ function renderCards(){
     userSpend[k] = all.filter(e => e.who === NAMES[k]).reduce((s, e) => s + (Number(e.amount) || 0), 0);
   });
 
-  const totInc = userKeys.reduce((s, k) => s + (Number(INCOME[k]) || 0), 0) || 0;
-  const svgs = totInc - tot;
-  const rem = TOTAL_B - tot;
-  const pct = TOTAL_B > 0 ? Math.round(tot / TOTAL_B * 100) : 0;
-  const rc = rem < 0 ? 'bad' : rem < TOTAL_B * 0.2 ? 'warn' : 'good';
-  const sc = svgs < 0 ? 'bad' : 'good';
+  const totInc  = userKeys.reduce((s, k) => s + (Number(INCOME[k]) || 0), 0) || 0;
+  const svgs    = totInc - tot;
+  const rem     = TOTAL_B - tot;
+  const pct     = TOTAL_B > 0 ? Math.round(tot / TOTAL_B * 100) : 0;
+  const rc      = rem < 0 ? 'bad' : rem < TOTAL_B * 0.2 ? 'warn' : 'good';
+  const sc      = svgs < 0 ? 'bad' : 'good';
+
+  // Month-over-month delta
+  const prevM = (function(){
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0,7);
+  })();
+  const prevTot = expenses.filter(e => e.date && e.date.startsWith(prevM))
+                          .reduce((s, e) => s + Number(e.amount), 0);
+  const delta   = tot - prevTot;
+  const deltaStr = (delta > 0 ? '+' : '') + fmt(Math.abs(delta));
+  const deltaColor = delta > 0 ? 'var(--danger)' : 'var(--accent)';
+  const deltaSuffix = prevTot > 0
+    ? ` <span style="font-size:11px; color:${deltaColor}; font-weight:600">${delta > 0 ? '▲' : '▼'} €${deltaStr} vs last month</span>`
+    : '';
 
   const totalIncome = Object.values(INCOME).reduce((a,b)=>a+Number(b), 0);
-  const projected = getProjectedRecurring(all);
+  const projected   = getProjectedRecurring(all);
   const projSavings = totalIncome - (tot + projected);
-  const psc = projSavings < 0 ? 'bad' : 'good';
-  
+  const psc         = projSavings < 0 ? 'bad' : 'good';
+
   let html = `
-    <div class="card"><div class="cl">${t('Total spent')}</div><div class="cv">${fmt(tot)}</div><div class="cs">${pct}% of €${TOTAL_B} budget</div></div>
+    <div class="card"><div class="cl">${t('Total spent')}</div><div class="cv">${fmt(tot)}</div><div class="cs">${pct}% of €${TOTAL_B} budget${deltaSuffix}</div></div>
     <div class="card"><div class="cl">${t('Remaining')}</div><div class="cv ${rc}">${(rem < 0 ? '-' : '') + fmt(Math.abs(rem))}</div><div class="cs">${rem < 0 ? t('Over budget') : t('Left this month')}</div></div>
-    <div class="card"><div class="cl">Proj. Savings</div><div class="cv ${psc}">${(projSavings < 0 ? '-' : '') + fmt(Math.abs(projSavings))}</div><div class="cs">incl. €${projected} expected</div></div>
+    <div class="card"><div class="cl">Proj. Savings</div><div class="cv ${psc}">${(projSavings < 0 ? '-' : '') + fmt(Math.abs(projSavings))}</div><div class="cs">incl. €${projected} expected bills</div></div>
   `;
 
   userKeys.forEach((k, i) => {
-    const uc = ['purple', 'pink', 'blue', 'orange'][i % 4];
+    const varPrefix = ['nikhil','zuzana','u3','u4'][i % 4];
     html += `
-      <div class="card user-card-${uc}">
+      <div class="card" style="border-top: 3px solid var(--${varPrefix})">
         <div class="cl">${esc(NAMES[k])}</div>
-        <div class="cv">${fmt(userSpend[k])}</div>
+        <div class="cv" style="color:var(--${varPrefix})">${fmt(userSpend[k])}</div>
         <div class="cs">${all.filter(e => e.who === NAMES[k]).length} entries</div>
       </div>`;
   });
 
   html += `<div class="card"><div class="cl">${t('Net Savings')}</div><div class="cv ${sc}">${(svgs < 0 ? '-' : '') + fmt(Math.abs(svgs))}</div><div class="cs">from €${totInc} income</div></div>`;
-  
   document.getElementById('cards').innerHTML = html;
 
+  // Global budget alert bar
   const bar = document.getElementById('alertbar');
   if (rem < 0) {
-    bar.className = 'alertbar d'; bar.style.display = 'block'; 
-    bar.textContent = 'You are ' + fmt(Math.abs(rem)) + ' over budget this month.';
+    bar.className = 'alertbar d'; bar.style.display = 'block';
+    bar.textContent = '⚠️ You are €' + fmt(Math.abs(rem)) + ' over budget this month.';
   } else if (pct > 80) {
-    bar.className = 'alertbar w'; bar.style.display = 'block'; 
-    bar.textContent = pct + '% of budget used — only ' + fmt(rem) + ' remaining.';
+    bar.className = 'alertbar w'; bar.style.display = 'block';
+    bar.textContent = '⚡ ' + pct + '% of total budget used — €' + fmt(rem) + ' remaining.';
   } else {
     bar.style.display = 'none';
   }
-  
+
+  // Per-category 80% alerts
+  const catSpend = {};
+  all.forEach(e => { catSpend[e.category] = (catSpend[e.category] || 0) + Number(e.amount); });
+  const overCats = CATS.filter(c => BUDGETS[c] > 0 && (catSpend[c] || 0) / BUDGETS[c] >= 0.8 && (catSpend[c] || 0) < BUDGETS[c]);
+  if (overCats.length > 0 && rem >= 0) {
+    bar.className = 'alertbar w'; bar.style.display = 'block';
+    bar.textContent = '⚡ Approaching limit in: ' + overCats.map(c => `${c} (${Math.round((catSpend[c]||0)/BUDGETS[c]*100)}%)`).join(', ');
+  }
+
   updateCharts(userSpend, catsObj(all));
 }
 
@@ -383,19 +420,49 @@ function renderLog(){
   if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="te">No expenses found.</td></tr>';document.getElementById('logtot').textContent='€0.00';return;}
   var tot=rows.reduce(function(s,e){return s+Number(e.amount);},0);
   tb.innerHTML=rows.map(function(e){
+    var pillCls = userPillClass(e.who);
     return '<tr>'+
       '<td class="act-col">'+
         '<button class="db db-edit" title="Edit" onclick="startEdit(\''+e.id+'\')">✎</button>'+
         '<button class="db db-del" title="Delete" onclick="deleteExp(\''+e.id+'\')">🗑</button>'+
       '</td>'+
       '<td style="font-family:var(--mono);font-size:12px;color:var(--muted)">'+fmtDate(e.date)+'</td>'+
-      '<td><span class="pill '+(e.who===NAMES.u1?'pn':'pz')+'">'+esc(e.who)+'</span></td>'+
+      '<td><span class="pill '+pillCls+'">'+esc(e.who)+'</span></td>'+
       '<td><span class="pill pc">'+esc(e.category)+'</span></td>'+
       '<td style="color:var(--muted)">'+esc(e.description||'—')+'</td>'+
       '<td class="ac">'+fmt(e.amount)+'</td>'+
       '</tr>';
   }).join('');
   document.getElementById('logtot').textContent=fmt(tot);
+}
+
+function exportCSV() {
+  if (!expenses || expenses.length === 0) {
+    flash('No data to export', true);
+    return;
+  }
+  const headers = ['Date', 'Who', 'Category', 'Description', 'Amount'];
+  const rows = expenses
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .map(e => [
+      fmtDate(e.date),
+      e.who || '',
+      e.category || '',
+      (e.description || '').replace(/,/g, ';'),
+      Number(e.amount).toFixed(2)
+    ]);
+
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM for Excel
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const month = curMonth ? curMonth() : new Date().toISOString().slice(0,7);
+  a.href = url;
+  a.download = `expenses-${month}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  flash(`Exported ${rows.length} expenses to CSV`);
 }
 
 function flash(msg,isErr) {
@@ -674,24 +741,34 @@ async function executeAuth(mode) {
   var pinInp = document.getElementById('auth-pin')?.value?.trim();
   
   if (mode === 'pin') {
-    if (pinInp === '2026') {
-      err.style.color = 'var(--nikhil)';
-      err.textContent = 'Unlocking primary household...';
-      // Secret Bridge: Log in to the legacy account
-      try {
-        const { error } = await supabaseClient.auth.signInWithPassword({
-          email: 'legacy@et-tracker.com',
-          password: 'pass2026'
-        });
-        if (error) throw error;
-        window.location.reload();
-      } catch (e) {
-        err.style.color = 'var(--danger)';
-        err.textContent = 'Bridge failed: ' + e.message;
-      }
-    } else {
+    if (!pinInp) {
       err.style.color = 'var(--danger)';
-      err.textContent = 'Incorrect PIN';
+      err.textContent = 'Please enter your PIN';
+      return;
+    }
+    err.style.color = 'var(--nikhil)';
+    err.textContent = 'Unlocking household...';
+    try {
+      // Call our secure server-side PIN validator (credentials never touch the client)
+      const res = await fetch('/api/pin-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinInp })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'PIN validation failed');
+
+      // Use the returned tokens to set the Supabase session directly
+      const { error: sessionErr } = await supabaseClient.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
+      if (sessionErr) throw sessionErr;
+
+      window.location.reload();
+    } catch (e) {
+      err.style.color = 'var(--danger)';
+      err.textContent = e.message || 'Unlock failed';
     }
     return;
   }

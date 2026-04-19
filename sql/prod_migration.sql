@@ -73,3 +73,27 @@ CREATE POLICY "Main expense isolation" ON expenses FOR ALL USING (household_id I
 
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Main invoice isolation" ON invoices FOR ALL USING (household_id IN (SELECT household_id FROM app_users WHERE id = auth.uid()));
+
+-- ========================================================
+-- SEED LEGACY BRIDGE USER MAPPING
+-- ========================================================
+-- The PIN bridge logic requires the user legacy@et-tracker.com to have a mapping.
+-- This script will map the legacy user to the oldest (original) household in your system.
+-- NOTE: Ensure you manually create the legacy@et-tracker.com user in Supabase Auth first!
+DO $$ 
+DECLARE
+  legacy_uid UUID;
+  primary_house_id UUID;
+BEGIN
+  -- Find the legacy user's auth UID
+  SELECT id INTO legacy_uid FROM auth.users WHERE email = 'legacy@et-tracker.com' LIMIT 1;
+  
+  -- Find your original primary household
+  SELECT id INTO primary_house_id FROM households ORDER BY created_at ASC LIMIT 1;
+  
+  IF legacy_uid IS NOT NULL AND primary_house_id IS NOT NULL THEN
+    INSERT INTO app_users (id, household_id)
+    VALUES (legacy_uid, primary_house_id)
+    ON CONFLICT (id) DO UPDATE SET household_id = EXCLUDED.household_id;
+  END IF;
+END $$;
