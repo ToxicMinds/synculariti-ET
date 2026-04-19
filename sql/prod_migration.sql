@@ -43,7 +43,10 @@ BEGIN
      -- Alter the table safely
      ALTER TABLE public.app_state DROP CONSTRAINT IF EXISTS app_state_pkey;
      DELETE FROM public.app_state WHERE id != 'settings'; -- cleanup any junk
-     ALTER TABLE public.app_state ALTER COLUMN id TYPE UUID USING primary_house_id;
+     
+     -- Use EXECUTE to interpolate the PL/pgSQL variable into the DDL command
+     EXECUTE format('ALTER TABLE public.app_state ALTER COLUMN id TYPE UUID USING %L::uuid', primary_house_id);
+     
      ALTER TABLE public.app_state ADD PRIMARY KEY (id);
      
      -- Re-add the foreign key constraint
