@@ -113,23 +113,26 @@ async function init() {
     }
   });
 
-  // Inactivity Lockout (15 minutes)
-  let idleTime = 0;
-  const idleLimit = 15; // minutes
-  const resetIdle = () => { idleTime = 0; };
+  // Inactivity Lockout (Persistent across refreshes)
+  const idleLimit = 10 * 60 * 1000; // 10 minutes in ms
+  const resetIdle = () => { localStorage.setItem('sf_last_act', Date.now()); };
   ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
     document.addEventListener(evt, resetIdle, true);
   });
+  
+  // Initialize if not set
+  if (!localStorage.getItem('sf_last_act')) resetIdle();
 
   setInterval(() => {
-    idleTime++;
-    if (idleTime >= idleLimit) {
+    const lastAct = parseInt(localStorage.getItem('sf_last_act') || Date.now());
+    if (Date.now() - lastAct >= idleLimit) {
+      localStorage.removeItem('sf_last_act');
       flash("Session expired due to inactivity.", true);
       setTimeout(() => {
         supabaseClient.auth.signOut();
-      }, 2000);
+      }, 1500);
     }
-  }, 60000); // Check every minute
+  }, 10000); // Check every 10 seconds
 
   /* Handle Enable Banking OAuth callback (?session_id=...) */
   var urlParams = new URLSearchParams(window.location.search);
