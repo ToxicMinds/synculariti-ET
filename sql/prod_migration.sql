@@ -22,12 +22,45 @@ CREATE TABLE IF NOT EXISTS public.app_users (
 
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 
--- 3. Create App State (Settings) Table
-CREATE TABLE IF NOT EXISTS public.app_state (
-    id UUID PRIMARY KEY REFERENCES public.households(id) ON DELETE CASCADE,
-    config JSONB NOT NULL DEFAULT '{}'::jsonb,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- 3. Create or Migrate App State (Settings) Table
+DO $$ 
+DECLARE
+  old_type TEXT;
+  primary_house_id UUID;
+BEGIN
+  -- Check if app_state exists and what type its id column is
+  SELECT data_type INTO old_type 
+  FROM information_schema.columns 
+  WHERE table_name = 'app_state' AND column_name = 'id';
+  
+  IF old_type = 'text' THEN
+     -- Find or create a primary household to attach the state to
+     SELECT id INTO primary_house_id FROM households ORDER BY created_at ASC LIMIT 1;
+     IF primary_house_id IS NULL THEN
+         INSERT INTO households (name) VALUES ('Primary Household') RETURNING id INTO primary_house_id;
+     END IF;
+     
+     -- Alter the table safely
+     ALTER TABLE public.app_state DROP CONSTRAINT IF EXISTS app_state_pkey;
+     DELETE FROM public.app_state WHERE id != 'settings'; -- cleanup any junk
+     ALTER TABLE public.app_state ALTER COLUMN id TYPE UUID USING primary_house_id;
+     ALTER TABLE public.app_state ADD PRIMARY KEY (id);
+     
+     -- Re-add the foreign key constraint
+     BEGIN
+       ALTER TABLE public.app_state ADD CONSTRAINT app_state_id_fkey FOREIGN KEY (id) REFERENCES public.households(id) ON DELETE CASCADE;
+     EXCEPTION WHEN duplicate_object THEN
+       -- Ignore if constraint already exists
+     END;
+  ELSIF old_type IS NULL THEN
+     -- Table does not exist, create it from scratch
+     CREATE TABLE public.app_state (
+         id UUID PRIMARY KEY REFERENCES public.households(id) ON DELETE CASCADE,
+         config JSONB NOT NULL DEFAULT '{}'::jsonb,
+         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+     );
+  END IF;
+END $$;
 
 ALTER TABLE public.app_state ENABLE ROW LEVEL SECURITY;
 
