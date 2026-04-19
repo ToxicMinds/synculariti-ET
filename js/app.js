@@ -211,7 +211,15 @@ async function addExpense() {
   btn.disabled=true; btn.textContent='Saving…'; setSyncing('s');
   
   if (editingId) {
-    var row = {who:who, date:date, category:cat, amount:amt, description:desc};
+    var row = {
+      who: who, 
+      who_id: currentWhoId,
+      date: date, 
+      category: cat, 
+      cat_id: cat, // Simplified cat_id for now, using name as ID
+      amount: amt, 
+      description: desc
+    };
     try {
       await sbUpdate(editingId, row);
       var idx = expenses.findIndex(e => e.id === editingId);
@@ -227,7 +235,16 @@ async function addExpense() {
       busy=false; btn.disabled=false;
     }
   } else {
-    var row={id:uid(),who:who,date:date,category:cat,amount:amt,description:desc};
+    var row = {
+      id: uid(),
+      who: who,
+      who_id: currentWhoId,
+      date: date,
+      category: cat,
+      cat_id: cat, // Simplified cat_id for now
+      amount: amt,
+      description: desc
+    };
     try {
       await sbInsert(row);
       row.created_at=new Date().toISOString();
@@ -243,11 +260,15 @@ async function addExpense() {
   }
 }
 
+function findIdByName(name) {
+  return Object.keys(NAMES).find(k => NAMES[k] === name) || 'u1';
+}
+
 function startEdit(id) {
   var e = expenses.find(x => x.id === id);
   if (!e) return;
   editingId = id;
-  setWho(e.who);
+  setWho(e.who_id || findIdByName(e.who));
   document.getElementById('fdate').value = e.date;
   document.getElementById('famt').value = e.amount;
   document.getElementById('fcat').value = e.category;

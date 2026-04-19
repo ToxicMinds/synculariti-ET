@@ -55,9 +55,9 @@ function applyNamesUI() {
   const toggleContainer = document.getElementById('user-toggles-container');
   if (toggleContainer) {
     toggleContainer.innerHTML = userKeys.map((key, i) => `
-      <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${who === NAMES[key] ? 'active' : ''}" 
+      <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${currentWhoId === key ? 'active' : ''}" 
               data-user-id="${key}"
-              onclick="setWho(NAMES['${key}'])">${esc(NAMES[key])}</button>
+              onclick="setWho('${key}')">${esc(NAMES[key])}</button>
     `).join('');
   }
 
@@ -102,13 +102,14 @@ function applyCatsUI() {
   if(fcf) fcf.innerHTML='<option value="">All Categories</option>'+CATS.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('');
 }
 
-function setWho(w) {
-  who = w;
+function setWho(id) {
+  currentWhoId = id;
+  who = NAMES[id];
   document.querySelectorAll('#user-toggles-container .wbtn').forEach(btn => {
-    btn.classList.toggle('active', btn.textContent === w);
+    btn.classList.toggle('active', btn.getAttribute('data-user-id') === id);
   });
   const fWhoEl = document.getElementById('fwho');
-  if(fWhoEl) fWhoEl.value = w;
+  if(fWhoEl) fWhoEl.value = who;
 }
 
 function initMonths() {
@@ -270,7 +271,7 @@ function renderCards(){
   
   let userSpend = {};
   userKeys.forEach(k => {
-    userSpend[k] = all.filter(e => e.who === NAMES[k]).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    userSpend[k] = all.filter(e => (e.who_id === k) || (!e.who_id && e.who === NAMES[k])).reduce((s, e) => s + (Number(e.amount) || 0), 0);
   });
 
   const totInc  = userKeys.reduce((s, k) => s + (Number(INCOME[k]) || 0), 0) || 0;
@@ -438,7 +439,7 @@ function renderLog(){
         '<button class="db db-del" title="Delete" onclick="deleteExp(\''+e.id+'\')">🗑</button>'+
       '</td>'+
       '<td style="font-family:var(--mono);font-size:12px;color:var(--muted)">'+fmtDate(e.date)+'</td>'+
-      '<td><span class="pill '+pillCls+'">'+esc(e.who)+'</span></td>'+
+      '<td><span class="pill '+pillCls+'">'+esc(NAMES[e.who_id] || e.who)+'</span></td>'+
       '<td><span class="pill pc">'+esc(e.category)+'</span></td>'+
       '<td style="color:var(--muted)">'+esc(e.description||'—')+'</td>'+
       '<td class="ac">'+fmt(e.amount)+'</td>'+
