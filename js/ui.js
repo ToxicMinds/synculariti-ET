@@ -9,6 +9,11 @@ function setElText(id, text) {
   if (el) el.textContent = text;
 }
 
+function showHelp(msg) {
+  document.getElementById('help-content').textContent = msg;
+  document.getElementById('help-overlay').style.display = 'flex';
+}
+
 function esc(s) { 
   if(!s)return''; 
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); 
@@ -316,22 +321,22 @@ function renderCards(){
   // 2. Build HTML
   let html = `
     <div class="card">
-      <div class="cl">Total Spent <span class="h-tip" title="Sum of all expenses this month, excluding 'Savings'.">ⓘ</span></div>
+      <div class="cl">Total Spent <span class="h-tip" onclick="showHelp('Sum of all expenses this month, excluding Savings.')">ⓘ</span></div>
       <div class="cv">€${fmt(spent)}</div>
       <div class="cs"><span style="color:${deltaColor}">${delta > 0 ? '▲' : '▼'} ${deltaStr}</span> vs last month</div>
     </div>
     <div class="card">
-      <div class="cl">Budget Left <span class="h-tip" title="Current budget minus actual spending.">ⓘ</span></div>
+      <div class="cl">Budget Left <span class="h-tip" onclick="showHelp('Current monthly budget minus actual spending.')">ⓘ</span></div>
       <div class="cv ${rc}">€${fmt(rem)}</div>
       <div class="cs">${pct}% used of €${TOTAL_B}</div>
     </div>
     <div class="card" style="border:1px solid var(--border-soft)">
-      <div class="cl">Forecast <span class="h-tip" title="Linear projection: (Spent / Days Passed) * Days in Month. Assumes your spending pace remains the same.">ⓘ</span></div>
+      <div class="cl">Forecast <span class="h-tip" onclick="showHelp('Linear projection: (Spent / Days Passed) * Days in Month. Assumes your spending pace remains the same.')">ⓘ</span></div>
       <div class="cv ${diff > 0 ? 'bad' : 'good'}">€${fmt(projected)}</div>
       <div class="cs" style="color:${diff > 0 ? 'var(--danger)' : 'var(--success)'}">${diff > 0 ? '⚠️ €'+fmt(diff)+' OVER' : '✅ €'+fmt(Math.abs(diff))+' UNDER'}</div>
     </div>
     <div class="card" style="border-top:3px solid #10b981">
-      <div class="cl">Total Saved <span class="h-tip" title="Sum of all entries in the 'Savings' category. This is money kept, not spent.">ⓘ</span></div>
+      <div class="cl">Total Saved <span class="h-tip" onclick="showHelp('Sum of all entries in the Savings category. This is money kept, not spent.')">ⓘ</span></div>
       <div class="cv" style="color:#10b981">€${fmt(saved)}</div>
       <div class="cs">€${fmt(netSavings)} net liquidity</div>
     </div>
@@ -341,13 +346,13 @@ function renderCards(){
     const varPrefix = ['nikhil','zuzana','u3','u4'][i % 4];
     html += `
       <div class="card" style="border-top: 3px solid var(--${varPrefix})">
-        <div class="cl">${esc(NAMES[k])} <span class="h-tip" title="Spending attributed to ${esc(NAMES[k])} this month (excluding Savings).">ⓘ</span></div>
+        <div class="cl">${esc(NAMES[k])} <span class="h-tip" onclick="showHelp('Spending attributed to ${esc(NAMES[k])} this month (excluding Savings).')">ⓘ</span></div>
         <div class="cv" style="color:var(--${varPrefix})">€${fmt(userSpend[k])}</div>
         <div class="cs">${all.filter(e => (e.who_id === k) || (!e.who_id && e.who === NAMES[k])).length} entries</div>
       </div>`;
   });
 
-  html += `<div class="card"><div class="cl">Net Savings <span class="h-tip" title="Income minus Spent. This is your theoretical bank balance change this month.">ⓘ</span></div><div class="cv ${sc}">€${(netSavings < 0 ? '-' : '') + fmt(Math.abs(netSavings))}</div><div class="cs">from €${fmt(totInc)} income</div></div>`;
+  html += `<div class="card"><div class="cl">Net Savings <span class="h-tip" onclick="showHelp('Total Income minus Total Spent. This is your theoretical bank balance change this month.')">ⓘ</span></div><div class="cv ${sc}">€${(netSavings < 0 ? '-' : '') + fmt(Math.abs(netSavings))}</div><div class="cs">from €${fmt(totInc)} income</div></div>`;
   
   document.getElementById('cards').innerHTML = html;
 

@@ -323,3 +323,6 @@ tbody tr:last-child td{border-bottom:none}
   white-space: nowrap;
 }
 .h-tip{cursor:help;color:var(--muted);font-size:12px;margin-left:4px;vertical-align:middle;opacity:0.6;} .h-tip:hover{opacity:1;}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.h-tip{cursor:help;color:var(--muted);font-size:14px;margin-left:6px;vertical-align:middle;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--border-soft);border:1px solid var(--border);}
+.h-tip:active{background:var(--accent);color:white;}
