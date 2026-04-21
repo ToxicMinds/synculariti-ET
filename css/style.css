@@ -230,6 +230,7 @@ tbody tr:last-child td{border-bottom:none}
 
 @media(max-width:640px){
   .topbar{padding:0 1rem}.main{padding:1rem}
+  .cards{grid-template-columns:1fr}
   .picat select{width:90px}
 }
 

@@ -501,10 +501,13 @@ function renderCards(){
     </div>
     <div class="card" style="border-top:3px solid #10b981">
       <div class="cl">Total Saved <span class="h-tip" onclick="showHelp('Sum of all entries in the Savings category. This is money kept, not spent.')">ⓘ</span></div>
-      <div class="card" style="border-left:4px solid var(--nikhil)">
+      <div class="cv">€${fmt(saved)}</div>
+      <div class="cs">Kept this month</div>
+    </div>
+    <div class="card" style="border-left:4px solid var(--nikhil)">
       <div class="cl">Net Savings <span class="h-tip" onclick="showHelp('Your real profit: Total Income - Total Spent. (Adjustment/Savings excluded). If this is high, check your income settings.')">ⓘ</span></div>
       <div class="cv ${sc}">€${fmt(netSavings)}</div>
-      <div class="cs">${Math.round(netSavings/totInc*100)}% of income kept</div>
+      <div class="cs">${totInc > 0 ? Math.round(netSavings/totInc*100) : 0}% of income kept</div>
     </div>
   `;
 
