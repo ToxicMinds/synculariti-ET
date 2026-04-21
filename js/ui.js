@@ -10,8 +10,10 @@ function setElText(id, text) {
 }
 
 function showHelp(msg) {
+  const overlay = document.getElementById('help-overlay');
+  if (!overlay) return;
   document.getElementById('help-content').textContent = msg;
-  document.getElementById('help-overlay').style.display = 'flex';
+  overlay.classList.add('open');
 }
 
 function checkMonthlyRitual() {
@@ -48,7 +50,7 @@ function showRitualNudge() {
 function openRitual() {
   const overlay = document.getElementById('ritual-overlay');
   if (!overlay) return;
-  overlay.style.display = 'flex';
+  overlay.classList.add('open');
   generateMonthlySummary();
 }
 
@@ -56,7 +58,7 @@ function dismissRitual() {
   const monthStr = new Date().toISOString().slice(0, 7);
   MEMORY.last_ritual_month = monthStr;
   sbSaveState().catch(() => {}); // Persist to DB for cross-device sync
-  document.getElementById('ritual-overlay').style.display = 'none';
+  document.getElementById('ritual-overlay').classList.remove('open');
   document.getElementById('ritual-nudge').style.display = 'none';
 }
 
@@ -126,9 +128,20 @@ function getTopVendors(limit = 6) {
 }
 
 function quickFill(desc, cat) {
+  // Clear any previous form state
+  cancelEdit(); 
+  
   document.getElementById('fdesc').value = desc;
   document.getElementById('fcat').value = cat;
-  document.getElementById('famt').focus();
+  
+  // Focus amount for quick entry
+  const amtInput = document.getElementById('famt');
+  if (amtInput) {
+    amtInput.value = '';
+    amtInput.focus();
+  }
+  
+  // Scroll to form
   const form = document.getElementById('form-title');
   if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -606,18 +619,15 @@ function renderLog(){
     var pillCls = userPillClass(e.who);
     var displayName = esc(NAMES[e.who_id] || e.who);
     return '<tr class="swipe-row" data-expense-id="'+e.id+'">'+
-      '<td class="act-col desktop-only">'+
-        '<button class="db db-edit" title="Edit" onclick="startEdit(\''+e.id+'\')">✎</button>'+
-        '<button class="db db-del" title="Delete" onclick="deleteExp(\''+e.id+'\')">🗑</button>'+
+      '<td class="act-col desktop-only" style="text-align:center">'+
+        '<span style="cursor:pointer; padding:5px" onclick="startEdit(\''+e.id+'\')">✎</span>'+
+        '<span style="cursor:pointer; padding:5px; color:var(--danger)" onclick="deleteExp(\''+e.id+'\')">🗑</span>'+
       '</td>'+
-      '<td style="font-family:var(--mono);font-size:12px;color:var(--muted)">'+fmtDate(e.date)+'</td>'+
-      '<td><span class="pill '+pillCls+'">'+displayName+'</span></td>'+
-      '<td>'+
-        '<span class="pill pc" style="font-weight:600">'+esc(e.category)+'</span>'+
-        '<span class="m-desc">'+esc(e.description||'')+'</span>'+
-      '</td>'+
-      '<td class="desktop-only" style="color:var(--muted)">'+esc(e.description||'—')+'</td>'+
-      '<td class="ac" style="font-weight:600">€'+fmt(e.amount)+'</td>'+
+      '<td style="font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap">'+fmtDate(e.date)+'</td>'+
+      '<td><span class="pill '+pillCls+'" style="font-size:11px">'+displayName+'</span></td>'+
+      '<td><span class="pill pc" style="font-weight:600; font-size:11px">'+esc(e.category)+'</span></td>'+
+      '<td style="font-size:13px; color:var(--text); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">'+esc(e.description||'—')+'</td>'+
+      '<td class="ac" style="font-weight:700; font-family:var(--mono); text-align:right">€'+fmt(e.amount)+'</td>'+
       '</tr>';
   }).join('');
   document.getElementById('logtot').textContent=fmt(tot);
