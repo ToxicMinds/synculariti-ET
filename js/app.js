@@ -277,7 +277,10 @@ function startEdit(id) {
   document.getElementById('fdesc').value = e.description;
   document.getElementById('form-title').innerHTML = 'Edit expense <button class="btn-g" style="padding:2px 8px;font-size:11px" onclick="cancelEdit()">Cancel</button>';
   document.getElementById('addbtn').textContent = 'Update expense';
-  document.getElementById('app').scrollTo({top:0, behavior:'smooth'});
+  
+  // Scroll to form correctly
+  const form = document.getElementById('form-title');
+  if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function cancelEdit() {

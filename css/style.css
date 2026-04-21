@@ -322,3 +322,4 @@ tbody tr:last-child td{border-bottom:none}
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.h-tip{cursor:help;color:var(--muted);font-size:12px;margin-left:4px;vertical-align:middle;opacity:0.6;} .h-tip:hover{opacity:1;}
