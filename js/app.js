@@ -16,6 +16,7 @@ async function init() {
   if (!session) {
     document.getElementById('auth-modal').classList.add('open');
     document.getElementById('app').style.display = 'none';
+    setTimeout(() => { const p = document.getElementById('auth-pin'); if(p) p.focus(); }, 100);
     return;
   }
   SESSION_JWT = session.access_token;

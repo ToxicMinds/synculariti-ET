@@ -131,6 +131,13 @@ tbody tr:last-child td{border-bottom:none}
 .te{text-align:center;padding:2.5rem;color:var(--muted);font-size:14px}
 .tf{display:flex;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--border);font-size:13px;font-weight:500;font-family:var(--mono);color:var(--muted)}
 .tf span{color:var(--text);margin-left:8px}
+/* Swipe-to-action rows */
+.swipe-row{will-change:transform;transition:transform 0.25s cubic-bezier(.4,0,.2,1),background 0.2s;touch-action:pan-y;}
+@media(max-width:640px){
+  .desktop-only{display:none !important;}
+  .swipe-row td:nth-child(2){font-size:11px;}
+  thead th:first-child{display:none;}
+}
 
 /* ── spinners ── */
 .spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle}

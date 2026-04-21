@@ -254,10 +254,10 @@ function showDayDetails(dateStr) {
     html += `
       <div class="panel" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <div style="font-weight:600; font-size:13px;">${esc(e.description || 'Expense')}</div>
+          <div style="font-weight:600; font-size:13px;">${esc(e.category)}</div>
+          <div style="font-size:12px; color:var(--muted); margin-top:2px;">${esc(e.description || '—')}</div>
           <div style="font-size:11px; color:var(--muted); margin-top:3px;">
-            <span class="pill pc" style="padding:2px 6px">${esc(e.category)}</span>
-            &nbsp;<span class="pill ${pillCls}" style="padding:2px 6px">${esc(e.who)}</span>
+            <span class="pill ${pillCls}" style="padding:2px 6px">${esc(NAMES[e.who_id] || e.who)}</span>
           </div>
         </div>
         <div style="font-family:var(--mono); font-weight:700; font-size:15px; color:var(--text)">€${fmt(e.amount)}</div>
@@ -433,23 +433,69 @@ function renderLog(){
     return d!==0?d:String(b.id).localeCompare(String(a.id));
   });
   var tb=document.getElementById('logbody');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="te">No expenses found.</td></tr>';document.getElementById('logtot').textContent='€0.00';return;}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="te">No expenses found.<br><small style="color:var(--muted);font-size:11px">💡 On mobile: swipe right to delete, left to edit</small></td></tr>';document.getElementById('logtot').textContent='€0.00';return;}
   var tot=rows.reduce(function(s,e){return s+Number(e.amount);},0);
   tb.innerHTML=rows.map(function(e){
     var pillCls = userPillClass(e.who);
-    return '<tr>'+
-      '<td class="act-col">'+
+    var displayName = esc(NAMES[e.who_id] || e.who);
+    return '<tr class="swipe-row" data-expense-id="'+e.id+'">'+
+      '<td class="act-col desktop-only">'+
         '<button class="db db-edit" title="Edit" onclick="startEdit(\''+e.id+'\')">✎</button>'+
         '<button class="db db-del" title="Delete" onclick="deleteExp(\''+e.id+'\')">🗑</button>'+
       '</td>'+
       '<td style="font-family:var(--mono);font-size:12px;color:var(--muted)">'+fmtDate(e.date)+'</td>'+
-      '<td><span class="pill '+pillCls+'">'+esc(NAMES[e.who_id] || e.who)+'</span></td>'+
+      '<td><span class="pill '+pillCls+'">'+displayName+'</span></td>'+
       '<td><span class="pill pc">'+esc(e.category)+'</span></td>'+
       '<td style="color:var(--muted)">'+esc(e.description||'—')+'</td>'+
       '<td class="ac">'+fmt(e.amount)+'</td>'+
       '</tr>';
   }).join('');
   document.getElementById('logtot').textContent=fmt(tot);
+  attachSwipeHandlers();
+}
+
+function attachSwipeHandlers() {
+  document.querySelectorAll('.swipe-row').forEach(function(row) {
+    var startX = 0, startY = 0, dx = 0, swiping = false;
+    var threshold = 80;
+    var expId = row.getAttribute('data-expense-id');
+
+    row.addEventListener('touchstart', function(ev) {
+      startX = ev.touches[0].clientX;
+      startY = ev.touches[0].clientY;
+      dx = 0; swiping = false;
+      row.style.transition = 'none';
+    }, {passive: true});
+
+    row.addEventListener('touchmove', function(ev) {
+      var curX = ev.touches[0].clientX;
+      var curY = ev.touches[0].clientY;
+      var absDx = Math.abs(curX - startX);
+      var absDy = Math.abs(curY - startY);
+      if (!swiping && absDy > absDx) return; // scroll wins
+      swiping = true;
+      ev.preventDefault();
+      dx = curX - startX;
+      var clamped = Math.max(-130, Math.min(130, dx));
+      row.style.transform = 'translateX(' + clamped + 'px)';
+      if (dx > 40) row.style.background = 'rgba(239,68,68,0.15)';
+      else if (dx < -40) row.style.background = 'rgba(37,99,235,0.12)';
+      else row.style.background = '';
+    }, {passive: false});
+
+    row.addEventListener('touchend', function() {
+      row.style.transition = 'transform 0.25s cubic-bezier(.4,0,.2,1), background 0.2s';
+      row.style.transform = '';
+      row.style.background = '';
+      if (!swiping) return;
+      if (dx > threshold) {
+        if (confirm('Delete this expense?')) deleteExp(expId);
+      } else if (dx < -threshold) {
+        startEdit(expId);
+      }
+      dx = 0; swiping = false;
+    }, {passive: true});
+  });
 }
 
 function exportCSV() {
