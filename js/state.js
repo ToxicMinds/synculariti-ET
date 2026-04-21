@@ -199,8 +199,13 @@ function sbH(extra) {
   return h;
 }
 async function sbSelect() {
-  dbg('Supabase SELECT', {}, true); /* enhanced debug */
-  var r = await fetch(REST+'?household_id=eq.'+HOUSEHOLD_ID+'&select=*&order=date.desc,created_at.desc', {headers:sbH()});
+  dbg('Supabase SELECT', {}, true);
+  // OPTIMIZATION: Only load last 4 months initially to keep login fast.
+  const cutOff = new Date();
+  cutOff.setMonth(cutOff.getMonth() - 4);
+  const dateStr = cutOff.toISOString().slice(0, 10);
+  
+  var r = await fetch(REST+'?household_id=eq.'+HOUSEHOLD_ID+'&date=gte.'+dateStr+'&select=*&order=date.desc,created_at.desc', {headers:sbH()});
   var b = await r.text();
   dbg('SELECT '+r.status, b.slice(0, 100), true);
   if (!r.ok) throw new Error('Load failed '+r.status+': '+b.slice(0,300));
@@ -258,7 +263,6 @@ async function sbSaveState() {
     memory: MEMORY, rules: RULES, goals: GOALS, banks: BANKS,
     gcal: GCAL
   };
-  // Use POST with resolution=merge-duplicates for an UPSERT
   var r = await fetch(SB_URL + '/rest/v1/app_state', {
     method:'POST', 
     headers:sbH({
@@ -272,4 +276,31 @@ async function sbSaveState() {
     console.error("State save failed", err);
     throw new Error('State sync failed');
   }
+}
+
+function applyState(config) {
+  if (!config) return;
+  NAMES   = config.names   || NAMES;
+  INCOME  = config.income  || INCOME;
+  BUDGETS = config.budgets || BUDGETS;
+  MEMORY  = config.memory  || MEMORY;
+  RULES   = config.rules   || RULES;
+  GOALS   = config.goals   || GOALS;
+  BANKS   = config.banks   || BANKS;
+  GCAL    = config.gcal    || GCAL;
+  CATS    = Object.keys(BUDGETS);
+  TOTAL_B = CATS.reduce(function(s,k){return s+Number(BUDGETS[k])},0);
+  
+  // Persist locally for next load speed
+  localStorage.setItem('sf_names',   JSON.stringify(NAMES));
+  localStorage.setItem('sf_income',  JSON.stringify(INCOME));
+  localStorage.setItem('sf_budgets', JSON.stringify(BUDGETS));
+  localStorage.setItem('sf_memory',  JSON.stringify(MEMORY));
+  localStorage.setItem('sf_rules',   JSON.stringify(RULES));
+  localStorage.setItem('sf_goals',   JSON.stringify(GOALS));
+  localStorage.setItem('sf_banks',   JSON.stringify(BANKS));
+  localStorage.setItem('sf_gcal',    JSON.stringify(GCAL));
+  
+  if (typeof applyNamesUI === 'function') applyNamesUI();
+  if (typeof applyCatsUI === 'function') applyCatsUI();
 }

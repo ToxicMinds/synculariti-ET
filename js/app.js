@@ -4,15 +4,20 @@
 
 
 async function init() {
-  // 1. BOOT: Initialize Supabase
-  const booted = await sysBootSupabase();
+  // 1. BOOT: Initialize Supabase (Parallelized with Auth Check)
+  const bootPromise = sysBootSupabase();
+  const authPromise = (async () => {
+    await bootPromise; 
+    return supabaseClient.auth.getSession();
+  })();
+
+  const [booted, authRes] = await Promise.all([bootPromise, authPromise]);
   if (!booted) {
     flash("Connection Error. Please refresh.", true);
     return;
   }
 
-  // 2. AUTH: Check for Session
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  const { data: { session } } = authRes;
   if (!session) {
     document.getElementById('auth-modal').classList.add('open');
     document.getElementById('app').style.display = 'none';
@@ -21,73 +26,45 @@ async function init() {
   }
   SESSION_JWT = session.access_token;
 
-  // 3. HOUSEHOLD: Resolve Mapping
-  try {
-    const { data: userData, error: userError } = await supabaseClient
-      .from('app_users')
-      .select('household_id')
-      .eq('id', session.user.id)
-      .maybeSingle();
-      
-    if (userError) throw userError;
-    if (userData && userData.household_id) {
-      HOUSEHOLD_ID = userData.household_id;
-    }
-  } catch (e) {
-    console.warn("Household lookup failed:", e.message);
+  // 2. PARALLEL DATA FETCHING
+  const [householdRes, stateRes] = await Promise.all([
+    supabaseClient.from('app_users').select('household_id').eq('id', session.user.id).maybeSingle(),
+    sbLoadState()
+  ]);
+
+  if (householdRes.data?.household_id) {
+    HOUSEHOLD_ID = householdRes.data.household_id;
   }
 
-  // Handle Translations early
   applyTranslations();
   document.getElementById('auth-modal').classList.remove('open');
   document.getElementById('app').style.display = 'block';
 
-  // 4. READY or ONBOARD:
   if (!HOUSEHOLD_ID) {
     document.getElementById('onboarding-modal').classList.add('open');
     return; 
   }
 
-  // 5. DATA LOAD:
+  // 3. APPLY STATE & LOAD EXPENSES
   setSyncing('s');
   try {
-    var cState = await sbLoadState();
-    if (cState) {
-      NAMES   = cState.names   || NAMES;
-      INCOME  = cState.income  || INCOME;
-      BUDGETS = cState.budgets || BUDGETS;
-      MEMORY  = cState.memory  || MEMORY;
-      RULES   = cState.rules   || RULES;
-      GOALS   = cState.goals   || GOALS;
-      BANKS   = cState.banks   || BANKS;
-      GCAL    = cState.gcal    || GCAL;
-      CATS = Object.keys(BUDGETS);
-      TOTAL_B = CATS.reduce(function(s,k){return s+Number(BUDGETS[k])},0);
-      localStorage.setItem('sf_names',   JSON.stringify(NAMES));
-      localStorage.setItem('sf_income',  JSON.stringify(INCOME));
-      localStorage.setItem('sf_budgets', JSON.stringify(BUDGETS));
-      localStorage.setItem('sf_memory',  JSON.stringify(MEMORY));
-      localStorage.setItem('sf_rules',   JSON.stringify(RULES));
-      localStorage.setItem('sf_goals',   JSON.stringify(GOALS));
-      localStorage.setItem('sf_banks',   JSON.stringify(BANKS));
-      localStorage.setItem('sf_gcal',    JSON.stringify(GCAL));
-      applyNamesUI(); applyCatsUI();
+    if (stateRes) {
+      applyState(stateRes);
     } else {
-      // Household exists but has no state. Initialize with defaults.
       await sbSaveState();
-      applyNamesUI(); applyCatsUI();
     }
 
-    expenses = await sbSelect();
-    dbg('Loaded '+expenses.length+' rows');
+    // Parallel load expenses and recurring bills
+    const [expList] = await Promise.all([
+      sbSelect(),
+      sbSelectRecurring()
+    ]);
     
-    // Load Recurring
-    await sbSelectRecurring();
-    
+    expenses = expList;
     setSyncing('ok');
   } catch(e) {
     setSyncing('e');
-    dbg('INIT: '+e.message, e, true);
+    console.error("Data load failed:", e);
     document.getElementById('cards').innerHTML =
       '<div class="card" style="grid-column:1/-1; text-align:center; padding:2rem">' +
       '<div style="font-size:32px; margin-bottom:12px">⚠️</div>' +
@@ -107,6 +84,21 @@ async function init() {
   
   // 5. RITUAL: Check for Monthly Summary
   checkMonthlyRitual();
+
+  // 4. REALTIME: Listen for changes
+  supabaseClient.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `household_id=eq.${HOUSEHOLD_ID}` }, async () => {
+      expenses = await sbSelect();
+      renderAll();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state', filter: `id=eq.${HOUSEHOLD_ID}` }, async (payload) => {
+      if (payload.new && payload.new.config) {
+        applyState(payload.new.config);
+        renderAll();
+        checkMonthlyRitual();
+      }
+    })
+    .subscribe();
 
   /* ═══════════════════════════════════════════════
      SECURITY & AUTH LISTENERS

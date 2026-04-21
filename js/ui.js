@@ -18,7 +18,7 @@ function checkMonthlyRitual() {
   const now = new Date();
   const day = now.getDate();
   const monthStr = now.toISOString().slice(0, 7); 
-  const dismissed = localStorage.getItem('sf_ritual_dismissed');
+  const dismissed = MEMORY.last_ritual_month;
 
   if (dismissed === monthStr) return;
 
@@ -43,7 +43,8 @@ function openRitual() {
 
 function dismissRitual() {
   const monthStr = new Date().toISOString().slice(0, 7);
-  localStorage.setItem('sf_ritual_dismissed', monthStr);
+  MEMORY.last_ritual_month = monthStr;
+  sbSaveState().catch(() => {}); // Persist to DB for cross-device sync
   document.getElementById('ritual-overlay').style.display = 'none';
   document.getElementById('ritual-nudge').style.display = 'none';
 }
