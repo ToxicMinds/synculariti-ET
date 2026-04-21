@@ -462,15 +462,13 @@ function renderCards(){
   const currentDay = Math.max(1, now.getDate());
 
   // ADVANCED FORECAST: "Bill-Aware"
-  // We separate fixed bills from daily spending so the projection isn't "Rent every day"
-  const billTotal = Object.values(BUDGETS).reduce((a,b)=>a+b, 0); // Total Budgeted (assuming budgets cover bills)
-  // Better: sum actual recurring patterns if we have them
   const recurringPaid = all.filter(e => e.recurring_id).reduce((s,e)=>s+Number(e.amount), 0);
   const variableSpent = spent - recurringPaid;
-  const projectedVariable = (variableSpent / currentDay) * daysInMonth;
+  const daysLeft = daysInMonth - currentDay;
+  const variableDailyRate = variableSpent / currentDay;
   
-  // Total projected = Projected Variable + Total Expected Monthly Bills (Budget)
-  const projected = projectedVariable + TOTAL_B; 
+  // Total projected = What we spent + (Projected Variable Spending for remaining days)
+  const projected = spent + (variableDailyRate * daysLeft); 
   const diff = projected - TOTAL_B;
 
   let userSpend = {};
