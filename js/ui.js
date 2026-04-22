@@ -436,51 +436,21 @@ function showDayDetails(dateStr) {
 }
 
 function renderCards(){
-  const all = moExp();
+  const all      = moExp();
   const userKeys = Object.keys(NAMES);
-  const now = new Date();
-  
-  // 1. Separate Spending vs Savings vs Adjustments
-  // 'Savings' is wealth building, 'Adjustment' is rebates/deposits. Neither are "costs".
-  const spent = all.filter(e => e.category !== 'Savings' && e.category !== 'Adjustment').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const saved = all.filter(e => e.category === 'Savings').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  
-  const rem = TOTAL_B - spent;
-  const rc = rem < 0 ? 'bad' : rem < TOTAL_B * 0.2 ? 'warn' : 'good';
-  const pct = TOTAL_B > 0 ? Math.round(spent / TOTAL_B * 100) : 0;
-  
-  const prevM = (function(){
-    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
-    return d.toISOString().slice(0,7);
-  })();
-  const prevTot = expenses.filter(e => e.date && e.date.startsWith(prevM) && e.category !== 'Savings' && e.category !== 'Adjustment').reduce((s, e) => s + Number(e.amount), 0);
-  const delta = spent - prevTot;
-  const deltaStr = (delta > 0 ? '+' : '-') + '€' + Math.abs(delta).toFixed(2);
-  const deltaColor = delta > 0 ? 'var(--danger)' : 'var(--success)';
+  const now      = new Date();
 
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const currentDay = Math.max(1, now.getDate());
-
-  // ADVANCED FORECAST: "Bill-Aware"
-  const recurringPaid = all.filter(e => e.recurring_id).reduce((s,e)=>s+Number(e.amount), 0);
-  const variableSpent = spent - recurringPaid;
-  const daysLeft = daysInMonth - currentDay;
-  const variableDailyRate = variableSpent / currentDay;
-  
-  // Total projected = What we spent + (Projected Variable Spending for remaining days)
-  const projected = spent + (variableDailyRate * daysLeft); 
-  const diff = projected - TOTAL_B;
-
-  let userSpend = {};
-  userKeys.forEach(k => {
-    userSpend[k] = all.filter(e => (e.who_id === k || (!e.who_id && e.who === NAMES[k])) && e.category !== 'Savings' && e.category !== 'Adjustment').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  });
-
-  const totInc = userKeys.reduce((s, k) => s + (Number(INCOME[k]) || 0), 0) || 0;
-  const netSavings = totInc - spent; // This is income minus real spending
+  // ── FINANCIAL CALCULATIONS (via finance.js) ──────────────────────────────
+  const { spent, saved }                = calcTotals(all);
+  const { remaining, pct, status: rc }  = calcBudgetStatus(spent, TOTAL_B);
+  const { delta, deltaStr, deltaColor } = calcMonthDelta(expenses, curMonth(), spent);
+  const { projected, diff }             = calcForecast(all, TOTAL_B, now);
+  const userSpend                       = calcPerUserSpend(all, NAMES);
+  const totInc    = userKeys.reduce((s, k) => s + (Number(INCOME[k]) || 0), 0);
+  const { netSavings, pct: savPct }     = calcNetSavings(totInc, spent);
   const sc = netSavings < 0 ? 'bad' : 'good';
 
-  // 2. Build HTML
+  // ── BUILD CARD HTML ──────────────────────────────────────────────────────
   let html = `
     <div class="card">
       <div class="cl">Total Spent <span class="h-tip" onclick="showHelp('Sum of all expenses this month, excluding Savings.')">ⓘ</span></div>
@@ -489,13 +459,15 @@ function renderCards(){
     </div>
     <div class="card">
       <div class="cl">Budget Left <span class="h-tip" onclick="showHelp('Current monthly budget minus actual spending.')">ⓘ</span></div>
-      <div class="cv ${rc}">€${fmt(rem)}</div>
+      <div class="cv ${rc}">€${fmt(remaining)}</div>
       <div class="cs">${pct}% used of €${TOTAL_B}</div>
     </div>
     <div class="card" style="border:1px solid var(--border-soft)">
-      <div class="cl">Forecast <span class="h-tip" onclick="showHelp('Smart Forecast: (Variable Daily Average * Days in Month) + Total Fixed Budgets. This assumes your daily habits continue but accounts for bills being paid once a month.')">ⓘ</span></div>
+      <div class="cl">Forecast <span class="h-tip" onclick="showHelp('Projected end-of-month spend based on your variable daily rate. Recurring bills are excluded from the daily rate so they do not inflate the projection.')">ⓘ</span></div>
       <div class="cv ${diff > 0 ? 'bad' : 'good'}">€${fmt(projected)}</div>
-      <div class="cs" style="color:${diff > 0 ? 'var(--danger)' : 'var(--success)'}">${diff > 0 ? '⚠️ €'+fmt(diff)+' OVER' : '✅ €'+fmt(Math.abs(diff))+' UNDER'}</div>
+      <div class="cs" style="color:${diff > 0 ? 'var(--danger)' : 'var(--success)'}">
+        ${diff > 0 ? '⚠️ €'+fmt(diff)+' OVER' : '✅ €'+fmt(Math.abs(diff))+' UNDER'}
+      </div>
     </div>
     <div class="card" style="border-top:3px solid #10b981">
       <div class="cl">Total Saved <span class="h-tip" onclick="showHelp('Sum of all entries in the Savings category. This is money kept, not spent.')">ⓘ</span></div>
@@ -503,41 +475,40 @@ function renderCards(){
       <div class="cs">Kept this month</div>
     </div>
     <div class="card" style="border-left:4px solid var(--nikhil)">
-      <div class="cl">Net Savings <span class="h-tip" onclick="showHelp('Your real profit: Total Income - Total Spent. (Adjustment/Savings excluded). If this is high, check your income settings.')">ⓘ</span></div>
+      <div class="cl">Net Savings <span class="h-tip" onclick="showHelp('Total Income minus Total Spent. Your real monthly profit.')">ⓘ</span></div>
       <div class="cv ${sc}">€${fmt(netSavings)}</div>
-      <div class="cs">${totInc > 0 ? Math.round(netSavings/totInc*100) : 0}% of income kept</div>
+      <div class="cs">${savPct}% of income kept</div>
     </div>
   `;
 
-  userKeys.forEach((k, i) => {
-    const varPrefix = ['nikhil','zuzana','u3','u4'][i % 4];
-    html += `
-      <div class="card" style="border-top: 3px solid var(--${varPrefix})">
-        <div class="cl">${esc(NAMES[k])} <span class="h-tip" onclick="showHelp('Spending attributed to ${esc(NAMES[k])} this month (excluding Savings).')">ⓘ</span></div>
-        <div class="cv" style="color:var(--${varPrefix})">€${fmt(userSpend[k])}</div>
-        <div class="cs">${all.filter(e => (e.who_id === k) || (!e.who_id && e.who === NAMES[k])).length} entries</div>
-      </div>`;
+  const userColors = ['nikhil', 'zuzana', 'u3', 'u4'];
+  userKeys.forEach(function(k, i) {
+    const color      = userColors[i % 4];
+    const entryCount = all.filter(function(e) { return e.who_id === k || (!e.who_id && e.who === NAMES[k]); }).length;
+    html += '<div class="card" style="border-top: 3px solid var(--' + color + ')">' +
+      '<div class="cl">' + esc(NAMES[k]) + ' <span class="h-tip" onclick="showHelp(\'Spending attributed to ' + esc(NAMES[k]) + ' this month (excluding Savings).\')">ⓘ</span></div>' +
+      '<div class="cv" style="color:var(--' + color + ')">€' + fmt(userSpend[k]) + '</div>' +
+      '<div class="cs">' + entryCount + ' entries</div>' +
+      '</div>';
   });
 
-  html += `<div class="card"><div class="cl">Net Savings <span class="h-tip" onclick="showHelp('Total Income minus Total Spent. This is your theoretical bank balance change this month.')">ⓘ</span></div><div class="cv ${sc}">€${(netSavings < 0 ? '-' : '') + fmt(Math.abs(netSavings))}</div><div class="cs">from €${fmt(totInc)} income</div></div>`;
-  
   document.getElementById('cards').innerHTML = html;
 
-  // 3. Alerts
+  // ── ALERT BAR ────────────────────────────────────────────────────────────
   const bar = document.getElementById('alertbar');
   if (bar) {
-    if (rem < 0) {
+    if (remaining < 0) {
       bar.className = 'alertbar d'; bar.style.display = 'block';
-      bar.textContent = '⚠️ You are €' + fmt(Math.abs(rem)) + ' over budget this month.';
+      bar.textContent = '⚠️ You are €' + fmt(Math.abs(remaining)) + ' over budget this month.';
     } else if (pct > 80) {
       bar.className = 'alertbar w'; bar.style.display = 'block';
-      bar.textContent = '⚡ ' + pct + '% of total budget used — €' + fmt(rem) + ' remaining.';
+      bar.textContent = '⚡ ' + pct + '% of total budget used — €' + fmt(remaining) + ' remaining.';
     } else {
       bar.style.display = 'none';
     }
   }
 
-  updateCharts(userSpend, catsObj(all));
+  updateCharts(userSpend, calcCategoryTotals(all));
 }
 
 function catsObj(all) {
