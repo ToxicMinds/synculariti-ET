@@ -138,11 +138,12 @@ async function init() {
     alert('Google Calendar has been successfully connected!');
   }
 
-  setupRealtime();
 }
 
+let realtimeSubscribed = false;
 function setupRealtime() {
-  if (!supabaseClient) return;
+  if (!supabaseClient || !HOUSEHOLD_ID || realtimeSubscribed) return;
+  realtimeSubscribed = true;
   
   supabaseClient.channel('db-changes')
     .on('postgres_changes', { 
