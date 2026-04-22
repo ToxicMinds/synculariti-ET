@@ -28,8 +28,10 @@
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; overflow-x: hidden; width: 100%; position: relative;}
-html { overflow-x: hidden; width: 100%; position: relative; }
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px; -webkit-font-smoothing: antialiased; width: 100%; position: relative;}
+html { width: 100%; position: relative; }
+
+#auth-modal { background: var(--bg); z-index: 99999; }
 
 /* ── flip card ── */
 .card-container {

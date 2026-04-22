@@ -39,13 +39,14 @@
 <div id="dbgpanel"></div>
 
 <!-- ══ AUTH MODAL ══ -->
-<div class="mbk" id="auth-modal" style="background:var(--bg); z-index:9999;">
+<div class="mbk" id="auth-modal">
   <div class="modal" style="max-width:320px; text-align:center;">
     <div class="mtitle" style="margin-bottom:6px" id="lbl-auth-title">ET Expense Tracker</div>
     <div class="msub" style="margin-bottom:1.5rem" id="lbl-auth-sub">Secure access to your household</div>
     
     <!-- Legacy PIN Bridge: NOW PRIMARY -->
     <form onsubmit="event.preventDefault(); executeAuth('pin')" style="background:var(--nikhil-light); border:1px solid var(--nikhil); border-radius:var(--r); padding:1.5rem 1rem; margin-bottom:20px;">
+      <input type="text" name="username" value="household" autocomplete="username" style="display:none">
       <div style="font-size:11px; font-weight:600; text-transform:uppercase; color:var(--nikhil); letter-spacing:0.1em; margin-bottom:12px;" id="lbl-family-passcode">🔐 Family Passcode</div>
       <input type="password" id="auth-pin" placeholder="••••" autofocus autocomplete="current-password" inputmode="numeric" style="width:100%; text-align:center; letter-spacing:8px; font-size:24px; font-family:var(--mono); margin-bottom:12px; border-color:var(--nikhil);" maxlength="4">
       <button type="submit" class="btn btn-p" style="width:100%; margin-top:0; background:var(--nikhil)" id="lbl-btn-pin-enter">Unlock Household</button>
@@ -66,8 +67,8 @@
       <div style="font-size:11px; color:var(--muted); cursor:pointer; text-decoration:underline;" onclick="document.getElementById('simple-auth-section').style.display='block'; this.style.display='none'" id="lbl-show-advanced">Advanced: Username & Password</div>
       
       <form id="simple-auth-section" onsubmit="event.preventDefault(); executeAuth('simple')" style="display:none; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--border)">
-        <input type="text" id="auth-user" placeholder="Username" style="width:100%; text-align:center; font-size:14px; margin-bottom:0.5rem;">
-        <input type="password" id="auth-pass" placeholder="Password" style="width:100%; text-align:center; font-size:14px; margin-bottom:0.8rem;">
+        <input type="text" id="auth-user" name="username" autocomplete="username" placeholder="Username" style="width:100%; text-align:center; font-size:14px; margin-bottom:0.5rem;">
+        <input type="password" id="auth-pass" name="password" autocomplete="current-password" placeholder="Password" style="width:100%; text-align:center; font-size:14px; margin-bottom:0.8rem;">
         <button type="submit" class="btn btn-g" style="width:100%; margin-top:0; font-size:13px" id="lbl-btn-enter">Login</button>
       </form>
     </div>
