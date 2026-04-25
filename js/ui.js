@@ -233,8 +233,8 @@ function applyCatsUI() {
   if(cb) cb.innerHTML=CATS.map(function(c){
     return '<div class="fg"><div class="fl">'+c+'</div><input type="number" id="bc_'+c+'" value="'+BUDGETS[c]+'"></div>';
   }).join('');
-  if(fcat) fcat.innerHTML=CATS.map(function(c){return '<option>'+c+'</option>'}).join('');
-  if(fcf) fcf.innerHTML='<option value="">All Categories</option>'+CATS.map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('');
+  if(fcat) fcat.innerHTML=getCategoryOptions();
+  if(fcf) fcf.innerHTML='<option value="">All Categories</option>'+getCategoryOptions();
 }
 
 function setWho(id) {
@@ -745,9 +745,7 @@ function showReview(store, dateStr, items, totalInput) {
   }
   
   list.innerHTML = items.map(function(it, i) {
-    var catOpts = CATS.map(function(c) {
-      return '<option ' + (c === it.category ? 'selected' : '') + '>' + c + '</option>';
-    }).join('');
+    var catOpts = getCategoryOptions(it.category);
     
     return '<div class="pitem">' +
       '<input type="checkbox" id="rcb_' + i + '" checked style="width:20px;height:20px">' +
@@ -1027,7 +1025,8 @@ async function executeAuth(mode) {
       const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          // Robust redirect: strip query params but keep pathname (important for PWA/Subdirs)
+          redirectTo: window.location.href.split('?')[0].split('#')[0]
         }
       });
       if (error) throw error;

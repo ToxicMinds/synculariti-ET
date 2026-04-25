@@ -169,6 +169,12 @@ var INCOME = oldInc || {u1: 1};
 
 var TOTAL_B = Object.keys(BUDGETS).reduce(function(s,k){return s+Number(BUDGETS[k])},0);
 var CATS    = Object.keys(BUDGETS);
+
+function getCategoryOptions(selected) {
+  return CATS.map(function(c) {
+    return '<option' + (c === selected ? ' selected' : '') + '>' + c + '</option>';
+  }).join('');
+}
 var MEMORY  = JSON.parse(localStorage.getItem('sf_memory')) || {};
 var RULES   = JSON.parse(localStorage.getItem('sf_rules'))  || []; /* [{id,pattern,category}] */
 var GOALS   = JSON.parse(localStorage.getItem('sf_goals'))  || []; /* [{id,name,target,saved,deadline}] */
