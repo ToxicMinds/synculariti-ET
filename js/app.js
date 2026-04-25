@@ -8,10 +8,6 @@ async function init() {
   const bootPromise = sysBootSupabase();
   const authPromise = (async () => {
     await bootPromise; 
-    // Wait slightly if there's a hash to allow Supabase SDK to parse it
-    if (window.location.hash.indexOf('access_token') > -1) {
-      await new Promise(r => setTimeout(r, 250));
-    }
     return supabaseClient.auth.getSession();
   })();
 

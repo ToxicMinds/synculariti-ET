@@ -1025,8 +1025,7 @@ async function executeAuth(mode) {
       const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Robust redirect: strip query params but keep pathname (important for PWA/Subdirs)
-          redirectTo: window.location.href.split('?')[0].split('#')[0]
+          redirectTo: window.location.origin
         }
       });
       if (error) throw error;
