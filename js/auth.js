@@ -99,24 +99,39 @@ async function joinHousehold() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) throw new Error("No active session. Please sign in first.");
     
-    // 1. Verify handle and PIN
-    const { data: house, error: hErr } = await supabaseClient
-      .from('households')
-      .select('id, access_pin')
-      .eq('handle', lowerHandle)
-      .maybeSingle();
-      
-    if (hErr) {
-        console.error("Join lookup error:", hErr);
-        throw new Error("Query failed. Please ensure the SQL migration is applied to your database.");
+    // 1. Verify handle and PIN (Or check for Legacy Alias)
+    let householdId = null;
+    let requiredPin = pin;
+
+    if (handle === '2026') {
+      const { data: aliasData, error: aErr } = await supabaseClient.rpc('verify_household_access', { input_code: '2026' });
+      if (aliasData && aliasData.length > 0) {
+        householdId = aliasData[0].target_id;
+        requiredPin = '2026';
+      }
     }
-    if (!house) throw new Error("Household handle not found.");
-    if (house.access_pin !== pin) throw new Error("Incorrect Household PIN.");
+
+    if (!householdId) {
+      const { data: house, error: hErr } = await supabaseClient
+        .from('households')
+        .select('id, access_pin')
+        .eq('handle', lowerHandle)
+        .maybeSingle();
+      
+      if (hErr) throw new Error("Query failed. Ensure SQL migration is applied.");
+      if (!house) throw new Error("Household handle not found.");
+      householdId = house.id;
+      requiredPin = house.access_pin;
+    }
+    
+    if (requiredPin && pin !== requiredPin && handle !== '2026') {
+       throw new Error("Incorrect Household PIN.");
+    }
     
     // 2. Link user to this household
     const { error: linkErr } = await supabaseClient
       .from('app_users')
-      .insert({ id: session.user.id, household_id: house.id });
+      .insert({ id: session.user.id, household_id: householdId });
       
     if (linkErr) throw linkErr;
     
