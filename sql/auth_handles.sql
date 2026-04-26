@@ -28,7 +28,7 @@ BEGIN
   IF primary_id IS NOT NULL THEN
     -- Set handle and PIN for the primary house
     UPDATE households 
-    SET handle = 'shanbhag', 
+    SET handle = 'shanbhag-26', 
         access_pin = '2026' 
     WHERE id = primary_id;
     
@@ -48,7 +48,7 @@ BEGIN
     RETURN QUERY 
     SELECT household_id, true FROM household_aliases WHERE alias = input_code
     UNION ALL
-    -- Check handles (Future proof)
-    SELECT id, false FROM households WHERE handle = input_code;
+    -- Check handles (Case-insensitive)
+    SELECT id, false FROM households WHERE LOWER(handle) = LOWER(input_code);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
