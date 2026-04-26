@@ -187,6 +187,7 @@ var GCAL    = JSON.parse(localStorage.getItem('sf_gcal'))   || { enabled: false,
    STATE
 ═══════════════════════════════════════════════ */
 var expenses = [];
+var scannerWhoId = 'u1';
 var currentWhoId = 'u1';
 var who  = NAMES.u1;
 var swho = 'u1';

@@ -43,6 +43,18 @@ async function init() {
   }
 
   applyTranslations();
+  
+  // 3. IDENTIFY LOGGED-IN USER IN NAMES
+  const userMeta = session.user.user_metadata || {};
+  const loggedInName = userMeta.full_name || userMeta.name || "";
+  const userKeys = Object.keys(NAMES);
+  
+  // Try to match current logged in person to a "Member Slot" (u1, u2...)
+  const matchedKey = userKeys.find(k => NAMES[k].toLowerCase() === loggedInName.toLowerCase());
+  if (matchedKey) {
+    scannerWhoId = matchedKey;
+    currentWhoId = matchedKey;
+  }
   document.getElementById('auth-modal').classList.remove('open');
   document.getElementById('app').style.display = 'block';
 
@@ -380,10 +392,18 @@ async function confirmReview() {
     var storeName = storeEl?.textContent?.trim();
     var invoiceId = null;
     
+    // 1. Determine who is adding this (with logged-in user fallback)
+    const userMeta = (await supabaseClient.auth.getSession()).data.session?.user?.user_metadata || {};
+    const loggedInName = userMeta.full_name || userMeta.name || "Unknown";
+    
+    // Final check for the "Who"
+    const activeWhoId = scannerWhoId || currentWhoId || 'u1';
+    const activeWhoName = NAMES[activeWhoId] || loggedInName;
+
     // If scanning receipt, create parent invoice
     if (storeName && storeName !== 'Unknown') {
       var invoice = await sbCreateInvoice({
-        who: swho,
+        who: activeWhoName,
         merchant_name: storeName,
         date: dateStr,
         total_amount: 0 // We aren't setting strict total amount for now, relying on sum of expenses
@@ -402,8 +422,8 @@ async function confirmReview() {
         
         var row = {
           id: uid(), 
-          who: NAMES[swho] || swho, 
-          who_id: swho, 
+          who: activeWhoName, 
+          who_id: activeWhoId, 
           date: dateStr, 
           category: cat, 
           amount: amt, 

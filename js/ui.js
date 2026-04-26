@@ -196,13 +196,22 @@ function applyNamesUI() {
     `).join('');
   }
 
-  // 2. Filter Toggles (dynamic colors)
   const filterContainer = document.getElementById('filter-user-toggles');
   if (filterContainer) {
     filterContainer.innerHTML = userKeys.map((key, i) => `
       <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${swho === key ? 'active' : ''}" 
               data-user-id="${key}"
               onclick="setSWho('${key}')">${esc(NAMES[key])}</button>
+    `).join('');
+  }
+
+  // 3. Scanner Toggles (Independent from filter)
+  const scannerContainer = document.getElementById('scanner-user-toggles');
+  if (scannerContainer) {
+    scannerContainer.innerHTML = userKeys.map((key, i) => `
+      <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${scannerWhoId === key ? 'active' : ''}" 
+              data-user-id="${key}"
+              onclick="setScannerWho('${key}')">${esc(NAMES[key])}</button>
     `).join('');
   }
 
@@ -239,12 +248,20 @@ function applyCatsUI() {
 
 function setWho(id) {
   currentWhoId = id;
-  who = NAMES[id];
-  document.querySelectorAll('#user-toggles-container .wbtn').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-user-id') === id);
-  });
-  const fWhoEl = document.getElementById('fwho');
-  if(fWhoEl) fWhoEl.value = id;
+  applyNamesUI();
+}
+function setScannerWho(id) {
+  scannerWhoId = id;
+  // Re-render only the scanner toggles to keep UI responsive
+  const scannerContainer = document.getElementById('scanner-user-toggles');
+  if (scannerContainer) {
+    const userKeys = Object.keys(NAMES);
+    scannerContainer.innerHTML = userKeys.map((key, i) => `
+      <button class="wbtn ${USER_BTN_CLS[i] || 'an'} ${scannerWhoId === key ? 'active' : ''}" 
+              data-user-id="${key}"
+              onclick="setScannerWho('${key}')">${esc(NAMES[key])}</button>
+    `).join('');
+  }
 }
 
 function initMonths() {
@@ -776,6 +793,10 @@ function closeSettings() {
 function openScanner() {
   document.getElementById('scan-modal').classList.add('open');
   document.getElementById('sdate').value = today();
+  
+  // Ensure the scanner user toggles are correctly rendered
+  applyNamesUI();
+  
   showStep('step-qr');
   startQRCamera();
 }
