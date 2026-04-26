@@ -1047,42 +1047,49 @@ async function executeAuth(mode) {
     } catch(e) { err.textContent = e.message; }
     return;
   }
-}
   
-  // Bridge Username to Email
-  var email = userInp.includes('@') ? userInp : (userInp.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '@et-tracker.com');
-  
-  err.textContent = 'Connecting...';
-  try {
-    // 1. Try Login
-    var { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: passInp });
-    
-    // 2. If login fails (user not found), try Signup automatically
-    if (error) {
-      if (error.message.toLowerCase().indexOf('invalid login credentials') > -1) {
-        err.textContent = 'Creating new household...';
-        var { data: sData, error: sErr } = await supabaseClient.auth.signUp({ 
-          email: email, 
-          password: passInp,
-          options: {
-            data: { household_name: userInp }
-          }
-        });
-        if (sErr) throw sErr;
-        
-        var { data: reData, error: reErr } = await supabaseClient.auth.signInWithPassword({ email: email, password: passInp });
-        if (reErr) {
-           err.textContent = "Household created! Please log in again.";
-           return;
-        }
-      } else {
-        throw error;
-      }
+  if (mode === 'simple') {
+    const userInp = document.getElementById('auth-user')?.value?.trim();
+    const passInp = document.getElementById('auth-pass')?.value?.trim();
+    if (!userInp || !passInp) {
+      err.textContent = 'Enter both name and password';
+      return;
     }
+    // Bridge Username to Email
+    var email = userInp.includes('@') ? userInp : (userInp.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '@et-tracker.com');
     
-    window.location.reload();
-  } catch (e) {
-    err.textContent = e.message || 'System error';
+    err.textContent = 'Connecting...';
+    try {
+      // 1. Try Login
+      var { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: passInp });
+      
+      // 2. If login fails (user not found), try Signup automatically
+      if (error) {
+        if (error.message.toLowerCase().indexOf('invalid login credentials') > -1) {
+          err.textContent = 'Creating new household...';
+          var { data: sData, error: sErr } = await supabaseClient.auth.signUp({ 
+            email: email, 
+            password: passInp,
+            options: {
+              data: { household_name: userInp }
+            }
+          });
+          if (sErr) throw sErr;
+          
+          var { data: reData, error: reErr } = await supabaseClient.auth.signInWithPassword({ email: email, password: passInp });
+          if (reErr) {
+             err.textContent = "Household created! Please log in again.";
+             return;
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      window.location.reload();
+    } catch (e) {
+      err.textContent = e.message || 'System error';
+    }
   }
 }
 
@@ -1213,35 +1220,25 @@ async function provisionHousehold(name) {
     const pin = Math.floor(Math.random() * 9000 + 1000).toString();
 
     // 2. Create Household Row 
-    const { data: house, error: hErr } = await supabaseClient
+    const { data: house, error: houseErr } = await supabaseClient
       .from('households')
       .insert({ name: name, handle: handle, access_pin: pin })
       .select('id')
       .single();
       
-    if (hErr) throw hErr;
-    HOUSEHOLD_ID = house.id;
-    // We include created_by so our RLS SELECT policy works immediately
-    const { data: hh, error: hErr } = await supabaseClient
-      .from('households')
-      .insert({ 
-        name: name,
-        created_by: session.user.id 
-      })
-      .select()
-      .single();
-    
-    if (hErr) throw hErr;
-    if (!hh) throw new Error("Household creation failed (no data)");
+    if (houseErr) throw houseErr;
+    if (!house) throw new Error("Household creation failed (no data)");
 
-    // 2. Link User to Household 
-    const { error: mErr } = await supabaseClient
+    // 3. Link User to Household 
+    const { error: mappingErr } = await supabaseClient
       .from('app_users')
-      .insert({ id: session.user.id, household_id: hh.id });
+      .insert({ id: session.user.id, household_id: house.id });
     
-    if (mErr) throw mErr;
+    if (mappingErr) throw mappingErr;
 
-    HOUSEHOLD_ID = hh.id;
+    HOUSEHOLD_ID = house.id;
+    HOUSEHOLD_HANDLE = handle;
+    HOUSEHOLD_PIN = pin;
     return true;
   } catch(e) {
     console.error("Provisioning failed:", e.message);
