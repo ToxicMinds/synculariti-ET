@@ -220,6 +220,7 @@ function applyNamesUI() {
   if (fwhoSelect) {
     fwhoSelect.innerHTML = '<option value="">All Members</option>' + 
       userKeys.map(key => `<option value="${key}">${esc(NAMES[key])}</option>`).join('');
+    fwhoSelect.value = swho; // Preserve the filter selection
   }
 
   // 4. Settings Grid
