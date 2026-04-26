@@ -39,16 +39,25 @@ BEGIN
   END IF;
 END $$;
 
--- 4. Function to verify a PIN or Alias
--- This can be called via RPC to securely check a code before logging in.
+-- 4. Function to verify a PIN or Alias (Bypasses RLS for onboarding)
 CREATE OR REPLACE FUNCTION public.verify_household_access(input_code TEXT)
 RETURNS TABLE (target_id UUID, is_alias BOOLEAN) AS $$
 BEGIN
-    -- Check aliases first (Legacy 2026 flow)
     RETURN QUERY 
     SELECT household_id, true FROM household_aliases WHERE alias = input_code
     UNION ALL
     -- Check handles (Case-insensitive)
     SELECT id, false FROM households WHERE LOWER(handle) = LOWER(input_code);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. Secure PIN check (Bypasses RLS)
+CREATE OR REPLACE FUNCTION public.check_household_pin(h_id UUID, input_pin TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+    actual_pin TEXT;
+BEGIN
+    SELECT access_pin INTO actual_pin FROM households WHERE id = h_id;
+    RETURN (actual_pin = input_pin);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

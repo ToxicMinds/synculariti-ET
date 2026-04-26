@@ -99,33 +99,36 @@ async function joinHousehold() {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) throw new Error("No active session. Please sign in first.");
     
-    // 1. Verify handle and PIN (Or check for Legacy Alias)
+    // 1. Verify handle and PIN (Using RPC to bypass RLS during Join)
     let householdId = null;
-    let requiredPin = pin;
+    let requiredPin = null;
 
-    if (handle === '2026') {
-      const { data: aliasData, error: aErr } = await supabaseClient.rpc('verify_household_access', { input_code: '2026' });
-      if (aliasData && aliasData.length > 0) {
-        householdId = aliasData[0].target_id;
-        requiredPin = '2026';
-      }
-    }
-
-    if (!householdId) {
-      const { data: house, error: hErr } = await supabaseClient
-        .from('households')
-        .select('id, access_pin')
-        .eq('handle', lowerHandle)
-        .maybeSingle();
+    try {
+      const { data: lookupData, error: lErr } = await supabaseClient.rpc('verify_household_access', { input_code: lowerHandle });
       
-      if (hErr) throw new Error("Query failed. Ensure SQL migration is applied.");
-      if (!house) throw new Error("Household handle not found.");
-      householdId = house.id;
-      requiredPin = house.access_pin;
-    }
-    
-    if (requiredPin && pin !== requiredPin && handle !== '2026') {
-       throw new Error("Incorrect Household PIN.");
+      if (lErr) throw lErr;
+      if (!lookupData || lookupData.length === 0) throw new Error("Household handle not found.");
+      
+      householdId = lookupData[0].target_id;
+      
+      // Since verify_household_access doesn't return the PIN (for security), 
+      // we need to verify the PIN via another RPC or allow a special read.
+      // For now, let's update the RPC to also return if the PIN matches, OR 
+      // just fetch the PIN securely.
+      
+      // Tweak: Let's use a more robust RPC that checks both Handle AND PIN.
+      const { data: verifyData, error: vErr } = await supabaseClient.rpc('check_household_pin', { 
+        h_id: householdId, 
+        input_pin: pin 
+      });
+      
+      if (vErr) throw vErr;
+      if (!verifyData) throw new Error("Incorrect Household PIN.");
+
+    } catch(e) {
+      if (err) err.textContent = e.message;
+      if (typeof setSyncing === 'function') setSyncing('e');
+      return;
     }
     
     // 2. Link user to this household
