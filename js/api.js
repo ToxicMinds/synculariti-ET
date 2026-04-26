@@ -94,9 +94,10 @@ async function categoriseWithGroq(ekasaData, receiptId) {
   });
 
   var prompt =
-    'You are a shopping receipt categoriser. Categorise each item below into EXACTLY one of these categories: '+
+    'You are a shopping receipt categoriser. Categorise each item below into one of these existing categories if possible: '+
     CATS.join(', ')+'\n\n'+
     'Rules:\n'+
+    '- If an item absolutely does NOT fit any existing category, you may suggest a NEW category name (max 15 chars, PascalCase).\n'+
     '- Food, drinks, produce, tobacco, cigarettes → Groceries\n'+
     '- Clothes, shoes, bags, accessories → Clothing\n'+
     '- Toys, baby items, school supplies → Kids\n'+
@@ -160,11 +161,15 @@ async function categoriseWithGroq(ekasaData, receiptId) {
       var amt   = Number(it.itemTotalPrice || it.lineTotal || (price*qty) || price);
       
       var ruleCat = applySmartRules(name);
+      var finalCat = ruleCat || catMap[i+1] || 'Other';
+      
+      // Auto-register if AI suggested a new category
+      ensureCategory(finalCat);
       
       return {
         name:     name,
         amount:   amt,
-        category: ruleCat || catMap[i+1] || 'Other'
+        category: finalCat
       };
     });
 

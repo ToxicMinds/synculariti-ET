@@ -238,11 +238,15 @@ function applyNamesUI() {
 function applyCatsUI() {
   var cb=document.getElementById('bud-cats');
   var fcat=document.getElementById('fcat');
+  var clist=document.getElementById('cat-list');
   var fcf=document.getElementById('fcatf');
+  
   if(cb) cb.innerHTML=CATS.map(function(c){
     return '<div class="fg"><div class="fl">'+c+'</div><input type="number" id="bc_'+c+'" value="'+BUDGETS[c]+'"></div>';
   }).join('');
-  if(fcat) fcat.innerHTML=getCategoryOptions();
+  
+  if(clist) clist.innerHTML=getCategoryOptions();
+  if(fcat && fcat.tagName === 'SELECT') fcat.innerHTML=getCategoryOptions(); // Fallback for selects
   if(fcf) fcf.innerHTML='<option value="">All Categories</option>'+getCategoryOptions();
 }
 

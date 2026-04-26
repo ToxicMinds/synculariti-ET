@@ -208,11 +208,24 @@ function sbH(extra) {
   return h;
 }
 
+function ensureCategory(cat) {
+  if (!cat) return;
+  if (!CATS.includes(cat)) {
+    BUDGETS[cat] = 0;
+    CATS = Object.keys(BUDGETS);
+    if (typeof applyCatsUI === 'function') applyCatsUI();
+    if (typeof sbSaveState === 'function') sbSaveState(); // Async fire-and-forget
+  }
+}
+
 function validateRow(row) {
   if (!row.date) throw new Error("Date is required");
   if (!row.amount || isNaN(row.amount)) throw new Error("Valid amount is required");
-  if (!row.category || !CATS.includes(row.category)) throw new Error("Valid category is required (" + row.category + ")");
   if (!row.who) throw new Error("Payer is required");
+  if (!row.category) throw new Error("Category is required");
+
+  ensureCategory(row.category);
+  
   if (!row.id) row.id = uid();
   return true;
 }

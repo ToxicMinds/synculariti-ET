@@ -383,9 +383,10 @@
           <div class="fg"><div class="fl">Amount (€)</div><input type="number" id="famt" step="0.01" placeholder="0.00"></div>
           <div class="fg">
             <div class="fl">Category</div>
-            <select id="fcat">
+            <input type="text" id="fcat" list="cat-list" placeholder="Select or type new..." style="width:100%">
+            <datalist id="cat-list">
               <!-- Populated dynamically -->
-            </select>
+            </datalist>
           </div>
           <div class="fg"><div class="fl">Description</div><input type="text" id="fdesc" placeholder="e.g. Lidl weekly shop"></div>
         </div>
