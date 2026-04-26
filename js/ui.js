@@ -1008,48 +1008,6 @@ function addOBMember() {
   list.appendChild(div);
 }
 
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) throw new Error("No active session");
-    
-    // 1. Verify handle and PIN
-    const { data: house, error: hErr } = await supabaseClient
-      .from('households')
-      .select('id, access_pin')
-      .eq('handle', handle)
-      .maybeSingle();
-      
-    if (hErr || !house) throw new Error("Household handle not found.");
-    if (house.access_pin !== pin) throw new Error("Incorrect Household PIN.");
-    
-    // 2. Link user to this household
-    const { error: linkErr } = await supabaseClient
-      .from('app_users')
-      .insert({ id: session.user.id, household_id: house.id });
-      
-    if (linkErr) throw linkErr;
-    
-    HOUSEHOLD_ID = house.id;
-    document.getElementById('onboarding-modal').classList.remove('open');
-    location.reload();
-  } catch(e) {
-    err.textContent = e.message;
-    setSyncing('e');
-  }
-}
-
-function copyHID() {
-  const handle = document.getElementById('set-h-handle')?.value || '';
-  const pin = document.getElementById('set-h-pin')?.value || '';
-  const shareText = `Join my household on ET Expense!\nHandle: ${handle}\nPIN: ${pin}`;
-  
-  if (navigator.share) {
-    navigator.share({ title: 'Join ET Expense', text: shareText });
-  } else {
-    navigator.clipboard.writeText(shareText);
-    flash('Join details copied to clipboard!');
-  }
-}
-
 
 /* ═══════════════════════════════════════════════
    TRANSLATIONS
