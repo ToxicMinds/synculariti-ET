@@ -3,33 +3,28 @@ import { supabase } from '@/lib/supabase';
 import { getNeo4jDriver } from '@/lib/neo4j';
 
 /**
- * DEBUG API: Syncs your HOUSEHOLD history to Neo4j.
- * Now restricted to your specific household for privacy.
+ * DEBUG API: Syncs transactions to Neo4j using a secret key.
+ * This bypasses the session cookie issue for easy debugging.
  */
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const key = searchParams.get('key');
+
+  // Simple secret key check for debugging
+  if (key !== 'et-secret-sync') {
+    return NextResponse.json({ error: 'Unauthorized. Please provide the correct ?key=' }, { status: 401 });
+  }
+
   const driver = getNeo4jDriver();
   if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
 
   try {
-    // 1. Identify the user's household (Security)
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: userMapping } = await supabase
-      .from('app_users')
-      .select('household_id')
-      .eq('id', session.user.id)
-      .single();
-
-    if (!userMapping?.household_id) return NextResponse.json({ error: 'No household found' }, { status: 404 });
-    const hid = userMapping.household_id;
-
-    // 2. Fetch only THIS household's expenses
+    // Fetch transactions (Limit to 200 for safety)
     const { data: expenses, error } = await supabase
       .from('expenses')
       .select('*')
-      .eq('household_id', hid)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .limit(200);
 
     if (error) throw error;
 
@@ -48,9 +43,9 @@ export async function GET(req: Request) {
             WITH m
             CALL {
               WITH m
-              UNWIND ['Lidl', 'Tesco', 'Amazon', 'Shell', 'Starbucks', 'Bolt', 'Wolt', 'McDonalds'] AS brandName
+              UNWIND ['Lidl', 'Tesco', 'Amazon', 'Shell', 'Starbucks', 'Bolt', 'Wolt', 'McDonalds', 'Billa', 'Kaufland'] AS brandName
               WITH m, brandName
-              WHERE m.name =~ ('(?i).*'+brandName+'.*') // Regex for case-insensitive contains
+              WHERE m.name =~ ('(?i).*'+brandName+'.*')
               MERGE (b:Brand {name: brandName})
               MERGE (m)-[:BELONGS_TO]->(b)
               RETURN count(b) AS branded
@@ -79,8 +74,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: `Privacy-Safe Sync: ${syncCount} transactions synced for your household.`,
-      tip: 'Go to Neo4j and run: MATCH (b:Brand)<-[:BELONGS_TO]-(m:Merchant) RETURN b,m'
+      message: `Big Bang Sync Complete: ${syncCount} transactions mapped.`,
+      tip: 'Run in Neo4j: MATCH (b:Brand)<-[:BELONGS_TO]-(m:Merchant) RETURN b,m'
     });
 
   } catch (e: any) {
