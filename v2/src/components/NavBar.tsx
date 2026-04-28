@@ -91,20 +91,14 @@ export function NavBar() {
     }}>
       <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ position: 'relative', width: 32, height: 32, background: 'var(--bg-card)', borderRadius: 8, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
-            <img 
-              src="/icon.png" 
-              alt="ET" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e) => {
-                (e.target as any).style.display = 'none';
-                if ((e.target as any).parentElement) {
-                  (e.target as any).parentElement.innerHTML = '<div style="background:var(--text-primary);color:var(--bg-primary);width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px">ET</div>';
-                }
-              }}
-            />
+          {/* CRITICAL FIX: Integrated SVG Logo that cannot break */}
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6H20M4 12H20M4 18H20" stroke="var(--bg-primary)" strokeWidth="3" strokeLinecap="round"/>
+                <path d="M12 4V20" stroke="var(--bg-primary)" strokeWidth="3" strokeLinecap="round"/>
+             </svg>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-primary)', display: 'block' }}>ET Expense</span>
+          <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-primary)' }}>ET Expense</span>
         </Link>
         <div style={{ display: 'flex', gap: 24 }} className="hide-mobile">
           {[{ name: 'Dashboard', href: '/' }, { name: 'Settings', href: '/settings' }].map((item) => (

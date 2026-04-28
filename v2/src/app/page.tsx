@@ -16,6 +16,7 @@ import { WealthBuilder } from '@/components/WealthBuilder';
 import { BudgetHealth } from '@/components/BudgetHealth';
 import { FamilySpends } from '@/components/FamilySpends';
 import { CommandCenter } from '@/components/CommandCenter';
+import { MarketTrends } from '@/components/MarketTrends';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -67,7 +68,9 @@ function DashboardContent() {
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} />
             <FamilySpends expenses={expenses} names={household.names} />
 
-            {/* ROW 3: Data & Charts */}
+            {/* ROW 3: Trends & History */}
+            <MarketTrends expenses={expenses} />
+            
             <div style={{ gridColumn: 'span 4' }}>
               <BentoCard title="Total Spent">
                 <div style={{ fontSize: 36, fontWeight: 500, letterSpacing: '-0.02em' }}>€{totals.spent.toFixed(2)}</div>
@@ -76,6 +79,7 @@ function DashboardContent() {
               </BentoCard>
             </div>
 
+            {/* ROW 4: Data Breakdown */}
             <BentoCard colSpan={8} rowSpan={2} title="Recent Expenses">
               <div className="scroll-area" style={{ maxHeight: 600 }}>
                 <ExpenseList expenses={expenses} onDelete={softDeleteExpense} />
