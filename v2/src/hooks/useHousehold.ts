@@ -35,37 +35,43 @@ export function useHousehold() {
 
   const fetchHouseholdState = async () => {
     try {
-      // Get app_user mapping
-      const { data: userMapping } = await supabase
+      // 1. Get current user's household mapping
+      const { data: userMapping, error: uError } = await supabase
         .from('app_users')
         .select('household_id')
         .single();
       
-      if (!userMapping?.household_id) return;
+      if (uError || !userMapping?.household_id) {
+        console.warn('No household mapping found for user');
+        return;
+      }
       
       const hid = userMapping.household_id;
 
-      // Get Handle
+      // 2. Get Household Handle
       const { data: house } = await supabase
         .from('households')
         .select('handle')
         .eq('id', hid)
         .single();
 
-      // Get State
-      const { data: state } = await supabase
+      // 3. Get State (Legacy-Aware)
+      // v1 stores everything in a 'config' JSONB column
+      const { data: stateData } = await supabase
         .from('app_state')
-        .select('*')
+        .select('config')
         .eq('id', hid)
         .single();
+
+      const config = stateData?.config || {};
 
       setHousehold({
         household_id: hid,
         handle: house?.handle || '',
-        names: state?.names || {},
-        income: state?.income || {},
-        budgets: state?.budgets || {},
-        memory: state?.memory || {}
+        names: config.names || {},
+        income: config.income || {},
+        budgets: config.budgets || {},
+        memory: config.memory || {}
       });
     } catch (e) {
       console.error('Error fetching household state:', e);
@@ -77,7 +83,15 @@ export function useHousehold() {
   const updateState = async (updates: Partial<AppState>) => {
     if (!household?.household_id) return;
     
-    const config = {
+    // We must maintain the legacy 'config' structure to keep v1 working!
+    const { data: currentState } = await supabase
+      .from('app_state')
+      .select('config')
+      .eq('id', household.household_id)
+      .single();
+
+    const newConfig = {
+      ...(currentState?.config || {}),
       names: updates.names || household.names,
       income: updates.income || household.income,
       budgets: updates.budgets || household.budgets,
@@ -86,8 +100,7 @@ export function useHousehold() {
 
     const { error } = await supabase
       .from('app_state')
-      .update({ config })
-      .eq('id', household.household_id);
+      .upsert({ id: household.household_id, config: newConfig });
 
     if (error) throw error;
     setHousehold({ ...household, ...updates });
