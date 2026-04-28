@@ -2,46 +2,45 @@
 
 import { useState, useEffect } from 'react';
 import { BentoCard } from './BentoCard';
-import { supabase } from '@/lib/supabase';
 
 export function AIInsights({ householdId }: { householdId: string | undefined }) {
   const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (householdId) {
-      fetchGraphInsights();
-    }
+    fetchRealAIInsight();
   }, [householdId]);
 
-  async function fetchGraphInsights() {
+  async function fetchRealAIInsight() {
     setLoading(true);
     try {
-      // 1. Fetch Top Brand from Neo4j (via a new helper)
-      // For now, let's simulate the AI reasoning based on our Neo4j sync data
-      const response = await fetch('/api/debug/sync-neo4j?key=et-secret-sync');
+      const response = await fetch('/api/ai/insight');
       const data = await response.json();
       
-      // 2. Logic: "If 138 transactions exist, give a smart summary"
       if (data.success) {
-        setInsight("Graph Intelligence: You have 138 transactions mapped. Your most frequent brand is 'Lidl'. AI Suggestion: You tend to shop here on Mondays; morning trips are 15% cheaper due to discounts.");
+        setInsight(data.insight);
+      } else {
+        setInsight("Your graph is populating. Soon I'll be able to tell you more about your habits!");
       }
     } catch (e) {
-      console.error("Failed to fetch graph insights:", e);
+      console.error("Failed to fetch AI insights:", e);
+      setInsight("I'm having trouble connecting to the graph right now, but I'll keep watching your spending.");
     } finally {
       setLoading(false);
     }
   }
 
   if (loading) return (
-    <BentoCard title="AI Intelligence" colSpan={12}>
-      <div className="spinner-small" />
-      <span style={{ fontSize: 14, color: 'var(--text-secondary)', marginLeft: 12 }}>Consulting the Graph...</span>
+    <BentoCard title="AI Intelligence" colSpan={8}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 48 }}>
+        <div className="spinner-small" />
+        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Analyzing your Graph patterns...</span>
+      </div>
     </BentoCard>
   );
 
   return (
-    <BentoCard title="AI Intelligence" colSpan={12}>
+    <BentoCard title="AI Intelligence" colSpan={8}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <div style={{ 
           width: 48, 
@@ -51,16 +50,17 @@ export function AIInsights({ householdId }: { householdId: string | undefined })
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 24
+          fontSize: 24,
+          flexShrink: 0
         }}>
           💡
         </div>
         <div>
-          <p style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
-            Personalized Spending Insight
+          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+            Graph & AI Insight
           </p>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-            {insight}
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5, fontStyle: 'italic' }}>
+            "{insight}"
           </p>
         </div>
       </div>
