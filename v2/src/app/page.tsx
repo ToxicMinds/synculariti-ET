@@ -12,6 +12,8 @@ import { ReceiptScanner } from '@/components/ReceiptScanner';
 import { ItemAnalytics } from '@/components/ItemAnalytics';
 import { SpendingBreakdown, DailyTrend } from '@/components/FinanceCharts';
 import { AIInsights } from '@/components/AIInsights';
+import { WealthBuilder } from '@/components/WealthBuilder';
+import { BudgetHealth } from '@/components/BudgetHealth';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -39,57 +41,43 @@ function DashboardContent() {
     return <AuthScreen session={session} />;
   }
 
+  const totals = calcTotals(expenses);
+  const totalIncome = Object.values(household.income || {}).reduce((a, b) => a + b, 0);
+  const totalBudget = Object.values(household.budgets || {}).reduce((a, b) => a + b, 0);
+  const monthlySavingsGoal = household.goals?.monthly_savings || 500;
+
   return (
     <main style={{ padding: '24px 0' }}>
       <div className="bento-grid">
         {showScanner ? (
           <div style={{ gridColumn: 'span 12' }}>
             <ReceiptScanner onSave={handleSaveReceipt} />
-            <button 
-              className="btn btn-secondary" 
-              style={{ marginTop: 12, width: '100%' }}
-              onClick={() => setShowScanner(false)}
-            >
-              Back to Dashboard
-            </button>
+            <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>Back to Dashboard</button>
           </div>
         ) : (
           <>
-            {/* TOP ROW: Brains & Hands */}
+            {/* ROW 1: Intelligence & Quick Actions */}
             <AIInsights householdId={household.household_id} />
-
             <BentoCard colSpan={4} title="Quick Actions" className="order-first-mobile">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button 
-                  className="btn btn-primary" 
-                  style={{ height: 48, fontSize: 16, gap: 8 }}
-                  onClick={() => setShowScanner(true)}
-                >
-                  📸 Scan Receipt
-                </button>
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ height: 44 }}
-                  onClick={() => alert("Manual entry coming soon!")}
-                >
-                  ➕ Add Manual
-                </button>
+                <button className="btn btn-primary" style={{ height: 48, fontSize: 16, gap: 8 }} onClick={() => setShowScanner(true)}>📸 Scan Receipt</button>
+                <button className="btn btn-secondary" style={{ height: 44 }} onClick={() => alert("Manual entry coming soon!")}>➕ Add Manual</button>
               </div>
             </BentoCard>
 
-            {/* SECOND ROW: Financial Overview */}
+            {/* ROW 2: The Wealth & Health Row (v1 Parity) */}
+            <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
+            <BudgetHealth spent={totals.spent} totalBudget={totalBudget} />
+            
             <div style={{ gridColumn: 'span 4' }}>
-              <BentoCard title="Overview">
-                <div style={{ fontSize: 36, fontWeight: 500, letterSpacing: '-0.02em' }}>
-                  €{calcTotals(expenses).spent.toFixed(2)}
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Total Spent</p>
-                <div style={{ marginTop: 24 }}>
-                  <DailyTrend expenses={expenses} />
-                </div>
+              <BentoCard title="Total Spent">
+                <div style={{ fontSize: 36, fontWeight: 500, letterSpacing: '-0.02em' }}>€{totals.spent.toFixed(2)}</div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Spendings this month</p>
+                <div style={{ marginTop: 24 }}><DailyTrend expenses={expenses} /></div>
               </BentoCard>
             </div>
 
+            {/* ROW 3: Data & Charts */}
             <BentoCard colSpan={8} rowSpan={2} title="Recent Expenses">
               <div className="scroll-area" style={{ maxHeight: 600 }}>
                 <ExpenseList expenses={expenses} onDelete={softDeleteExpense} />
@@ -100,7 +88,6 @@ function DashboardContent() {
               <SpendingBreakdown expenses={expenses} />
             </BentoCard>
 
-            {/* FOOTER ROW: Analytics */}
             <BentoCard colSpan={12} title="Top Items (Deep Analytics)">
               <ItemAnalytics householdId={household.household_id} />
             </BentoCard>

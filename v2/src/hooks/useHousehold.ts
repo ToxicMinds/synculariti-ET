@@ -10,6 +10,7 @@ export interface AppState {
   income: Record<string, number>;
   budgets: Record<string, number>;
   memory: Record<string, string>;
+  goals: Record<string, any>; // Added for v1 compatibility
 }
 
 export function useHousehold() {
@@ -35,28 +36,20 @@ export function useHousehold() {
 
   const fetchHouseholdState = async () => {
     try {
-      // 1. Get current user's household mapping
-      const { data: userMapping, error: uError } = await supabase
+      const { data: userMapping } = await supabase
         .from('app_users')
         .select('household_id')
         .single();
       
-      if (uError || !userMapping?.household_id) {
-        console.warn('No household mapping found for user');
-        return;
-      }
-      
+      if (!userMapping?.household_id) return;
       const hid = userMapping.household_id;
 
-      // 2. Get Household Handle
       const { data: house } = await supabase
         .from('households')
         .select('handle')
         .eq('id', hid)
         .single();
 
-      // 3. Get State (Legacy-Aware)
-      // v1 stores everything in a 'config' JSONB column
       const { data: stateData } = await supabase
         .from('app_state')
         .select('config')
@@ -71,7 +64,8 @@ export function useHousehold() {
         names: config.names || {},
         income: config.income || {},
         budgets: config.budgets || {},
-        memory: config.memory || {}
+        memory: config.memory || {},
+        goals: config.goals || { monthly_savings: 500 } // Fallback to 500 if missing
       });
     } catch (e) {
       console.error('Error fetching household state:', e);
@@ -83,7 +77,6 @@ export function useHousehold() {
   const updateState = async (updates: Partial<AppState>) => {
     if (!household?.household_id) return;
     
-    // We must maintain the legacy 'config' structure to keep v1 working!
     const { data: currentState } = await supabase
       .from('app_state')
       .select('config')
@@ -95,7 +88,8 @@ export function useHousehold() {
       names: updates.names || household.names,
       income: updates.income || household.income,
       budgets: updates.budgets || household.budgets,
-      memory: updates.memory || household.memory
+      memory: updates.memory || household.memory,
+      goals: updates.goals || household.goals
     };
 
     const { error } = await supabase
