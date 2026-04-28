@@ -14,6 +14,8 @@ import { SpendingBreakdown, DailyTrend } from '@/components/FinanceCharts';
 import { AIInsights } from '@/components/AIInsights';
 import { WealthBuilder } from '@/components/WealthBuilder';
 import { BudgetHealth } from '@/components/BudgetHealth';
+import { FamilySpends } from '@/components/FamilySpends';
+import { CommandCenter } from '@/components/CommandCenter';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -56,19 +58,16 @@ function DashboardContent() {
           </div>
         ) : (
           <>
-            {/* ROW 1: Intelligence & Quick Actions */}
+            {/* ROW 1: Intelligence & Command */}
             <AIInsights householdId={household.household_id} />
-            <BentoCard colSpan={4} title="Quick Actions" className="order-first-mobile">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="btn btn-primary" style={{ height: 48, fontSize: 16, gap: 8 }} onClick={() => setShowScanner(true)}>📸 Scan Receipt</button>
-                <button className="btn btn-secondary" style={{ height: 44 }} onClick={() => alert("Manual entry coming soon!")}>➕ Add Manual</button>
-              </div>
-            </BentoCard>
+            <CommandCenter onScan={() => setShowScanner(true)} onManual={(item) => alert("Opening manual entry for: " + item)} />
 
-            {/* ROW 2: The Wealth & Health Row (v1 Parity) */}
+            {/* ROW 2: Financial Foundation */}
             <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} />
-            
+            <FamilySpends expenses={expenses} names={household.names} />
+
+            {/* ROW 3: Data & Charts */}
             <div style={{ gridColumn: 'span 4' }}>
               <BentoCard title="Total Spent">
                 <div style={{ fontSize: 36, fontWeight: 500, letterSpacing: '-0.02em' }}>€{totals.spent.toFixed(2)}</div>
@@ -77,7 +76,6 @@ function DashboardContent() {
               </BentoCard>
             </div>
 
-            {/* ROW 3: Data & Charts */}
             <BentoCard colSpan={8} rowSpan={2} title="Recent Expenses">
               <div className="scroll-area" style={{ maxHeight: 600 }}>
                 <ExpenseList expenses={expenses} onDelete={softDeleteExpense} />
