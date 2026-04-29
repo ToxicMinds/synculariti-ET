@@ -172,9 +172,9 @@ export function NavBar() {
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           {/* Theme-aware SVG icon */}
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-            <img src="/icon.png" alt="ET Expense" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src="/icon.png" alt="Synculariti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-primary)' }}>ET Expense</span>
+          <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-primary)' }}>Synculariti - Tracker</span>
         </Link>
         <div className="hide-mobile" style={{ display: 'flex', gap: 20 }}>
           {[{ name: 'Dashboard', href: '/' }, { name: 'Settings', href: '/settings' }].map(item => (

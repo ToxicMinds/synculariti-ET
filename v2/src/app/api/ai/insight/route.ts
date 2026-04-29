@@ -29,12 +29,17 @@ export async function GET(req: Request) {
 
     // Build a rich context string for Groq — all merchants + category breakdown
     const merchantSummary = facts
-      .map((f: any) => `${f.merchant}: ${f.visits} visits, €${Number(f.total).toFixed(2)}`)
+      .map((f: any) => {
+        const visits = typeof f.visits === 'object' && f.visits !== null ? f.visits.low : f.visits;
+        return `${f.merchant}: ${visits} visits, €${Number(f.total).toFixed(2)}`;
+      })
       .join('; ');
 
     const categorySummary = categories
       .slice(0, 6)
-      .map((c: any) => `${c.category}: €${Number(c.total).toFixed(2)}`)
+      .map((c: any) => {
+        return `${c.category}: €${Number(c.total).toFixed(2)}`;
+      })
       .join('; ');
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {

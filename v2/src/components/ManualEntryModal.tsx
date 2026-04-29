@@ -3,23 +3,24 @@
 import { useState } from 'react';
 import { labelStyle, inputStyle } from './formStyles';
 
-const CATEGORIES = [
-  'Groceries','Food','Transport','Housing','Utilities',
-  'Health','Clothing','Entertainment','Savings','Adjustment','Other'
-];
 
 interface ManualEntryProps {
   defaultDescription?: string;
-  names: Record<string, string>;
+  defaultCategory?: string;
+  household: any;
   selectedUser: string;
   onSave: (entry: { description: string; amount: number; category: string; who_id: string; who: string; date: string }) => Promise<void>;
   onClose: () => void;
 }
 
-export function ManualEntryModal({ defaultDescription, names, selectedUser, onSave, onClose }: ManualEntryProps) {
+export function ManualEntryModal({ defaultDescription, defaultCategory, household, selectedUser, onSave, onClose }: ManualEntryProps) {
   const [description, setDescription] = useState(defaultDescription || '');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Groceries');
+  
+  const names = household.names || {};
+  const categories = household.budgets ? Object.keys(household.budgets) : ['Groceries', 'Food', 'Transport'];
+  
+  const [category, setCategory] = useState(defaultCategory || categories[0]);
   const [who_id, setWhoId] = useState(selectedUser || Object.keys(names)[0] || '');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
@@ -97,7 +98,7 @@ export function ManualEntryModal({ defaultDescription, names, selectedUser, onSa
             <div>
               <label style={labelStyle}>Category</label>
               <select style={inputStyle} value={category} onChange={e => setCategory(e.target.value)}>
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                {categories.map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
             <div>

@@ -3,14 +3,14 @@
 import { BentoCard } from './BentoCard';
 
 const QUICK_ACTIONS = [
-  { label: '🛒 Groceries', merchant: 'Groceries' },
-  { label: '☕ Coffee', merchant: 'Coffee' },
-  { label: '⛽ Fuel', merchant: 'Fuel' },
-  { label: '🍽️ Dining', merchant: 'Restaurant' },
-  { label: '🚇 Transport', merchant: 'Transport' },
+  { label: '🛒 Groceries', category: 'Groceries' },
+  { label: '☕ Coffee', category: 'Dining out' },
+  { label: '⛽ Fuel', category: 'Transport' },
+  { label: '🍽️ Dining', category: 'Dining out' },
+  { label: '🚇 Transport', category: 'Transport' },
 ];
 
-export function CommandCenter({ onScan, onManual, onStatement }: { onScan: () => void, onManual: (item: string) => void, onStatement: () => void }) {
+export function CommandCenter({ onScan, onManual, onStatement }: { onScan: () => void, onManual: (item?: {category?: string}) => void, onStatement: () => void }) {
   return (
     <BentoCard title="Command Center" colSpan={4}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -25,7 +25,7 @@ export function CommandCenter({ onScan, onManual, onStatement }: { onScan: () =>
           <button 
             className="btn btn-secondary" 
             style={{ flex: 1, height: 48, padding: '0 8px' }}
-            onClick={() => onManual('')}
+            onClick={() => onManual()}
           >
             ➕ Manual
           </button>
@@ -47,7 +47,7 @@ export function CommandCenter({ onScan, onManual, onStatement }: { onScan: () =>
             {QUICK_ACTIONS.map((action) => (
               <button 
                 key={action.label}
-                onClick={() => onManual(action.merchant)}
+                onClick={() => onManual({ category: action.category })}
                 style={{
                   padding: '6px 12px',
                   borderRadius: 8,

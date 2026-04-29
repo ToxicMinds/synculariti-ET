@@ -6,13 +6,13 @@ import { NavBar } from "@/components/NavBar";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "ET Expense",
+  title: "Synculariti - Tracker",
   description: "Intelligent household expense tracking for Shanbhag-26",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ET Expense",
+    title: "Synculariti - Tracker",
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -36,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <link rel="icon" href="/icon.png" />
         <link rel="apple-touch-icon" href="/icon.png" />
       </head>
       <body className={inter.className}>

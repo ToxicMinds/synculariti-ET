@@ -1,6 +1,6 @@
 {
-  "name": "ET Expense v2",
-  "short_name": "ET Expense",
+  "name": "Synculariti - Tracker",
+  "short_name": "Synculariti",
   "description": "Intelligent minimalist household expense tracking",
   "start_url": "/",
   "display": "standalone",

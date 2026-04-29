@@ -26,7 +26,7 @@ function DashboardContent() {
   const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense } = useExpenses(household?.household_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
-  const [manualEntry, setManualEntry] = useState<string | null>(null); // null = closed, string = prefill
+  const [manualEntry, setManualEntry] = useState<{ category?: string; description?: string } | null>(null);
 
   const selectedUser = searchParams.get('u') || (household ? Object.keys(household.names)[0] : null);
   const loading = hLoading || (household && eLoading);
@@ -81,8 +81,9 @@ function DashboardContent() {
       {/* Manual Entry Modal */}
       {manualEntry !== null && (
         <ManualEntryModal
-          defaultDescription={manualEntry}
-          names={household.names}
+          defaultDescription={manualEntry.description}
+          defaultCategory={manualEntry.category}
+          household={household}
           selectedUser={selectedUser || Object.keys(household.names)[0]}
           onSave={handleManualSave}
           onClose={() => setManualEntry(null)}
@@ -103,7 +104,7 @@ function DashboardContent() {
             <AIInsights householdId={household.household_id} expenseCount={expenses.length} />
             <CommandCenter
               onScan={() => setShowScanner(true)}
-              onManual={(prefill) => setManualEntry(prefill || '')}
+              onManual={(prefill) => setManualEntry(prefill || {})}
               onStatement={() => setShowStatement(true)}
             />
 
