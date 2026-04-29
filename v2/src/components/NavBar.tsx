@@ -171,10 +171,8 @@ export function NavBar() {
       <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           {/* Theme-aware SVG icon */}
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M3 12h18M3 6h18M3 18h18" stroke="var(--bg-primary)" strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+            <img src="/icon.png" alt="ET Expense" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-primary)' }}>ET Expense</span>
         </Link>

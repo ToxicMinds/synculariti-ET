@@ -12,6 +12,7 @@ export async function GET(req: Request) {
       MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction)
       WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
       ORDER BY visits DESC
+      LIMIT 15
       RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
     `);
     
