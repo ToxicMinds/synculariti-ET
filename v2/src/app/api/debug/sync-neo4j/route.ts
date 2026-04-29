@@ -51,12 +51,9 @@ export async function GET(req: Request) {
               RETURN count(b) AS branded
             }
             
-            CREATE (t:Transaction {
-              id: $id, 
-              amount: $amount, 
-              date: $date,
-              category: $category
-            })
+            MERGE (t:Transaction {id: $id})
+            ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category
+            ON MATCH SET t.amount = $amount, t.date = $date, t.category = $category
             MERGE (m)-[:PROCESSED]->(t)
           `, {
             rawName,
