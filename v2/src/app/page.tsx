@@ -6,7 +6,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { ExpenseList } from '@/components/ExpenseList';
 import { useHousehold } from '@/hooks/useHousehold';
 import { useExpenses, ReceiptData } from '@/hooks/useExpenses';
-import { calcTotals, calcPerUserSpend } from '@/lib/finance';
+import { calcTotals } from '@/lib/finance';
 import { AuthScreen } from '@/components/AuthScreen';
 import { ReceiptScanner } from '@/components/ReceiptScanner';
 import { ItemAnalytics } from '@/components/ItemAnalytics';
@@ -17,24 +17,27 @@ import { BudgetHealth } from '@/components/BudgetHealth';
 import { FamilySpends } from '@/components/FamilySpends';
 import { CommandCenter } from '@/components/CommandCenter';
 import { MarketTrends } from '@/components/MarketTrends';
+import { ManualEntryModal } from '@/components/ManualEntryModal';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
   const { session, household, loading: hLoading } = useHousehold();
-  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt } = useExpenses(household?.household_id);
+  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense } = useExpenses(household?.household_id);
   const [showScanner, setShowScanner] = useState(false);
+  const [manualEntry, setManualEntry] = useState<string | null>(null); // null = closed, string = prefill
 
   const selectedUser = searchParams.get('u') || (household ? Object.keys(household.names)[0] : null);
   const loading = hLoading || (household && eLoading);
 
   const handleSaveReceipt = async (data: ReceiptData) => {
     if (!selectedUser || !household) return;
-    try {
-      await saveReceipt(data, selectedUser, household.names[selectedUser]);
-      setShowScanner(false);
-    } catch (e) {
-      alert("Failed to save receipt: " + (e as Error).message);
-    }
+    await saveReceipt(data, selectedUser, household.names[selectedUser]);
+    setShowScanner(false);
+  };
+
+  const handleManualSave = async (entry: any) => {
+    await addExpense(entry);
+    setManualEntry(null);
   };
 
   if (loading) return (
@@ -53,54 +56,66 @@ function DashboardContent() {
 
   return (
     <main>
+      {/* Manual Entry Modal */}
+      {manualEntry !== null && (
+        <ManualEntryModal
+          defaultDescription={manualEntry}
+          names={household.names}
+          selectedUser={selectedUser || Object.keys(household.names)[0]}
+          onSave={handleManualSave}
+          onClose={() => setManualEntry(null)}
+        />
+      )}
+
       <div className="bento-grid">
         {showScanner ? (
-          <>
-            <div style={{ gridColumn: 'span 12' }}>
-              <ReceiptScanner onSave={handleSaveReceipt} />
-              <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>
-                ← Back to Dashboard
-              </button>
-            </div>
-          </>
+          <div style={{ gridColumn: 'span 12' }}>
+            <ReceiptScanner onSave={handleSaveReceipt} />
+            <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>
+              ← Back to Dashboard
+            </button>
+          </div>
         ) : (
           <>
-            {/* ROW 1: Brains + Hands */}
-            <AIInsights householdId={household.household_id} />
-            <CommandCenter onScan={() => setShowScanner(true)} onManual={(item) => alert("Opening entry for: " + item)} />
+            {/* ROW 1: Brains + Command */}
+            <AIInsights householdId={household.household_id} expenseCount={expenses.length} />
+            <CommandCenter
+              onScan={() => setShowScanner(true)}
+              onManual={(prefill) => setManualEntry(prefill || '')}
+            />
 
-            {/* ROW 2: Financial Foundation with "i" Tooltips */}
+            {/* ROW 2: Financial Foundation */}
             <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} />
             <FamilySpends expenses={expenses} names={household.names} />
 
-            {/* ROW 3: Overview + Trends */}
+            {/* ROW 3: Trends & Overview */}
             <BentoCard
               colSpan={4}
               title="Total Spent"
               tooltip={{
                 title: "Total Spent",
-                explanation: "The sum of all non-Savings, non-Adjustment expenses for your household in the last 4 months. 'Savings' and 'Adjustment' category entries are excluded from this number.",
-                formula: "Total Spent = Σ(expenses) WHERE category ≠ 'Savings' AND category ≠ 'Adjustment' AND is_deleted = false"
+                explanation: "Sum of all non-Savings, non-Adjustment expenses for your household over the last 4 months.",
+                formula: "Σ(amount) WHERE category ≠ 'Savings' AND is_deleted = false"
               }}
             >
-              <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+              <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em' }}>
                 €{totals.spent.toFixed(2)}
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>This month's variable spending</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Variable spending (4 months)</p>
               <div style={{ marginTop: 20 }}><DailyTrend expenses={expenses} /></div>
             </BentoCard>
 
             <MarketTrends expenses={expenses} />
 
             {/* ROW 4: Expense List + Categories */}
-            <BentoCard colSpan={8} rowSpan={2} title="Recent Expenses">
+            <BentoCard colSpan={8} rowSpan={2} title="All Expenses">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList expenses={expenses} onDelete={softDeleteExpense} />
               </div>
             </BentoCard>
 
-            <BentoCard colSpan={4} title="Categories">
+            <BentoCard colSpan={4} title="Category Breakdown">
               <SpendingBreakdown expenses={expenses} />
             </BentoCard>
 
