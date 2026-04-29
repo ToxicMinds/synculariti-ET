@@ -49,7 +49,7 @@ export async function GET(req: Request) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama-3.1-70b-versatile",
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
@@ -71,8 +71,11 @@ Give us one sharp insight.`
     });
 
     const aiData = await groqRes.json();
+    if (aiData.error) {
+      console.error("Groq API Error:", aiData.error);
+    }
     const insightText = aiData.choices?.[0]?.message?.content || 
-      "Your spending patterns are being analyzed. Sync your transactions to see personalized insights.";
+      (aiData.error ? `Groq Error: ${aiData.error.message}` : "Your spending patterns are being analyzed. Sync your transactions to see personalized insights.");
 
     return NextResponse.json({ 
       success: true, 
