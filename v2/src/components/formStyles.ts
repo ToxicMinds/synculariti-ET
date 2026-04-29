@@ -1,4 +1,4 @@
-const labelStyle: React.CSSProperties = {
+export const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 11,
   fontWeight: 700,
@@ -8,7 +8,7 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 6
 };
 
-const inputStyle: React.CSSProperties = {
+export const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '10px 12px',
   borderRadius: 10,

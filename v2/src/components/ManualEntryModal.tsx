@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { labelStyle, inputStyle } from './formStyles';
 
 const CATEGORIES = [
   'Groceries','Food','Transport','Housing','Utilities',
