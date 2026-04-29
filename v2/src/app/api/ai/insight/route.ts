@@ -1,35 +1,42 @@
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
 
-/**
- * AI Insight Engine: 
- * 1. Pulls raw facts from Neo4j Graph
- * 2. Processes them via Groq AI
- * 3. Returns a "human" insight
- */
 export async function GET(req: Request) {
   const driver = getNeo4jDriver();
   if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
 
   const session = driver.session();
   try {
-    // 1. Fetch "Interesting Facts" from the Graph
-    const result = await session.run(`
-      MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction)
-      WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
-      ORDER BY visits DESC
-      LIMIT 3
-      RETURN collect({merchant: merchant, visits: visits, total: total}) AS topMerchants
-    `);
+    // Pull ALL merchants (no LIMIT), plus category distribution and time patterns
+    const [merchantResult, categoryResult] = await Promise.all([
+      session.run(`
+        MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction)
+        WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
+        ORDER BY visits DESC
+        RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
+      `),
+      session.run(`
+        MATCH (t:Transaction)
+        WHERE t.category IS NOT NULL
+        WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
+        ORDER BY total DESC
+        RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
+      `)
+    ]);
 
-    const facts = result.records[0].get('topMerchants');
-    
-    // 2. Format for Groq
-    const factString = facts.map((f: any) => 
-      `${f.merchant}: ${f.visits} visits, total €${f.total.toFixed(2)}`
-    ).join('; ');
+    const facts = merchantResult.records[0]?.get('topMerchants') || [];
+    const categories = categoryResult.records[0]?.get('categories') || [];
 
-    // 3. Call Groq for "Human Interpretation"
+    // Build a rich context string for Groq — all merchants + category breakdown
+    const merchantSummary = facts
+      .map((f: any) => `${f.merchant}: ${f.visits} visits, €${Number(f.total).toFixed(2)}`)
+      .join('; ');
+
+    const categorySummary = categories
+      .slice(0, 6)
+      .map((c: any) => `${c.category}: €${Number(c.total).toFixed(2)}`)
+      .join('; ');
+
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -41,25 +48,32 @@ export async function GET(req: Request) {
         messages: [
           {
             role: "system",
-            content: "You are a professional, witty, and concise financial advisor for a family household. You look at spending facts and give one punchy insight (1-2 sentences). Be specific and helpful. Language: English."
+            content: `You are a sharp, witty, and caring financial advisor for a Slovak-based family household. 
+You analyze spending patterns across ALL merchants and categories — not just the top 3.
+Give ONE focused, actionable insight in 2 sentences max. Be specific with amounts where useful.
+Avoid generic advice like "consider saving more." Focus on patterns visible in the data.`
           },
           {
             role: "user",
-            content: `Here are the top spending locations this month from our Neo4j graph: ${factString}. Give us one smart insight.`
+            content: `Full merchant history: ${merchantSummary || 'No data yet'}.
+Category breakdown: ${categorySummary || 'No data yet'}.
+Give us one sharp insight.`
           }
         ],
         temperature: 0.7,
-        max_tokens: 100
+        max_tokens: 200
       })
     });
 
     const aiData = await groqRes.json();
-    const insightText = aiData.choices?.[0]?.message?.content || "The graph shows stable spending patterns. Keep it up!";
+    const insightText = aiData.choices?.[0]?.message?.content || 
+      "Your spending patterns are being analyzed. Sync your transactions to see personalized insights.";
 
     return NextResponse.json({ 
       success: true, 
       insight: insightText,
-      facts: facts // Send back raw facts for the UI if needed
+      facts,
+      categories
     });
 
   } catch (e: any) {

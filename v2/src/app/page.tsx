@@ -6,7 +6,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { ExpenseList } from '@/components/ExpenseList';
 import { useHousehold } from '@/hooks/useHousehold';
 import { useExpenses, ReceiptData } from '@/hooks/useExpenses';
-import { calcTotals } from '@/lib/finance';
+import { calcTotals, calcPerUserSpend } from '@/lib/finance';
 import { AuthScreen } from '@/components/AuthScreen';
 import { ReceiptScanner } from '@/components/ReceiptScanner';
 import { ItemAnalytics } from '@/components/ItemAnalytics';
@@ -25,7 +25,6 @@ function DashboardContent() {
   const [showScanner, setShowScanner] = useState(false);
 
   const selectedUser = searchParams.get('u') || (household ? Object.keys(household.names)[0] : null);
-
   const loading = hLoading || (household && eLoading);
 
   const handleSaveReceipt = async (data: ReceiptData) => {
@@ -38,50 +37,65 @@ function DashboardContent() {
     }
   };
 
-  if (loading) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading System...</div>;
+  if (loading) return (
+    <div style={{ padding: 64, textAlign: 'center', color: 'var(--text-secondary)' }}>
+      <div className="spinner-small" style={{ margin: '0 auto 12px' }} />
+      <p style={{ fontSize: 14 }}>Loading your household data…</p>
+    </div>
+  );
 
-  if (!household) {
-    return <AuthScreen session={session} />;
-  }
+  if (!household) return <AuthScreen session={session} />;
 
   const totals = calcTotals(expenses);
-  const totalIncome = Object.values(household.income || {}).reduce((a, b) => a + b, 0);
-  const totalBudget = Object.values(household.budgets || {}).reduce((a, b) => a + b, 0);
+  const totalIncome = Object.values(household.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
+  const totalBudget = Object.values(household.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const monthlySavingsGoal = household.goals?.monthly_savings || 500;
 
   return (
-    <main style={{ padding: '24px 0' }}>
+    <main>
       <div className="bento-grid">
         {showScanner ? (
-          <div style={{ gridColumn: 'span 12' }}>
-            <ReceiptScanner onSave={handleSaveReceipt} />
-            <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>Back to Dashboard</button>
-          </div>
+          <>
+            <div style={{ gridColumn: 'span 12' }}>
+              <ReceiptScanner onSave={handleSaveReceipt} />
+              <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>
+                ← Back to Dashboard
+              </button>
+            </div>
+          </>
         ) : (
           <>
-            {/* ROW 1: Intelligence & Command */}
+            {/* ROW 1: Brains + Hands */}
             <AIInsights householdId={household.household_id} />
-            <CommandCenter onScan={() => setShowScanner(true)} onManual={(item) => alert("Opening manual entry for: " + item)} />
+            <CommandCenter onScan={() => setShowScanner(true)} onManual={(item) => alert("Opening entry for: " + item)} />
 
-            {/* ROW 2: Financial Foundation */}
+            {/* ROW 2: Financial Foundation with "i" Tooltips */}
             <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} />
             <FamilySpends expenses={expenses} names={household.names} />
 
-            {/* ROW 3: Trends & History */}
-            <MarketTrends expenses={expenses} />
-            
-            <div style={{ gridColumn: 'span 4' }}>
-              <BentoCard title="Total Spent">
-                <div style={{ fontSize: 36, fontWeight: 500, letterSpacing: '-0.02em' }}>€{totals.spent.toFixed(2)}</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Spendings this month</p>
-                <div style={{ marginTop: 24 }}><DailyTrend expenses={expenses} /></div>
-              </BentoCard>
-            </div>
+            {/* ROW 3: Overview + Trends */}
+            <BentoCard
+              colSpan={4}
+              title="Total Spent"
+              tooltip={{
+                title: "Total Spent",
+                explanation: "The sum of all non-Savings, non-Adjustment expenses for your household in the last 4 months. 'Savings' and 'Adjustment' category entries are excluded from this number.",
+                formula: "Total Spent = Σ(expenses) WHERE category ≠ 'Savings' AND category ≠ 'Adjustment' AND is_deleted = false"
+              }}
+            >
+              <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+                €{totals.spent.toFixed(2)}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>This month's variable spending</p>
+              <div style={{ marginTop: 20 }}><DailyTrend expenses={expenses} /></div>
+            </BentoCard>
 
-            {/* ROW 4: Data Breakdown */}
+            <MarketTrends expenses={expenses} />
+
+            {/* ROW 4: Expense List + Categories */}
             <BentoCard colSpan={8} rowSpan={2} title="Recent Expenses">
-              <div className="scroll-area" style={{ maxHeight: 600 }}>
+              <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList expenses={expenses} onDelete={softDeleteExpense} />
               </div>
             </BentoCard>
@@ -90,6 +104,7 @@ function DashboardContent() {
               <SpendingBreakdown expenses={expenses} />
             </BentoCard>
 
+            {/* ROW 5: Deep Analytics */}
             <BentoCard colSpan={12} title="Top Items (Deep Analytics)">
               <ItemAnalytics householdId={household.household_id} />
             </BentoCard>
@@ -102,7 +117,7 @@ function DashboardContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div style={{ padding: 64, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>}>
       <DashboardContent />
     </Suspense>
   );
