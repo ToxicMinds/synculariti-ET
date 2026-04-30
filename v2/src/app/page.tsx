@@ -23,10 +23,10 @@ import { ManualEntryModal } from '@/components/ManualEntryModal';
 function DashboardContent() {
   const searchParams = useSearchParams();
   const { session, household, loading: hLoading, updateState } = useHousehold();
-  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense } = useExpenses(household?.household_id);
+  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense, updateExpense } = useExpenses(household?.household_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
-  const [manualEntry, setManualEntry] = useState<{ category?: string; description?: string } | null>(null);
+  const [manualEntry, setManualEntry] = useState<any | null>(null);
 
   const selectedUser = searchParams.get('u') || (household ? Object.keys(household.names)[0] : null);
   const loading = hLoading || (household && eLoading);
@@ -48,7 +48,11 @@ function DashboardContent() {
   };
 
   const handleManualSave = async (entry: any) => {
-    await addExpense(entry);
+    if (entry.id) {
+      await updateExpense(entry.id, entry);
+    } else {
+      await addExpense(entry);
+    }
     setManualEntry(null);
   };
 
@@ -100,8 +104,7 @@ function DashboardContent() {
       {/* Manual Entry Modal */}
       {manualEntry !== null && (
         <ManualEntryModal
-          defaultDescription={manualEntry.description}
-          defaultCategory={manualEntry.category}
+          prefill={manualEntry}
           household={household}
           selectedUser={selectedUser || Object.keys(household.names)[0]}
           onSave={handleManualSave}
@@ -123,7 +126,7 @@ function DashboardContent() {
             <AIInsights householdId={household.household_id} expenseCount={expenses.length} updateState={updateState} household={household} />
             <CommandCenter
               onScan={() => setShowScanner(true)}
-              onManual={(prefill) => setManualEntry(prefill || {})}
+              onManual={(prefill) => setManualEntry({ ...prefill, who_id: selectedUser })}
               onStatement={() => setShowStatement(true)}
             />
 
@@ -154,7 +157,11 @@ function DashboardContent() {
             {/* ROW 4: Expense List + Categories */}
             <BentoCard colSpan={8} rowSpan={2} title="All Expenses">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
-                <ExpenseList expenses={expenses} onDelete={softDeleteExpense} />
+                <ExpenseList 
+                  expenses={expenses} 
+                  onDelete={softDeleteExpense} 
+                  onEdit={(exp) => setManualEntry(exp)}
+                />
               </div>
             </BentoCard>
 

@@ -153,5 +153,22 @@ export function useExpenses(householdId: string | undefined) {
     if (error) throw error;
   };
 
-  return { expenses, loading, addExpense, saveReceipt, softDeleteExpense, fetchExpenses };
+  const updateExpense = async (id: string, expense: Partial<Expense> & { merchant?: string }) => {
+    if (!householdId) return;
+
+    const { error } = await supabase
+      .from('expenses')
+      .update({ ...expense, household_id: householdId })
+      .eq('id', id);
+
+    if (error) throw error;
+
+    // Update Neo4j as well
+    const merchantName = expense.merchant || expense.description || 'Unknown Merchant';
+    normalizeAndLinkMerchant(merchantName, id, Number(expense.amount)).catch(err => 
+      console.error('Neo4j Update Failed:', err)
+    );
+  };
+
+  return { expenses, loading, addExpense, saveReceipt, softDeleteExpense, updateExpense, fetchExpenses };
 }

@@ -86,7 +86,11 @@ function CalendarView({ expenses }: { expenses: Expense[] }) {
   );
 }
 
-export function ExpenseList({ expenses, onDelete }: { expenses: Expense[]; onDelete: (id: string) => void }) {
+export function ExpenseList({ expenses, onDelete, onEdit }: { 
+  expenses: Expense[]; 
+  onDelete: (id: string) => void;
+  onEdit: (exp: Expense) => void;
+}) {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [whoFilter, setWhoFilter] = useState('All');
   const [whatFilter, setWhatFilter] = useState('');
@@ -186,6 +190,11 @@ export function ExpenseList({ expenses, onDelete }: { expenses: Expense[]; onDel
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: 14 }}>€{Number(exp.amount).toFixed(2)}</span>
+                    <button
+                      onClick={() => onEdit(exp)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}
+                      title="Edit"
+                    >✏️</button>
                     <button
                       onClick={() => exp.id && onDelete(exp.id)}
                       style={{ background: 'none', border: 'none', color: 'var(--accent-danger)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}
