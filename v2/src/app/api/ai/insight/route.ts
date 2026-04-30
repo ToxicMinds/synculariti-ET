@@ -59,16 +59,15 @@ export async function GET(req: Request) {
         messages: [
           {
             role: "system",
-            content: `You are a sharp, witty, and caring financial advisor for a Slovak-based family household. 
-You analyze spending patterns across ALL merchants and categories — not just the top 3.
-Give ONE focused, actionable insight in 2 sentences max. Be specific with amounts where useful.
-Avoid generic advice like "consider saving more." Focus on patterns visible in the data.`
+            content: `You are a sharp, caring financial advisor for a Slovak-based household.
+IMPORTANT CONTEXT: The merchant data may be unreliable — many expenses are manually entered with product names (e.g. "Kuracia šunka") instead of store names. Treat the CATEGORY breakdown as the ground truth for spending patterns. Use merchant names only for anecdotes, never for totals.
+Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
           },
           {
             role: "user",
-            content: `Full merchant history: ${merchantSummary || 'No data yet'}.
-Category breakdown: ${categorySummary || 'No data yet'}.
-Give us one sharp insight.`
+            content: `Category breakdown (USE THIS AS GROUND TRUTH): ${categorySummary || 'No category data yet'}.
+Top merchants by visits (treat as anecdotal only — names may be product descriptions, not stores): ${merchantSummary || 'No merchant data'}.
+Give one sharp, category-focused insight.`
           }
         ],
         temperature: 0.7,
