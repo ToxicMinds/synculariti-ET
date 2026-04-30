@@ -3,14 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { getNeo4jDriver } from '@/lib/neo4j';
 
 /**
- * DEBUG API: Syncs transactions to Neo4j using a secret key.
- * This bypasses the session cookie issue for easy debugging.
+ * DEBUG API: Full sync of Supabase expenses to Neo4j.
+ * Cypher 5 compliant — every statement ends with RETURN.
+ * Usage: GET /api/debug/sync-neo4j?key=et-secret-sync
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
 
-  // Simple secret key check for debugging
   if (key !== 'et-secret-sync') {
     return NextResponse.json({ error: 'Unauthorized. Please provide the correct ?key=' }, { status: 401 });
   }
@@ -33,35 +33,27 @@ export async function GET(req: Request) {
     try {
       await sessionNeo.executeWrite(async (tx) => {
         for (const exp of expenses) {
-          const rawName = exp.description || 'Unknown Merchant';
-          
-          await tx.run(`
-            MERGE (m:Merchant {name: $rawName})
-            
-            // Smart Case-Insensitive Branding
-            WITH m
-            CALL {
-              WITH m
-              UNWIND ['Lidl', 'Tesco', 'Amazon', 'Shell', 'Starbucks', 'Bolt', 'Wolt', 'McDonalds', 'Billa', 'Kaufland'] AS brandName
-              WITH m, brandName
-              WHERE m.name =~ ('(?i).*'+brandName+'.*')
-              MERGE (b:Brand {name: brandName})
-              MERGE (m)-[:BELONGS_TO]->(b)
-              RETURN count(b) AS branded
-            }
-            
-            MERGE (t:Transaction {id: $id})
-            ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.household_id = $household_id
-            ON MATCH SET t.amount = $amount, t.date = $date, t.category = $category, t.household_id = $household_id
-            MERGE (m)-[:PROCESSED]->(t)
-          `, {
-            rawName,
-            id: exp.id,
-            amount: Number(exp.amount),
-            date: exp.date,
-            category: exp.category,
-            household_id: exp.household_id
-          });
+          const rawName = (exp.description || 'Unknown Merchant').trim();
+
+          // Query 1: MERGE/update Transaction node with household_id
+          await tx.run(
+            `MERGE (t:Transaction {id: $id})
+             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.household_id = $household_id
+             ON MATCH SET  t.household_id = $household_id, t.amount = $amount, t.date = $date, t.category = $category
+             RETURN t.id AS id`,
+            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, household_id: exp.household_id }
+          );
+
+          // Query 2: MERGE Merchant + link to Transaction
+          await tx.run(
+            `MERGE (m:Merchant {name: $rawName})
+             WITH m
+             MATCH (t:Transaction {id: $id})
+             MERGE (m)-[:PROCESSED]->(t)
+             RETURN m.name AS merchant`,
+            { rawName, id: exp.id }
+          );
+
           syncCount++;
         }
       });
@@ -69,10 +61,10 @@ export async function GET(req: Request) {
       await sessionNeo.close();
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: `Big Bang Sync Complete: ${syncCount} transactions mapped.`,
-      tip: 'Run in Neo4j: MATCH (b:Brand)<-[:BELONGS_TO]-(m:Merchant) RETURN b,m'
+      tip: 'Run in Neo4j Aura: MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction) RETURN m.name, count(t) ORDER BY count(t) DESC'
     });
 
   } catch (e: any) {
