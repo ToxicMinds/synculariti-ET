@@ -111,3 +111,68 @@ When migrating data or refining the graph, use the dedicated debug endpoints (se
 - **TECH_DEBT-004:** Category DRY violation. Currently, categories are defined in `state.js` (v1) and `config` (v2). V2 transition should unify this.
 - **ROADMAP:** Implementation of "Franchise-mode" for tracking multiple unrelated households under a single franchise owner.
 - **ROADMAP:** Integration with Enable Banking API for direct bank account sync.
+
+---
+
+## 8. API & Data Schemas
+
+### 8.1 eKasa Proxy (`POST /api/ekasa`)
+Portable proxy for Slovak fiscal data.
+- **Request Body:** `{ "receiptId": "O-..." }`
+- **Response:** Raw JSON from Slovak Government API.
+
+### 8.2 AI Receipt Parser (`POST /api/ai/parse-receipt`)
+Deterministic parser that separates financial facts from AI categorization.
+- **Request Body:** 
+  ```json
+  {
+    "ekasaData": { ... },
+    "categories": ["Groceries", "Dining Out", "..."]
+  }
+  ```
+- **Response Shape (Financial Ground Truth):**
+  ```json
+  {
+    "store": "Normalized Merchant Name",
+    "date": "YYYY-MM-DD",
+    "total": 12.34,
+    "items": [
+      { "name": "AI Normalized Name", "amount": 5.00, "category": "AI Suggestion" }
+    ]
+  }
+  ```
+
+### 8.3 AI Insights (`GET /api/ai/insight`)
+Neo4j-backed analytical generator.
+- **Query Params:** `?householdId=UUID`
+- **Response:**
+  ```json
+  {
+    "insight": "Specific, actionable text.",
+    "facts": [{ "merchant": "...", "visits": 5, "total": 120.00 }],
+    "categories": [{ "category": "...", "total": 300.00 }]
+  }
+  ```
+
+### 8.4 Core Database (Supabase / Postgres)
+Primary tables using the **Financial Artifact Model**.
+
+#### `expenses` (The Ledger)
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | Primary Key |
+| `household_id` | UUID | Tenant isolation |
+| `who_id` | TEXT | Linked member (u1, u2) |
+| `amount` | DECIMAL | Financial fact (Immutable) |
+| `category` | TEXT | System bucket |
+| `date` | DATE | Fact date |
+| `is_deleted` | BOOLEAN | **Voided** state |
+
+#### `receipt_items` (The Allocations)
+| Column | Type | Description |
+|--------|------|-------------|
+| `expense_id` | UUID | FK to expenses |
+| `name` | TEXT | Original receipt item name |
+| `amount` | DECIMAL | Line item cost |
+| `category` | TEXT | AI-assigned category |
+
