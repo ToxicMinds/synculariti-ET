@@ -2,13 +2,24 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Synculariti - Tracker",
-  description: "Intelligent household expense tracking for Shanbhag-26",
+  description: "Intelligent household expense tracking",
   manifest: "/manifest.json",
+  // Next.js 14 proper favicon handling
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icon.png" },
+    ],
+    shortcut: "/icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -35,15 +46,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="icon" href="/icon.png" />
-        <link rel="apple-touch-icon" href="/icon.png" />
-      </head>
       <body className={inter.className}>
         <NavBar />
         <div className="app-container">
           {children}
         </div>
+        <MobileBottomNav />
       </body>
     </html>
   );
