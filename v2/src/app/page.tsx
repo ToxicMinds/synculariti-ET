@@ -22,7 +22,7 @@ import { ManualEntryModal } from '@/components/ManualEntryModal';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
-  const { session, household, loading: hLoading } = useHousehold();
+  const { session, household, loading: hLoading, updateState } = useHousehold();
   const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense } = useExpenses(household?.household_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
