@@ -50,7 +50,14 @@ Data integrity and privacy are enforced via structural isolation.
 ### 3.2 State Synchronization
 V2 eliminates `localStorage` bugs by moving all configuration to the `app_state` table in Supabase.
 - **Config JSONB:** Stores member names (`u1`, `u2`), budgets, goals, and smart rules.
-- **Deterministic AI Caching:** AI insights are stored in `app_state.config.ai_insight`. The cache is only invalidated when the `expenseCount` changes, preventing redundant API costs and ensuring cross-device consistency.
+- **Deterministic AI Caching:** AI insights are stored in `app_state.config.ai_insight`. The cache is only invalidated when the `dataHash` (count + totals) changes, preventing redundant API costs and ensuring cross-device consistency.
+
+### 3.3 AI Caching Verification (Proof of Determinism)
+You can verify that the system is not calling Groq unnecessarily by:
+1. **The UI Indicator:** When an insight is loaded from the Supabase `app_state`, a small **"cached"** badge appears next to the insight title. If it's missing, it was a "live" fetch.
+2. **Database Check:** Run `SELECT config->'ai_insight' FROM app_state WHERE household_id = '...'`. You will see the JSON object containing the insight text and the `hash`.
+3. **Cross-Device Sync:** If you update an expense on your phone, the hash changes. The phone calls Groq once and saves the result to Supabase. When you refresh your Desktop, the Desktop sees the NEW hash and insight in Supabase and displays it instantly with the "cached" label — without calling Groq again.
+
 
 ---
 

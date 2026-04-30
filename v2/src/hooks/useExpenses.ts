@@ -93,7 +93,10 @@ export function useExpenses(householdId: string | undefined) {
       .select();
     if (error) throw error;
 
-    // Fire-and-forget Neo4j sync for each new expense using merchant name if available
+    // Proactively refresh the local list for immediate UI feedback
+    fetchExpenses();
+
+    // Fire-and-forget Neo4j sync
     if (data) {
       for (const saved of data) {
         const merchantName = (expense as any).merchant || saved.description || 'Unknown Merchant';
@@ -154,6 +157,7 @@ export function useExpenses(householdId: string | undefined) {
       .eq('id', id)
       .eq('household_id', householdId);
     if (error) throw error;
+    fetchExpenses();
   };
 
   const updateExpense = async (id: string, expense: Partial<Expense> & { merchant?: string }) => {
@@ -168,6 +172,7 @@ export function useExpenses(householdId: string | undefined) {
       .eq('id', id);
 
     if (error) throw error;
+    fetchExpenses();
 
     // Update Neo4j as well
     const merchantName = expense.merchant || expense.description || 'Unknown Merchant';

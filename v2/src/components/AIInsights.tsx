@@ -6,11 +6,13 @@ import { BentoCard } from './BentoCard';
 export function AIInsights({
   householdId,
   expenseCount,
+  dataHash,
   updateState,
   household
 }: {
   householdId: string | undefined;
   expenseCount?: number;
+  dataHash?: string;
   updateState?: (s: any) => Promise<void>;
   household?: any;
 }) {
@@ -22,8 +24,8 @@ export function AIInsights({
   const lastFetchedHash = useRef<string | null>(null);
   const isFetching = useRef(false);
 
-  // Stable cache key: only changes when household or expense count changes
-  const cacheHash = householdId ? `${householdId}_${expenseCount ?? 0}` : null;
+  // Stable cache key: only changes when household or expense count/totals change
+  const cacheHash = householdId ? (dataHash || `${householdId}_${expenseCount ?? 0}`) : null;
 
   useEffect(() => {
     if (!householdId || !household || !cacheHash) return;
