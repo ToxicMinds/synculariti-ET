@@ -3,24 +3,34 @@
 import { useState } from 'react';
 import { labelStyle, inputStyle } from './formStyles';
 
-
 interface ManualEntryProps {
   defaultDescription?: string;
   defaultCategory?: string;
   household: any;
   selectedUser: string;
-  onSave: (entry: { description: string; amount: number; category: string; who_id: string; who: string; date: string }) => Promise<void>;
+  onSave: (entry: {
+    description: string;
+    merchant: string;
+    amount: number;
+    category: string;
+    who_id: string;
+    who: string;
+    date: string;
+  }) => Promise<void>;
   onClose: () => void;
 }
 
 export function ManualEntryModal({ defaultDescription, defaultCategory, household, selectedUser, onSave, onClose }: ManualEntryProps) {
   const [description, setDescription] = useState(defaultDescription || '');
+  // Merchant is the STORE name for Neo4j graph accuracy (e.g. "Lidl")
+  // Defaults to empty — falls back to description on save if not provided
+  const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
-  
+
   const names = household.names || {};
   const categories = household.budgets ? Object.keys(household.budgets) : ['Groceries', 'Food', 'Transport'];
-  
-  const [category, setCategory] = useState(defaultCategory || categories[0]);
+
+  const [category, setCategory] = useState(defaultCategory || '');
   const [who_id, setWhoId] = useState(selectedUser || Object.keys(names)[0] || '');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
@@ -32,10 +42,17 @@ export function ManualEntryModal({ defaultDescription, defaultCategory, househol
       setError('Please enter a valid amount.');
       return;
     }
+    if (!category) {
+      setError('Please select a category.');
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
         description,
+        // Use the explicit merchant name if provided; otherwise fall back to description
+        // This feeds into Neo4j for accurate merchant graph data
+        merchant: merchant.trim() || description.trim() || 'Unknown Merchant',
         amount: Number(amount),
         category,
         who_id,
@@ -59,17 +76,30 @@ export function ManualEntryModal({ defaultDescription, defaultCategory, househol
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Description</label>
-            <input
-              style={inputStyle}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="e.g. Lidl groceries"
-              autoFocus
-            />
+          {/* Row: Store + Description */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Store / Merchant</label>
+              <input
+                style={inputStyle}
+                value={merchant}
+                onChange={e => setMerchant(e.target.value)}
+                placeholder="e.g. Lidl"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Description <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <input
+                style={inputStyle}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="e.g. Weekly groceries"
+              />
+            </div>
           </div>
 
+          {/* Row: Amount + Date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Amount (€)</label>
@@ -94,11 +124,13 @@ export function ManualEntryModal({ defaultDescription, defaultCategory, househol
             </div>
           </div>
 
+          {/* Row: Category + Person */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Category</label>
               <select style={inputStyle} value={category} onChange={e => setCategory(e.target.value)}>
-                {categories.map(c => <option key={c}>{c}</option>)}
+                <option value="">— select —</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>

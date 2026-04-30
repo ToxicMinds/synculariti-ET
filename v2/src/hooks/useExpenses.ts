@@ -74,15 +74,31 @@ export function useExpenses(householdId: string | undefined) {
 
   const addExpense = async (expense: Partial<Expense> | Partial<Expense>[]) => {
     if (!householdId) return;
-    
-    const payload = Array.isArray(expense) 
-      ? expense.map(e => ({ ...e, household_id: householdId }))
-      : { ...expense, household_id: householdId };
 
-    const { error } = await supabase
+    const normalize = (e: Partial<Expense> & { merchant?: string }) => ({
+      ...e,
+      household_id: householdId,
+    });
+
+    const payload = Array.isArray(expense)
+      ? expense.map(e => normalize(e))
+      : normalize(expense);
+
+    const { data, error } = await supabase
       .from('expenses')
-      .insert(payload);
+      .insert(payload)
+      .select();
     if (error) throw error;
+
+    // Fire-and-forget Neo4j sync for each new expense using merchant name if available
+    if (data) {
+      for (const saved of data) {
+        const merchantName = (expense as any).merchant || saved.description || 'Unknown Merchant';
+        normalizeAndLinkMerchant(merchantName, saved.id, Number(saved.amount)).catch(
+          err => console.error('Neo4j sync failed for manual entry:', err)
+        );
+      }
+    }
   };
 
   const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string) => {

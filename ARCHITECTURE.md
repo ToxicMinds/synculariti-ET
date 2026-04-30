@@ -1,86 +1,102 @@
-# ET Expense v2 - System Architecture & Production Guide
+# ET Expense v2 - Comprehensive System Architecture & Production Guide
 
-This document outlines the architecture, technology stack, data flow, and production-grade features of the **ET Expense v2** SaaS platform. It serves as the single source of truth for understanding how the system operates in a multi-tenant, cloud-native environment.
-
-## 1. System Architecture
-The application follows a modern serverless architecture utilizing Next.js (App Router) on the frontend, Vercel Serverless Functions for API endpoints, and a dual-database strategy (Supabase PostgreSQL + Neo4j Graph).
-
-```mermaid
-graph TD
-    Client[Next.js Client (React)] -->|State Sync & Realtime| Supabase[Supabase PostgreSQL]
-    Client -->|API Routes| VercelAPI[Vercel Serverless API]
-    VercelAPI -->|eKasa Proxy| EKasa[Slovak eKasa API]
-    VercelAPI -->|Categorization| Groq[Groq AI (Llama 3)]
-    VercelAPI -->|Insights & Analytics| Neo4j[Neo4j Aura Graph DB]
-```
-
-### 1.1 Dual-Database Strategy
-- **Supabase (PostgreSQL):** The primary source of truth. Handles authentication, row-level security (RLS), real-time subscriptions, and stores all transactional data (`expenses`, `invoices`, `receipt_items`).
-- **Neo4j (Graph):** A specialized analytical database. It maps relationships between `Transactions`, `Merchants`, and `Brands`. It powers the "Deep Analytics" and feeds structural context to the AI Insight engine.
-
-### 1.2 Multi-Tenancy & Isolation
-The system is a fully multi-tenant SaaS. Data isolation is strictly enforced at the database level:
-1. Every user belongs to a `household` via the `app_users` mapping table.
-2. Every table (`expenses`, `invoices`, `app_state`, `recurring_expenses`, `audit_logs`) has a mandatory `household_id` column.
-3. Supabase Row Level Security (RLS) policies strictly prevent users from selecting, inserting, updating, or deleting records outside their assigned `household_id`.
-4. Neo4j queries are parameterized to filter nodes by `household_id`, ensuring cross-tenant data leakage is structurally impossible.
+This document is the definitive source of truth for the **ET Expense v2** SaaS platform. It details the architecture, tech stack, data flows, security model, and production operational procedures required to maintain a high-performance, multi-tenant financial tracking system.
 
 ---
 
-## 2. Technology Stack
-- **Frontend Framework:** Next.js 14 (App Router)
-- **UI Library:** React 18
-- **Styling:** Vanilla CSS Modules with custom CSS variables (No Tailwind)
-- **Data Visualization:** Chart.js via `react-chartjs-2`
-- **QR Scanning:** `html5-qrcode`
-- **Primary Database:** Supabase (PostgreSQL) + Supabase JS SDK
-- **Analytical Database:** Neo4j Aura (Neo4j JavaScript Driver)
-- **Generative AI:** Groq API (`llama-3.3-70b-versatile`)
-- **Hosting / CI/CD:** Vercel
+## 1. Executive Summary
+**Synculariti - Tracker (V2)** is a minimalist, high-performance financial management platform. It transitions the legacy V1 (Vanilla JS/LocalStorage) to a modern, server-side-rendered Next.js architecture. The core value proposition is **Multi-User Determinism**: ensuring that every household member sees the exact same data, insights, and state regardless of device (Mobile PWA or Desktop).
 
 ---
 
-## 3. Production Readiness & Resilience
+## 2. Technology Stack & Infrastructure
 
-To operate reliably in the "free tier" zone without sacrificing stability, the system employs several resilience patterns.
+The application leverages a "Best-of-Breed" serverless stack designed for maximum performance within free-tier resource constraints.
 
-### 3.1 Network Retries & Exponential Backoff
-External APIs (Slovak eKasa API and Groq AI) can occasionally timeout or hit rate limits. The application uses a custom `fetchWithRetry` utility located in `lib/utils.ts`. 
-- **Mechanism:** If an external call fails with a `5xx` error, the system waits (500ms, 1000ms, 2000ms...) and retries up to 3 times before bubbling the error to the UI.
+### 2.1 Core Frameworks
+- **Frontend/Backend:** Next.js 14 (App Router)
+- **Runtime:** Node.js 18 (Vercel Serverless Functions)
+- **Styling:** Premium Vanilla CSS. Employs modern CSS features like `:root` variables, glassmorphism (`backdrop-filter`), and Bento-grid layouts.
+- **PWA:** Full Progressive Web App manifest (`manifest.json`) for standalone home-screen installation.
 
-### 3.2 AI Caching (Cross-Device Determinism)
-Calling the Groq API on every page load is slow and wastes tokens.
-- **Mechanism:** The AI Insight is cached directly in the `app_state` JSONB column in Supabase alongside the `expenseHash` (which represents the total number of expenses). 
-- **Result:** When a user opens the app on their phone or laptop, the UI reads the insight instantly from the Supabase state object. The Groq API is *only* called if the number of expenses changes.
+### 2.2 Data Layer (Dual-Engine)
+- **Primary (Relational):** Supabase (PostgreSQL). 
+  - Handles Auth, Transactions, and Config. 
+  - Uses **Postgres Change Subscriptions** for real-time UI updates.
+- **Analytical (Graph):** Neo4j Aura DB. 
+  - Maps `Merchant` -> `Transaction` -> `Brand` nodes. 
+  - Powers structural pattern recognition for AI.
 
-### 3.3 Health Checks
-The system exposes a public health endpoint at `GET /api/health`.
-- This endpoint pings both Supabase and Neo4j.
-- It returns `200 OK` if both databases are reachable, or `503 Degraded` with explicit error messages if a connection drops.
-- **Usage:** You can hook this endpoint up to free monitoring tools like UptimeRobot to receive SMS/Email alerts if the database goes down.
-
-### 3.4 Audit Logging & Monitoring
-Instead of paying for expensive third-party logging tools (Datadog/Sentry), the system utilizes a custom, free-tier logging strategy:
-- **Financial Auditing:** Supabase PostgreSQL triggers automatically write every `INSERT`, `UPDATE`, and `DELETE` operation on expenses to the `audit_logs` table, storing the old and new JSON payloads.
-- **System Monitoring:** The frontend utilizes a `systemLog` utility (`lib/utils.ts`) that catches critical application errors (e.g., eKasa scan failures, AI timeouts) and writes them directly into the `audit_logs` table under the `system` namespace for easy review.
+### 2.3 Intelligence Layer
+- **Model:** Llama 3.3 (70B) via **Groq API**.
+- **Performance:** Sub-second inference latency.
+- **Orchestration:** Custom prompt engineering located in `/src/app/api/ai/insight/route.ts`.
 
 ---
 
-## 4. End-to-End Workflows
+## 3. Data Architecture & Multi-Tenancy
 
-### 4.1 The Receipt Scanning Flow
-1. **Scan:** The user points the camera at a fiscal QR code.
-2. **Extract:** The app extracts the 32-character eKasa ID from the string.
-3. **Fetch:** A request is sent through the Next.js Vercel rewrite (`/ekasa-proxy`) to the official Slovak government API (retried automatically on failure).
-4. **Parse & AI:** The raw JSON is sent to `/api/groq`. The Llama 3 model strips the garbage data, extracts the store name, parses the line items, and assigns a normalized category to each item.
-5. **Review:** The user reviews the parsed items in the UI.
-6. **Save:** Upon confirmation, the parent total is saved to the `expenses` table, and the individual line items are saved to the `receipt_items` table.
-7. **Graph Sync:** The system triggers an asynchronous Neo4j update to map the new Merchant and Transaction nodes.
+Data integrity and privacy are enforced via structural isolation.
 
-### 4.2 How to Roll Out V2
-Currently, users are seeing V1. To transition your user base to V2 without downtime:
-1. Since the V2 codebase lives inside the `/v2` directory of your repository, you must update your Vercel project settings.
-2. Go to **Vercel Dashboard > Project > Settings > General**.
-3. Change the **Root Directory** from `/` to `v2`.
-4. Trigger a new deployment. Vercel will build the Next.js app, and the URL will instantly serve the V2 interface to all users. 
-*(Note: Because V2 uses the exact same Supabase database and authentication flow as V1, users will not be logged out and no data migration scripts are necessary).*
+### 3.1 Structural Multi-Tenancy
+1. **The Household Unit:** The primary entity is a `household`. Users are mapped to households via the `app_users` table.
+2. **Row Level Security (RLS):** Every PostgreSQL table has a mandatory `household_id` column with a Supabase RLS policy:
+   ```sql
+   CREATE POLICY "User can only see their household data" ON expenses
+   FOR ALL USING (household_id = (SELECT household_id FROM app_users WHERE id = auth.uid()));
+   ```
+3. **Graph Isolation:** Every node in Neo4j includes a `household_id` property. Every Cypher query is strictly parameterized to filter by this ID.
+
+### 3.2 State Synchronization
+V2 eliminates `localStorage` bugs by moving all configuration to the `app_state` table in Supabase.
+- **Config JSONB:** Stores member names (`u1`, `u2`), budgets, goals, and smart rules.
+- **Deterministic AI Caching:** AI insights are stored in `app_state.config.ai_insight`. The cache is only invalidated when the `expenseCount` changes, preventing redundant API costs and ensuring cross-device consistency.
+
+---
+
+## 4. Operational Workflows
+
+### 4.1 Advanced Receipt Pipeline (eKasa + Groq)
+1. **QR Capture:** `html5-qrcode` extracts the Slovak eKasa ID.
+2. **Vercel Proxy:** The request is proxied through `/ekasa-proxy/*` to bypass CORS and Slovak Gov API IP restrictions.
+3. **AI Itemization:** Groq parses the raw items, normalizes Slovak product names (e.g., "Kup. šunka" -> "Groceries"), and assigns categories.
+4. **Graph Normalization:** Upon save, the store name is normalized in Neo4j to link fragmented merchant names to parent Brands (e.g., "Lidl #142" -> "Lidl").
+
+### 4.2 Manual Entry & Data Quality
+V2 features an improved **Store/Merchant vs. Description** separation.
+- **Description:** Qualitative note about what was bought.
+- **Store:** Quantitative merchant name used for Neo4j analytics. 
+- If a manual entry lacks a store name, it falls back to the description to ensure graph connectivity.
+
+---
+
+## 5. Resilience & Observability
+
+### 5.1 Fault Tolerance
+- **Exponential Backoff:** The `fetchWithRetry` utility handles 5xx errors from Groq/eKasa with a 3-retry limit and 500ms starting backoff.
+- **PIN Verification:** Uses a secure PostgreSQL RPC (`check_household_pin`) to verify bcrypt-hashed PINs without exposing them to the client.
+
+### 5.2 Zero-Cost Monitoring
+- **Health Check:** `/api/health` performs live pings to Postgres and Neo4j.
+- **Audit Logs:** Postgres triggers log all table mutations.
+- **System Logs:** The `systemLog` utility writes client-side JS errors directly into the `audit_logs` table for remote troubleshooting.
+
+---
+
+## 6. Deployment & Maintenance
+
+### 6.1 Rollout Strategy
+1. **Root Directory:** In Vercel Settings, change the root directory from `/` to `v2`.
+2. **Env Vars:** Ensure `NEXT_PUBLIC_SUPABASE_URL`, `GROQ_API_KEY`, and `NEO4J_PASSWORD` are set in the Vercel dashboard.
+
+### 6.2 Database Backfills
+When migrating data or refining the graph, use the dedicated debug endpoints (secured via `key=et-secret-sync`):
+- `/api/debug/sync-neo4j`: Performs a "Big Bang" sync of all Supabase transactions to the Graph.
+- `/api/debug/backfill-neo4j`: Specifically stamps missing `household_id` properties onto existing graph nodes to enable multi-tenant isolation.
+
+---
+
+## 7. Known Tech Debt & Future Roadmap
+- **TECH_DEBT-004:** Category DRY violation. Currently, categories are defined in `state.js` (v1) and `config` (v2). V2 transition should unify this.
+- **ROADMAP:** Implementation of "Franchise-mode" for tracking multiple unrelated households under a single franchise owner.
+- **ROADMAP:** Integration with Enable Banking API for direct bank account sync.
