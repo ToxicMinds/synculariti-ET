@@ -19,12 +19,11 @@ export async function GET(req: Request) {
   if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
 
   try {
-    // Fetch transactions (Limit to 200 for safety)
+    // Fetch all non-deleted expenses for this sync run
     const { data: expenses, error } = await supabase
       .from('expenses')
       .select('*')
-      .eq('is_deleted', false)
-      .limit(200);
+      .eq('is_deleted', false);
 
     if (error) throw error;
 
