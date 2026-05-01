@@ -65,8 +65,8 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
   };
 
   const selectStyle: React.CSSProperties = {
-    padding: '8px 16px', // Increased padding for a larger hit-box
-    borderRadius: 12,
+    padding: '6px 10px',
+    borderRadius: 10,
     border: '1px solid var(--border-color)',
     background: 'var(--bg-secondary)',
     color: 'var(--text-primary)',
@@ -74,11 +74,8 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
     fontWeight: 600,
     cursor: 'pointer',
     pointerEvents: 'auto',
-    appearance: 'auto', // Restoring 'auto' for better Desktop Chrome reliability
-    minWidth: 120,      // Ensures a consistent clickable area
-    position: 'relative',
-    zIndex: 5,
-    outline: 'none'
+    appearance: 'none',
+    WebkitAppearance: 'none'
   };
 
   return (
@@ -215,7 +212,17 @@ export function NavBar() {
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
             <img src="/icon.png" alt="Synculariti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-primary)' }}>Synculariti - Tracker</span>
+          <span style={{ 
+            fontWeight: 800, 
+            fontSize: 20, 
+            letterSpacing: '-0.5px',
+            background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            display: 'inline-block'
+          }}>
+            Synculariti
+          </span>
         </Link>
         <div className="hide-mobile" style={{ display: 'flex', gap: 20 }}>
           {[{ name: 'Dashboard', href: '/' }, { name: 'Settings', href: '/settings' }].map(item => (
