@@ -12,6 +12,7 @@ export interface AppState {
   memory: Record<string, string>;
   goals: Record<string, any>; // Added for v1 compatibility
   ai_insight?: { insight: string; hash: string };
+  created_at?: string;
 }
 
 export function useHousehold() {
@@ -47,7 +48,7 @@ export function useHousehold() {
 
       const { data: house } = await supabase
         .from('households')
-        .select('handle')
+        .select('handle, created_at')
         .eq('id', hid)
         .single();
 
@@ -67,7 +68,8 @@ export function useHousehold() {
         budgets: config.budgets || {},
         memory: config.memory || {},
         goals: config.goals || { monthly_savings: 500 }, // Fallback to 500 if missing
-        ai_insight: config.ai_insight
+        ai_insight: config.ai_insight,
+        created_at: house?.created_at
       });
     } catch (e) {
       console.error('Error fetching household state:', e);

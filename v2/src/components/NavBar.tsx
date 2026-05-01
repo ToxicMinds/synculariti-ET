@@ -70,19 +70,28 @@ function UserSwitcher() {
   );
 }
 
-function MonthSwitcher() {
+function MonthSwitcher({ createdAt }: { createdAt?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const currentM = searchParams.get('m') || new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  const currentMonthISO = now.toISOString().slice(0, 7);
+  const selectedM = searchParams.get('m') || currentMonthISO;
 
   const months = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  const startLimit = createdAt ? new Date(createdAt) : new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  // Normalize startLimit to start of month
+  const startMonth = new Date(startLimit.getFullYear(), startLimit.getMonth(), 1);
+
+  let d = new Date(now.getFullYear(), now.getMonth(), 1);
+  while (d >= startMonth) {
     months.push(d.toISOString().slice(0, 7));
+    d.setMonth(d.getMonth() - 1);
   }
+
+  // Fallback: always show at least current month
+  if (months.length === 0) months.push(currentMonthISO);
 
   const handleChange = (val: string) => {
     const params = new URLSearchParams(searchParams);
@@ -92,7 +101,7 @@ function MonthSwitcher() {
 
   return (
     <select 
-      value={currentM} 
+      value={selectedM} 
       onChange={(e) => handleChange(e.target.value)}
       style={{
         padding: '6px 10px',
@@ -237,7 +246,7 @@ export function NavBar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <ThemeToggle />
         <Suspense fallback={<div style={{ width: 60, height: 36, background: 'var(--bg-hover)', borderRadius: 10 }} />}>
-          <MonthSwitcher />
+          <MonthSwitcher createdAt={household?.created_at} />
         </Suspense>
         <Suspense fallback={<div style={{ width: 80, height: 36, background: 'var(--bg-hover)', borderRadius: 10 }} />}>
           <UserSwitcher />
