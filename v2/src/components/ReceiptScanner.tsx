@@ -31,6 +31,7 @@ export function ReceiptScanner({
   const [step, setStep] = useState<'scan' | 'processing' | 'review'>('scan');
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -107,6 +108,19 @@ export function ReceiptScanner({
     // Quietly ignore scan failures
   }
 
+  async function handleSave() {
+    if (!receipt) return;
+    setIsSaving(true);
+    setError('');
+    try {
+      await onSave(receipt);
+      // The parent will usually unmount us on success (setShowScanner(false))
+    } catch (e: any) {
+      setError(e.message || 'Failed to save receipt.');
+      setIsSaving(false);
+    }
+  }
+
   function extractEkasaId(txt: string) {
     const m = txt.match(/O-[0-9A-F]{32}/i);
     if (m) return m[0];
@@ -117,10 +131,22 @@ export function ReceiptScanner({
 
   if (step === 'processing') {
     return (
-      <BentoCard title="Processing Receipt">
+      <BentoCard title={isSaving ? "Finalizing..." : "Processing Receipt"}>
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <div className="spinner" style={{ marginBottom: 16 }}></div>
-          <p>Fetching eKasa details and running AI categorization...</p>
+          <p>{isSaving ? "Analyzing & Storing your receipt..." : "Fetching eKasa details and running AI categorization..."}</p>
+        </div>
+      </BentoCard>
+    );
+  }
+
+  if (isSaving) {
+    return (
+      <BentoCard title="Saving Expense">
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <div className="spinner" style={{ marginBottom: 16 }}></div>
+          <p style={{ fontWeight: 600 }}>Analyzing & Storing...</p>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>This will only take a moment.</p>
         </div>
       </BentoCard>
     );
@@ -148,7 +174,30 @@ export function ReceiptScanner({
                 />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500 }}>{item.name}</div>
-                  <CategoryPill category={item.category} />
+                  <select 
+                    value={item.category} 
+                    onChange={(e) => {
+                      const next = [...receipt.items];
+                      next[i].category = e.target.value;
+                      setReceipt({ ...receipt, items: next });
+                    }}
+                    style={{ 
+                      fontSize: 11, 
+                      background: 'var(--bg-secondary)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: 4, 
+                      color: 'var(--text-secondary)',
+                      padding: '2px 4px',
+                      marginTop: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {categories.length > 0 ? (
+                      categories.map(c => <option key={c} value={c}>{c}</option>)
+                    ) : (
+                      <option value={item.category}>{item.category}</option>
+                    )}
+                  </select>
                 </div>
               </div>
               <div style={{ fontWeight: 600 }}>€{item.amount.toFixed(2)}</div>
@@ -164,11 +213,12 @@ export function ReceiptScanner({
         </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn btn-primary" onClick={() => onSave(receipt)} disabled={loading}>
-            {loading ? 'Saving...' : 'Confirm & Save'}
+          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Confirm & Save'}
           </button>
-          <button className="btn btn-secondary" onClick={() => setStep('scan')}>Cancel</button>
+          <button className="btn btn-secondary" onClick={() => setStep('scan')} disabled={isSaving}>Cancel</button>
         </div>
+        {error && <div style={{ color: 'var(--accent-danger)', marginTop: 16, fontSize: 13 }}>{error}</div>}
       </BentoCard>
     );
   }

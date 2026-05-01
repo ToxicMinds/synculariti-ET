@@ -108,7 +108,20 @@ export function useExpenses(householdId: string | undefined) {
   };
 
   const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string) => {
-    if (!householdId) return;
+    if (!householdId) {
+      console.error('saveReceipt failed: No householdId provided');
+      return;
+    }
+
+    const selectedItems = receipt.items.filter(i => i.selected);
+    if (selectedItems.length === 0) {
+      throw new Error('No items selected to save.');
+    }
+
+    // Determine the primary category (most frequent among selected items)
+    const catCounts: Record<string, number> = {};
+    selectedItems.forEach(i => catCounts[i.category] = (catCounts[i.category] || 0) + 1);
+    const primaryCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
 
     // 1. Insert the parent Expense
     const { data: expenseData, error: expenseError } = await supabase
@@ -117,8 +130,8 @@ export function useExpenses(householdId: string | undefined) {
         household_id: householdId,
         who_id: whoId,
         who: whoName,
-        category: 'Multiple', // Or most common category
-        amount: receipt.items.filter(i => i.selected).reduce((acc, curr) => acc + curr.amount, 0),
+        category: primaryCategory,
+        amount: selectedItems.reduce((acc, curr) => acc + curr.amount, 0),
         date: receipt.date,
         description: receipt.store,
       })
@@ -128,20 +141,17 @@ export function useExpenses(householdId: string | undefined) {
     if (expenseError) throw expenseError;
 
     // 2. Insert the Receipt Items
-    const selectedItems = receipt.items.filter(i => i.selected);
-    if (selectedItems.length > 0) {
-      const { error: itemsError } = await supabase
-        .from('receipt_items')
-        .insert(selectedItems.map(item => ({
-          expense_id: expenseData.id,
-          household_id: householdId,
-          name: item.name,
-          amount: item.amount,
-          category: item.category
-        })));
+    const { error: itemsError } = await supabase
+      .from('receipt_items')
+      .insert(selectedItems.map(item => ({
+        expense_id: expenseData.id,
+        household_id: householdId,
+        name: item.name,
+        amount: item.amount,
+        category: item.category
+      })));
 
-      if (itemsError) throw itemsError;
-    }
+    if (itemsError) throw itemsError;
 
     // 3. Neo4j Normalization (Fire and forget to keep UI snappy)
     normalizeAndLinkMerchant(receipt.store, expenseData.id, expenseData.amount).catch(err => 
