@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { BentoCard } from './BentoCard';
-import { CategoryPill } from './CategoryPill';
+import { CategorySelector } from './CategorySelector';
 
 import { fetchWithRetry, systemLog } from '@/lib/utils';
 
@@ -205,33 +205,16 @@ export function ReceiptScanner({
                 />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 500 }}>{item.name}</div>
-                  <select 
-                    value={item.category} 
-                    onChange={(e) => {
+                  <CategorySelector 
+                    variant="compact"
+                    categories={categories}
+                    selectedCategory={item.category}
+                    onSelect={(val) => {
                       const next = [...receipt.items];
-                      next[i].category = e.target.value;
+                      next[i].category = val;
                       setReceipt({ ...receipt, items: next });
                     }}
-                    style={{ 
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                      borderRadius: 20,
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-hover)',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      marginTop: 4
-                    }}
-                  >
-                    {categories.length > 0 ? (
-                      categories.map(c => <option key={c} value={c}>{c}</option>)
-                    ) : (
-                      <option value={item.category}>{item.category}</option>
-                    )}
-                  </select>
+                  />
                 </div>
               </div>
               <div style={{ fontWeight: 600 }}>€{item.amount.toFixed(2)}</div>

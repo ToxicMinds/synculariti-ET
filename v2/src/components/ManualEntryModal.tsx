@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { labelStyle, inputStyle } from './formStyles';
 import { Expense } from '@/lib/finance';
+import { CategorySelector } from './CategorySelector';
 
 interface ManualEntryProps {
   prefill?: Partial<Expense> & { merchant?: string };
@@ -130,29 +131,11 @@ export function ManualEntryModal({ prefill, household, selectedUser, onSave, onC
           {/* Category Pills - The "Nice V1 UX" */}
           <div>
             <label style={labelStyle}>Category</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {categories.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCategory(c)}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 12,
-                    border: '1px solid',
-                    borderColor: category === c ? '#6366f1' : 'var(--border-color)',
-                    background: category === c ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-secondary)',
-                    color: category === c ? '#818cf8' : 'var(--text-secondary)',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
+            <CategorySelector 
+              categories={categories}
+              selectedCategory={category}
+              onSelect={setCategory}
+            />
           </div>
 
           {/* Person Pills - Fixing attribution speed */}
