@@ -23,7 +23,7 @@ import { MonthlyPerformance } from '@/components/MonthlyPerformance';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
-  const { session, household, loading: hLoading, updateState } = useHousehold();
+  const { session, household, loading: hLoading, updateState, addCategory } = useHousehold();
   const now = new Date();
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedMonth = searchParams.get('m') || currentMonthISO;
@@ -115,6 +115,7 @@ function DashboardContent() {
           household={household}
           selectedUser={selectedUser || Object.keys(household.names)[0]}
           onSave={handleManualSave}
+          onAddCategory={addCategory}
           onClose={() => setManualEntry(null)}
         />
       )}
@@ -124,6 +125,7 @@ function DashboardContent() {
           <div style={{ gridColumn: 'span 12' }}>
             <ReceiptScanner 
               onSave={handleSaveReceipt} 
+              onAddCategory={addCategory}
               categories={household.budgets ? Object.keys(household.budgets) : []}
               names={household.names}
             />

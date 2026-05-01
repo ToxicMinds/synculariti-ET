@@ -6,6 +6,7 @@ interface CategorySelectorProps {
   categories: string[];
   selectedCategory: string;
   onSelect: (category: string) => void;
+  onAdd?: (name: string) => Promise<void>;
   variant?: 'full' | 'compact';
 }
 
@@ -17,8 +18,20 @@ export function CategorySelector({
   categories, 
   selectedCategory, 
   onSelect,
+  onAdd,
   variant = 'full'
 }: CategorySelectorProps) {
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [newCat, setNewCat] = React.useState('');
+
+  const handleAdd = async () => {
+    if (!newCat.trim() || !onAdd) return;
+    await onAdd(newCat.trim());
+    onSelect(newCat.trim());
+    setNewCat('');
+    setIsAdding(false);
+  };
+
   // Common categories to show if none provided
   const items = categories.length > 0 ? categories : ['Groceries', 'Dining out', 'Transport', 'Utilities', 'Health', 'Shopping', 'Other'];
 
@@ -63,6 +76,40 @@ export function CategorySelector({
           {cat}
         </button>
       ))}
+
+      {onAdd && !isAdding && (
+        <button 
+          type="button"
+          onClick={() => setIsAdding(true)}
+          style={{ ...pillStyle(''), borderStyle: 'dashed', color: 'var(--text-muted)' }}
+        >
+          + Add
+        </button>
+      )}
+
+      {isAdding && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <input
+            autoFocus
+            value={newCat}
+            onChange={e => setNewCat(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            placeholder="New name..."
+            style={{
+              padding: '6px 12px',
+              borderRadius: 20,
+              fontSize: 12,
+              border: '1px solid var(--accent-primary)',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+              width: 100,
+              outline: 'none'
+            }}
+          />
+          <button onClick={handleAdd} style={{ fontSize: 16, background: 'none', border: 'none', cursor: 'pointer' }}>✅</button>
+          <button onClick={() => setIsAdding(false)} style={{ fontSize: 16, background: 'none', border: 'none', cursor: 'pointer' }}>❌</button>
+        </div>
+      )}
     </div>
   );
 }

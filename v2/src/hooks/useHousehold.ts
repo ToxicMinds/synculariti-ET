@@ -105,5 +105,14 @@ export function useHousehold() {
     setHousehold({ ...household, ...updates });
   };
 
-  return { session, household, loading, fetchHouseholdState, updateState };
+  const addCategory = async (name: string) => {
+    if (!household?.budgets) return;
+    const cleanName = name.trim();
+    if (!cleanName || household.budgets[cleanName] !== undefined) return;
+    
+    const newBudgets = { ...household.budgets, [cleanName]: 0 };
+    await updateState({ budgets: newBudgets });
+  };
+
+  return { session, household, loading, fetchHouseholdState, updateState, addCategory };
 }

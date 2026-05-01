@@ -28,6 +28,7 @@ export function ReceiptScanner({
   names = {}
 }: { 
   onSave: (data: ReceiptData, whoId: string) => Promise<void>;
+  onAddCategory?: (name: string) => Promise<void>;
   categories?: string[];
   names?: Record<string, string>;
 }) {
@@ -229,7 +230,7 @@ export function ReceiptScanner({
                     }}
                   >
                     {categories.length > 0 ? (
-                      categories.map(c => <option key={c} value={c}>{c}</option>)
+                      [...categories, "Add New..."].map(c => <option key={c} value={c}>{c}</option>)
                     ) : (
                       <option value={item.category}>{item.category}</option>
                     )}
@@ -240,6 +241,42 @@ export function ReceiptScanner({
             </div>
           ))}
         </div>
+
+        {/* Global Add Category for Scanner Review */}
+        {onAddCategory && (
+          <div style={{ marginBottom: 20, padding: 12, background: 'var(--bg-hover)', borderRadius: 12 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Missing a category?</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input 
+                id="scanner-new-cat"
+                placeholder="New category name..."
+                style={{ 
+                  flex: 1, 
+                  fontSize: 12, 
+                  padding: '6px 12px', 
+                  borderRadius: 8, 
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+              <button 
+                className="btn btn-primary"
+                style={{ height: 32, minHeight: 32, fontSize: 12, padding: '0 12px' }}
+                onClick={async () => {
+                  const el = document.getElementById('scanner-new-cat') as HTMLInputElement;
+                  if (el && el.value.trim()) {
+                    await onAddCategory(el.value.trim());
+                    el.value = '';
+                  }
+                }}
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontWeight: 600 }}>Total selected:</span>

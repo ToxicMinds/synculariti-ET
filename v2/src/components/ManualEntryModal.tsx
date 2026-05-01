@@ -19,10 +19,11 @@ interface ManualEntryProps {
     who: string;
     date: string;
   }) => Promise<void>;
+  onAddCategory?: (name: string) => Promise<void>;
   onClose: () => void;
 }
 
-export function ManualEntryModal({ prefill, household, selectedUser, onSave, onClose }: ManualEntryProps) {
+export function ManualEntryModal({ prefill, household, selectedUser, onSave, onAddCategory, onClose }: ManualEntryProps) {
   const isEdit = !!prefill?.id;
 
   const [description, setDescription] = useState(prefill?.description || '');
@@ -143,6 +144,7 @@ export function ManualEntryModal({ prefill, household, selectedUser, onSave, onC
               categories={categories}
               selectedCategory={category}
               onSelect={setCategory}
+              onAdd={onAddCategory}
             />
           </div>
 
