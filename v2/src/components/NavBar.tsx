@@ -65,8 +65,8 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
   };
 
   const selectStyle: React.CSSProperties = {
-    padding: '6px 10px',
-    borderRadius: 10,
+    padding: '8px 16px', // Increased padding for a larger hit-box
+    borderRadius: 12,
     border: '1px solid var(--border-color)',
     background: 'var(--bg-secondary)',
     color: 'var(--text-primary)',
@@ -74,8 +74,11 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
     fontWeight: 600,
     cursor: 'pointer',
     pointerEvents: 'auto',
-    appearance: 'none',
-    WebkitAppearance: 'none'
+    appearance: 'auto', // Restoring 'auto' for better Desktop Chrome reliability
+    minWidth: 120,      // Ensures a consistent clickable area
+    position: 'relative',
+    zIndex: 5,
+    outline: 'none'
   };
 
   return (
