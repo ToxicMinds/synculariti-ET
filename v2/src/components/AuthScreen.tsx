@@ -9,6 +9,31 @@ export function AuthScreen({ session }: { session: any }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pinOnly, setPinOnly] = useState('');
+
+  const handlePinLogin = async () => {
+    if (!pinOnly) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinOnly })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'PIN login failed');
+
+      await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message);
+      setLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -83,6 +108,39 @@ export function AuthScreen({ session }: { session: any }) {
             >
               {loading ? 'Connecting...' : 'Sign in with Google'}
             </button>
+
+            <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border-color)' }}>
+              <p style={{ marginBottom: 16, fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', textAlign: 'center', textTransform: 'uppercase' }}>
+                Or: Unblock Family Household
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input 
+                  type="password" 
+                  placeholder="Family PIN (e.g. 2026)" 
+                  value={pinOnly}
+                  onChange={e => setPinOnly(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handlePinLogin()}
+                  style={{ 
+                    flex: 1, 
+                    padding: '12px', 
+                    borderRadius: 8, 
+                    border: '1px solid var(--border-color)', 
+                    background: 'var(--bg-secondary)', 
+                    color: 'var(--text-primary)',
+                    textAlign: 'center',
+                    letterSpacing: '4px'
+                  }}
+                />
+                <button 
+                  className="btn btn-primary"
+                  onClick={handlePinLogin}
+                  disabled={loading || !pinOnly}
+                  style={{ padding: '0 24px' }}
+                >
+                  Unlock
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div>
