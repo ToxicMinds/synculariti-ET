@@ -131,6 +131,14 @@ export function ManualEntryModal({ prefill, household, selectedUser, onSave, onC
           {/* Category Pills - The "Nice V1 UX" */}
           <div>
             <label style={labelStyle}>Category</label>
+            <select 
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              style={{ ...inputStyle, marginBottom: 8 }}
+            >
+              <option value="" disabled>Select category...</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
             <CategorySelector 
               categories={categories}
               selectedCategory={category}
