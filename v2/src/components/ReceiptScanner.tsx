@@ -23,13 +23,16 @@ interface ReceiptData {
 
 export function ReceiptScanner({ 
   onSave,
-  categories = []
+  categories = [],
+  names = {}
 }: { 
-  onSave: (data: ReceiptData) => Promise<void>;
+  onSave: (data: ReceiptData, whoId: string) => Promise<void>;
   categories?: string[];
+  names?: Record<string, string>;
 }) {
   const [step, setStep] = useState<'scan' | 'processing' | 'review'>('scan');
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [payerId, setPayerId] = useState<string>(Object.keys(names)[0] || '');
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -113,7 +116,10 @@ export function ReceiptScanner({
     setIsSaving(true);
     setError('');
     try {
-      await onSave(receipt);
+      // Find name for selected payer
+      // We'll pass the whole logic to the parent via onSave if we want to follow current pattern
+      // but easier to just let onSave handle the data
+      await onSave(receipt, payerId);
       // The parent will usually unmount us on success (setShowScanner(false))
     } catch (e: any) {
       setError(e.message || 'Failed to save receipt.');
@@ -155,8 +161,33 @@ export function ReceiptScanner({
   if (step === 'review' && receipt) {
     return (
       <BentoCard title={`Review: ${receipt.store}`}>
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Date: {receipt.date}</p>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>Date: {receipt.date}</p>
+          
+          <div style={{ marginTop: 12 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Who paid?</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {Object.entries(names).map(([id, name]) => (
+                <button
+                  key={id}
+                  onClick={() => setPayerId(id)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: '1px solid var(--border-color)',
+                    background: payerId === id ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                    color: payerId === id ? 'var(--accent-primary-text)' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {name as string}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 400, overflowY: 'auto', marginBottom: 20 }}>
@@ -182,14 +213,17 @@ export function ReceiptScanner({
                       setReceipt({ ...receipt, items: next });
                     }}
                     style={{ 
-                      fontSize: 11, 
-                      background: 'var(--bg-secondary)', 
-                      border: '1px solid var(--border-color)', 
-                      borderRadius: 4, 
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      borderRadius: 20,
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-hover)',
                       color: 'var(--text-secondary)',
-                      padding: '2px 4px',
-                      marginTop: 4,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      marginTop: 4
                     }}
                   >
                     {categories.length > 0 ? (

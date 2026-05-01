@@ -35,9 +35,10 @@ function DashboardContent() {
   const selectedUser = searchParams.get('u') || (household ? Object.keys(household.names)[0] : null);
   const loading = hLoading || (household && eLoading);
 
-  const handleSaveReceipt = async (data: ReceiptData) => {
-    if (!selectedUser || !household) return;
-    await saveReceipt(data, selectedUser, household.names[selectedUser]);
+  const handleSaveReceipt = async (data: ReceiptData, whoId?: string) => {
+    const finalWhoId = whoId || selectedUser;
+    if (!finalWhoId || !household) return;
+    await saveReceipt(data, finalWhoId, household.names[finalWhoId]);
     setShowScanner(false);
   };
 
@@ -124,6 +125,7 @@ function DashboardContent() {
             <ReceiptScanner 
               onSave={handleSaveReceipt} 
               categories={household.budgets ? Object.keys(household.budgets) : []}
+              names={household.names}
             />
             <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>
               ← Back to Dashboard
