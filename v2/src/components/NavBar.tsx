@@ -65,21 +65,30 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
   };
 
   const selectStyle: React.CSSProperties = {
-    padding: '6px 10px',
+    padding: '10px 14px', // Larger, more reliable touch target
     borderRadius: 10,
     border: '1px solid var(--border-color)',
     background: 'var(--bg-secondary)',
     color: 'var(--text-primary)',
-    fontSize: 13,
-    fontWeight: 600,
+    fontSize: 14, // Slightly larger for readability
+    fontWeight: 700,
     cursor: 'pointer',
     pointerEvents: 'auto',
-    appearance: 'none',
-    WebkitAppearance: 'none'
+    position: 'relative',
+    zIndex: 999, // Force to the very front
+    outline: 'none',
+    width: 'auto'
   };
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', pointerEvents: 'auto' }}>
+    <div style={{ 
+      display: 'flex', 
+      gap: 8, 
+      alignItems: 'center', 
+      pointerEvents: 'auto',
+      position: 'relative',
+      zIndex: 1000 
+    }}>
       <select 
         value={selectedM} 
         onChange={(e) => handleMonthChange(e.target.value)}
