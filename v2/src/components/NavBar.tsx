@@ -70,6 +70,51 @@ function UserSwitcher() {
   );
 }
 
+function MonthSwitcher() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  const currentM = searchParams.get('m') || new Date().toISOString().slice(0, 7);
+
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toISOString().slice(0, 7));
+  }
+
+  const handleChange = (val: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('m', val);
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  return (
+    <select 
+      value={currentM} 
+      onChange={(e) => handleChange(e.target.value)}
+      style={{
+        padding: '6px 10px',
+        borderRadius: 10,
+        border: '1px solid var(--border-color)',
+        background: 'var(--bg-secondary)',
+        color: 'var(--text-primary)',
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer'
+      }}
+    >
+      {months.map(m => {
+        const [y, mm] = m.split('-');
+        const date = new Date(parseInt(y), parseInt(mm) - 1);
+        const label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        return <option key={m} value={m}>{label}</option>;
+      })}
+    </select>
+  );
+}
+
 function ProfileMenu({ householdHandle }: { householdHandle: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -191,6 +236,9 @@ export function NavBar() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <ThemeToggle />
+        <Suspense fallback={<div style={{ width: 60, height: 36, background: 'var(--bg-hover)', borderRadius: 10 }} />}>
+          <MonthSwitcher />
+        </Suspense>
         <Suspense fallback={<div style={{ width: 80, height: 36, background: 'var(--bg-hover)', borderRadius: 10 }} />}>
           <UserSwitcher />
         </Suspense>

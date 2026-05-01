@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/ekasa-proxy/:match*",
-      "destination": "https://ekasa.financnasprava.sk/mdu/api/v1/opd/:match*"
-    }
-  ]
-}

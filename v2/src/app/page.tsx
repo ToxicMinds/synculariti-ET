@@ -19,11 +19,13 @@ import { FamilySpends } from '@/components/FamilySpends';
 import { CommandCenter } from '@/components/CommandCenter';
 import { MarketTrends } from '@/components/MarketTrends';
 import { ManualEntryModal } from '@/components/ManualEntryModal';
+import { MonthlyPerformance } from '@/components/MonthlyPerformance';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
   const { session, household, loading: hLoading, updateState } = useHousehold();
-  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense, updateExpense } = useExpenses(household?.household_id);
+  const selectedMonth = searchParams.get('m') || new Date().toISOString().slice(0, 7);
+  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense, updateExpense } = useExpenses(household?.household_id, selectedMonth);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
   const [manualEntry, setManualEntry] = useState<any | null>(null);
@@ -65,7 +67,9 @@ function DashboardContent() {
 
   if (!household) return <AuthScreen session={session} />;
 
-  const totals = calcTotals(expenses);
+  // Filter expenses for current month components (useExpenses returns current + prev for comparison)
+  const displayExpenses = expenses.filter(e => e.date?.startsWith(selectedMonth));
+  const totals = calcTotals(displayExpenses);
   const totalIncome = Object.values(household.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const totalBudget = Object.values(household.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const monthlySavingsGoal = household.goals?.monthly_savings || 500;
@@ -141,33 +145,34 @@ function DashboardContent() {
 
             {/* ROW 2: Financial Foundation */}
             <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
+            <MonthlyPerformance expenses={expenses} selectedMonth={selectedMonth} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} />
-            <FamilySpends expenses={expenses} names={household.names} />
+            <FamilySpends expenses={displayExpenses} names={household.names} />
 
             {/* ROW 3: Trends & Overview */}
             <BentoCard
               colSpan={4}
-              title="Total Spent"
+              title={`Total Spent (${selectedMonth})`}
               tooltip={{
                 title: "Total Spent",
-                explanation: "Sum of all non-Savings, non-Adjustment expenses for your household over the last 4 months.",
+                explanation: "Sum of all non-Savings, non-Adjustment expenses for your household for the selected month.",
                 formula: "Σ(amount) WHERE category ≠ 'Savings' AND is_deleted = false"
               }}
             >
               <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em' }}>
                 €{totals.spent.toFixed(2)}
               </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Variable spending (4 months)</p>
-              <div style={{ marginTop: 20 }}><DailyTrend expenses={expenses} /></div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Spending for {selectedMonth}</p>
+              <div style={{ marginTop: 20 }}><DailyTrend expenses={displayExpenses} /></div>
             </BentoCard>
 
-            <MarketTrends expenses={expenses} />
+            <MarketTrends expenses={expenses} selectedMonth={selectedMonth} />
 
             {/* ROW 4: Expense List + Categories */}
             <BentoCard colSpan={8} rowSpan={2} title="All Expenses">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
-                  expenses={expenses} 
+                   expenses={displayExpenses} 
                   onDelete={softDeleteExpense} 
                   onEdit={(exp) => setManualEntry(exp)}
                 />
@@ -175,7 +180,7 @@ function DashboardContent() {
             </BentoCard>
 
             <BentoCard colSpan={4} title="Category Breakdown">
-              <SpendingBreakdown expenses={expenses} />
+              <SpendingBreakdown expenses={displayExpenses} />
             </BentoCard>
 
             {/* ROW 5: Deep Analytics */}

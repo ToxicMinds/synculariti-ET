@@ -25,12 +25,14 @@ ChartJS.register(
   Filler
 );
 
-export function MarketTrends({ expenses }: { expenses: any[] }) {
+export function MarketTrends({ expenses, selectedMonth }: { expenses: any[], selectedMonth: string }) {
   // Logic: Group expenses by month for the last 6 months
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const now = new Date();
+  const [y, m] = selectedMonth.split('-');
+  const baseDate = new Date(parseInt(y), parseInt(m) - 1, 1);
+  
   const last6Months = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() - (5 - i), 1);
     return { name: months[d.getMonth()], month: d.getMonth(), year: d.getFullYear() };
   });
 

@@ -19,7 +19,7 @@ export interface ReceiptData {
   items: ReceiptItem[];
 }
 
-export function useExpenses(householdId: string | undefined) {
+export function useExpenses(householdId: string | undefined, selectedMonth?: string) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,22 +47,34 @@ export function useExpenses(householdId: string | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [householdId]);
+  }, [householdId, selectedMonth]);
 
   const fetchExpenses = async () => {
     if (!householdId) return;
     
-    // Fetch last 4 months (matching old state.js logic)
-    const cutOff = new Date();
-    cutOff.setMonth(cutOff.getMonth() - 4);
-    const dateStr = cutOff.toISOString().slice(0, 10);
-
-    const { data, error } = await supabase
+    let query = supabase
       .from('expenses')
       .select('*')
       .eq('household_id', householdId)
-      .eq('is_deleted', false)
-      .gte('date', dateStr)
+      .eq('is_deleted', false);
+
+    if (selectedMonth) {
+      // Fetch selected month PLUS 5 previous months for trends (6 months total)
+      const [y, m] = selectedMonth.split('-');
+      const startDate = new Date(parseInt(y), parseInt(m) - 6, 1).toISOString().slice(0, 10);
+      
+      const nextMonthDate = new Date(parseInt(y), parseInt(m), 1);
+      const endDate = new Date(nextMonthDate.getTime() - 1).toISOString().slice(0, 10);
+      
+      query = query.gte('date', startDate).lte('date', endDate);
+    } else {
+      // Default: Last 4 months
+      const cutOff = new Date();
+      cutOff.setMonth(cutOff.getMonth() - 4);
+      query = query.gte('date', cutOff.toISOString().slice(0, 10));
+    }
+
+    const { data, error } = await query
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
 
