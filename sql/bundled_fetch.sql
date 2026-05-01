@@ -29,13 +29,17 @@ BEGIN
     FROM public.households 
     WHERE id = v_household_id;
 
+    -- If the household itself is missing, the user is orphaned
+    IF v_house.handle IS NULL THEN
+        RETURN NULL;
+    END IF;
+
     -- 3. Get app state configuration (budgets, names, etc.)
     SELECT config INTO v_state 
     FROM public.app_state 
     WHERE id = v_household_id;
 
     -- 4. Construct and return the unified bundle
-    -- This matches the AppState interface exactly.
     RETURN jsonb_build_object(
         'household_id', v_household_id,
         'handle', v_house.handle,

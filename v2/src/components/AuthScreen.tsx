@@ -53,10 +53,10 @@ export function AuthScreen({ session }: { session: any }) {
       if (vErr) throw vErr;
       if (!verifyData) throw new Error("Incorrect Household PIN.");
       
-      // 3. Link user
+      // 3. Link user (using upsert to prevent duplicate key errors)
       const { error: linkErr } = await supabase
         .from('app_users')
-        .insert({ id: session.user.id, household_id: householdId });
+        .upsert({ id: session.user.id, household_id: householdId });
         
       if (linkErr) throw linkErr;
       
