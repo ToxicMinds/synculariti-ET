@@ -56,6 +56,7 @@ To ensure absolute isolation between households:
 1.  **JWT Claims**: Every request to Supabase must include the user's JWT.
 2.  **Server-Side Resolution**: The database uses `auth.uid()` to look up the `household_id` in `app_users`.
 3.  **No Global Reads**: Tables like `receipt_items` are protected by RLS policies that prevent reading any line items not belonging to the user's resolved household.
+4.  **Hardened API Routes**: All `/api` routes are session-aware. They verify the user's JWT from cookies and resolve the household internally. No sensitive IDs are passed in query parameters.
 
 ---
 

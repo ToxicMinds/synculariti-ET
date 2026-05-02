@@ -54,7 +54,7 @@ export function AIInsights({
   }, [householdId, cacheHash]);
 
   async function fetchInsight(forceRefresh = false) {
-    if (!householdId || isFetching.current) return;
+    if (isFetching.current) return;
 
     if (!forceRefresh && lastFetchedHash.current === cacheHash) return;
 
@@ -62,7 +62,7 @@ export function AIInsights({
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/ai/insight?householdId=${encodeURIComponent(householdId)}`);
+      const response = await fetch('/api/ai/insight');
       const data = await response.json();
 
       if (data.success && data.insight) {

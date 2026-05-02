@@ -5,7 +5,17 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
+import { createClient } from '@/lib/supabase-server';
+
 export async function POST(req: Request) {
+  const supabase = createClient();
+  
+  // 1. Verify Authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { ekasaData, categories } = await req.json();
 

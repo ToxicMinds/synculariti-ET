@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import { createClient } from '@/lib/supabase-server';
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const householdId = searchParams.get('householdId');
+export async function GET() {
+  const supabase = createClient();
   
-  if (!householdId) {
-    return NextResponse.json({ error: 'householdId is required' }, { status: 400 });
+  // 1. Verify Authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 2. Resolve Household ID (Server-Side Secure)
+  // We call our hardened RPC to get the memoized household ID
+  const { data: householdId, error: hError } = await supabase.rpc('get_my_household');
+  
+  if (hError || !householdId) {
+    return NextResponse.json({ error: 'Household not found' }, { status: 404 });
   }
 
   const driver = getNeo4jDriver();
@@ -33,7 +43,7 @@ export async function GET(req: Request) {
     const facts = merchantResult.records[0]?.get('topMerchants') || [];
     const categories = categoryResult.records[0]?.get('categories') || [];
 
-    // Build a rich context string for Groq — all merchants + category breakdown
+    // Build context for Groq
     const merchantSummary = facts
       .map((f: any) => {
         const visits = typeof f.visits === 'object' && f.visits !== null ? f.visits.low : f.visits;
@@ -43,9 +53,7 @@ export async function GET(req: Request) {
 
     const categorySummary = categories
       .slice(0, 6)
-      .map((c: any) => {
-        return `${c.category}: €${Number(c.total).toFixed(2)}`;
-      })
+      .map((c: any) => `${c.category}: €${Number(c.total).toFixed(2)}`)
       .join('; ');
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -60,14 +68,12 @@ export async function GET(req: Request) {
           {
             role: "system",
             content: `You are a sharp, caring financial advisor for a Slovak-based household.
-IMPORTANT CONTEXT: The merchant data may be unreliable — many expenses are manually entered with product names (e.g. "Kuracia šunka") instead of store names. Treat the CATEGORY breakdown as the ground truth for spending patterns. Use merchant names only for anecdotes, never for totals.
 Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
           },
           {
             role: "user",
-            content: `Category breakdown (USE THIS AS GROUND TRUTH): ${categorySummary || 'No category data yet'}.
-Top merchants by visits (treat as anecdotal only — names may be product descriptions, not stores): ${merchantSummary || 'No merchant data'}.
-Give one sharp, category-focused insight.`
+            content: `Category breakdown: ${categorySummary || 'No data'}.
+Top merchants: ${merchantSummary || 'No data'}.`
           }
         ],
         temperature: 0.7,
@@ -76,11 +82,7 @@ Give one sharp, category-focused insight.`
     });
 
     const aiData = await groqRes.json();
-    if (aiData.error) {
-      console.error("Groq API Error:", aiData.error);
-    }
-    const insightText = aiData.choices?.[0]?.message?.content || 
-      (aiData.error ? `Groq Error: ${aiData.error.message}` : "Your spending patterns are being analyzed. Sync your transactions to see personalized insights.");
+    const insightText = aiData.choices?.[0]?.message?.content || "Your spending patterns are being analyzed.";
 
     return NextResponse.json({ 
       success: true, 

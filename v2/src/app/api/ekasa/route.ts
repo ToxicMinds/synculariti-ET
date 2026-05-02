@@ -8,10 +8,20 @@ import { NextResponse } from 'next/server';
  * 
  * Regionality: Slovak Gov API blocks US IPs. We pin this to 'fra1' (Frankfurt).
  */
+import { createClient } from '@/lib/supabase-server';
+
 export const preferredRegion = 'fra1';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const supabase = createClient();
+  
+  // 1. Verify Authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { receiptId } = await request.json();
 
