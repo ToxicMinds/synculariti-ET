@@ -1,8 +1,17 @@
-import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
+  const supabase = await createClient();
+  
+  // 1. Verify Authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const { text } = await req.json();
+    const { text, categories } = await req.json();
+    const categoryList = categories?.join(', ') || 'Groceries, Dining Out, Transport, Other';
 
     if (!text || text.length < 10) {
       return NextResponse.json({ error: 'Statement text too short or empty' }, { status: 400 });
@@ -28,9 +37,9 @@ Format each item exactly like this:
   "date": "YYYY-MM-DD",
   "description": "Store or Merchant Name",
   "amount": 12.34,
-  "category": "One of: Groceries, Food, Transport, Housing, Utilities, Health, Clothing, Entertainment, Savings, Adjustment, Other"
+  "category": "One of: ${categoryList}"
 }
-Only output the JSON object. Do not wrap in markdown blocks like \`\`\`json. Do not include any explanations.`
+Only output the JSON object.`
           },
           {
             role: "user",

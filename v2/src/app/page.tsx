@@ -102,6 +102,7 @@ function DashboardContent() {
       {showStatement && (
         <StatementScanner
           names={household.names}
+          categories={household.categories}
           selectedUser={selectedUser || Object.keys(household.names)[0]}
           onSave={handleSaveStatement}
           onClose={() => setShowStatement(false)}
@@ -126,7 +127,7 @@ function DashboardContent() {
             <ReceiptScanner 
               onSave={handleSaveReceipt} 
               onAddCategory={addCategory}
-              categories={household.budgets ? Object.keys(household.budgets) : []}
+              categories={household.categories}
               names={household.names}
             />
             <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>

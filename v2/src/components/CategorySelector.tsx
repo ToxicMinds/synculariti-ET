@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 interface CategorySelectorProps {
   categories: string[];
@@ -33,7 +33,7 @@ export function CategorySelector({
   };
 
   // Common categories to show if none provided
-  const items = categories.length > 0 ? categories : ['Groceries', 'Dining out', 'Transport', 'Utilities', 'Health', 'Shopping', 'Other'];
+  const items = categories.length > 0 ? categories : DEFAULT_CATEGORIES;
 
   const containerStyle: React.CSSProperties = {
     display: 'flex',

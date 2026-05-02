@@ -57,13 +57,12 @@ export async function POST(req: Request) {
       I will provide a list of item names from a Slovak shopping receipt.
       Your job is to:
       1. Normalize the name (e.g., "Kup. sunka 100g" -> "Šunka").
-      2. Assign a CATEGORY from this list: ${categories?.join(', ') || 'Groceries, Food, Transport, Shopping, Health, Utilities, Others'}.
+      2. Assign a CATEGORY from this list: ${categories?.join(', ') || 'Groceries, Dining Out, Transport, Other'}.
       
       RULES:
       - DO NOT add prices.
       - DO NOT change the order of items.
       - Use "Groceries" for supermarket food.
-      - Use "Food" for restaurants.
       
       RETURN JSON:
       {

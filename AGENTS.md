@@ -36,8 +36,9 @@ AI Insights (Groq) are shared across the household to minimize cost and latency.
 
 ### 3.1 Known Violations
 1.  **DRY (Don't Repeat Yourself)**:
-    *   *Issue*: Categories are hardcoded in components instead of a central constant.
-    *   *Next Step*: Unify categories in `v2/src/lib/constants.ts` or DB config.
+    *   *Status*: **FIXED**.
+    *   *Solution*: Categories and Icons are centralized in `v2/src/lib/constants.ts` and managed via the `HouseholdContext`.
+    *   *Rule*: NEVER hardcode categories in components. Always pull from `household.categories`.
 2.  **Single Responsibility (SOLID)**:
     *   *Issue*: `useExpenses` hook handles too many concerns (Fetch, Save, Delete, Neo4j).
     *   *Next Step*: Split into `useTransactions` and `useSync`.

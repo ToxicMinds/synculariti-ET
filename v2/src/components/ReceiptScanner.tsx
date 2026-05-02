@@ -8,6 +8,8 @@ import { CategoryPill } from './CategoryPill';
 
 import { fetchWithRetry, systemLog } from '@/lib/utils';
 
+import { DEFAULT_CATEGORIES } from '@/lib/constants';
+
 interface ReceiptItem {
   name: string;
   amount: number;
@@ -25,7 +27,7 @@ interface ReceiptData {
 export function ReceiptScanner({ 
   onSave,
   onAddCategory,
-  categories = [],
+  categories = DEFAULT_CATEGORIES,
   names = {}
 }: { 
   onSave: (data: ReceiptData, whoId: string) => Promise<void>;

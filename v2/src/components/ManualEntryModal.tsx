@@ -31,7 +31,7 @@ export function ManualEntryModal({ prefill, household, selectedUser, onSave, onA
   const [amount, setAmount] = useState(prefill?.amount?.toString() || '');
 
   const names = household.names || {};
-  const categories = household.budgets ? Object.keys(household.budgets) : ['Groceries', 'Food', 'Transport'];
+  const categories = household.categories || [];
 
   const [category, setCategory] = useState(prefill?.category || '');
   const [who_id, setWhoId] = useState(prefill?.who_id || selectedUser || Object.keys(names)[0] || '');

@@ -12,12 +12,13 @@ interface ParsedTransaction {
 
 interface StatementScannerProps {
   names: Record<string, string>;
+  categories: string[];
   selectedUser: string;
   onSave: (transactions: any[], whoId: string, whoName: string) => Promise<void>;
   onClose: () => void;
 }
 
-export function StatementScanner({ names, selectedUser, onSave, onClose }: StatementScannerProps) {
+export function StatementScanner({ names, categories, selectedUser, onSave, onClose }: StatementScannerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
@@ -34,7 +35,7 @@ export function StatementScanner({ names, selectedUser, onSave, onClose }: State
       const res = await fetch('/api/ai/statement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, categories })
       });
       const data = await res.json();
       

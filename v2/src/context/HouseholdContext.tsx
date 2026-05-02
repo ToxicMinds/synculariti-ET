@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AppState } from '@/hooks/useHousehold';
+import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 interface HouseholdContextType {
   session: any;
@@ -70,6 +71,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         memory: config.memory || {},
         goals: config.goals || { monthly_savings: 500 },
         ai_insight: config.ai_insight,
+        categories: config.categories || DEFAULT_CATEGORIES,
         created_at: metadata.created_at
       });
 
@@ -107,7 +109,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       budgets: updates.budgets || household.budgets,
       memory: updates.memory || household.memory,
       goals: updates.goals || household.goals,
-      ai_insight: updates.ai_insight || household.ai_insight
+      ai_insight: updates.ai_insight || household.ai_insight,
+      categories: updates.categories || household.categories
     };
 
     const { error } = await supabase

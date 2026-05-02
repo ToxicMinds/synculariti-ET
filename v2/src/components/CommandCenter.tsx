@@ -2,12 +2,13 @@
 
 import { BentoCard } from './BentoCard';
 
+import { CATEGORY_ICONS } from '@/lib/constants';
+
 const QUICK_ACTIONS = [
-  { label: '🛒 Groceries', category: 'Groceries' },
-  { label: '☕ Coffee', category: 'Dining out' },
-  { label: '⛽ Fuel', category: 'Transport' },
-  { label: '🍽️ Dining', category: 'Dining out' },
-  { label: '🚇 Transport', category: 'Transport' },
+  { label: `${CATEGORY_ICONS['Groceries'] || '🛒'} Groceries`, category: 'Groceries' },
+  { label: `${CATEGORY_ICONS['Dining Out'] || '🍽️'} Dining`, category: 'Dining Out' },
+  { label: `${CATEGORY_ICONS['Transport'] || '🚗'} Transport`, category: 'Transport' },
+  { label: `${CATEGORY_ICONS['Shopping'] || '🛍️'} Shop`, category: 'Shopping' },
 ];
 
 export function CommandCenter({ onScan, onManual, onStatement }: { onScan: () => void, onManual: (item?: {category?: string}) => void, onStatement: () => void }) {

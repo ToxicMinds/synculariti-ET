@@ -21,6 +21,7 @@ export interface AppState {
   memory: Record<string, string>;
   goals: Record<string, any>;
   ai_insight?: { insight: string; hash: string; timestamp: string };
+  categories: string[];
   created_at?: string;
 }
 
