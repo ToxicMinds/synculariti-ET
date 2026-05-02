@@ -1,6 +1,3 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/lib/finance';
 import { normalizeAndLinkMerchant } from '@/lib/neo4j';
@@ -19,71 +16,12 @@ export interface ReceiptData {
   items: ReceiptItem[];
 }
 
-export function useExpenses(householdId: string | undefined, selectedMonth?: string) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!householdId) {
-      setExpenses([]);
-      setLoading(false);
-      return;
-    }
-
-    fetchExpenses();
-
-    // Set up Realtime Subscription
-    const channel = supabase.channel('expenses-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'expenses',
-        filter: `household_id=eq.${householdId}`
-      }, () => {
-        fetchExpenses();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [householdId, selectedMonth]);
-
-  const fetchExpenses = async () => {
-    if (!householdId) return;
-    
-    let query = supabase
-      .from('expenses')
-      .select('*')
-      .eq('household_id', householdId)
-      .eq('is_deleted', false);
-
-    if (selectedMonth) {
-      // Fetch selected month PLUS 5 previous months for trends (6 months total)
-      const [y, m] = selectedMonth.split('-');
-      const startDate = new Date(parseInt(y), parseInt(m) - 6, 1).toISOString().slice(0, 10);
-      
-      const nextMonthDate = new Date(parseInt(y), parseInt(m), 1);
-      const endDate = new Date(nextMonthDate.getTime() - 1).toISOString().slice(0, 10);
-      
-      query = query.gte('date', startDate).lte('date', endDate);
-    } else {
-      // Default: Last 4 months
-      const cutOff = new Date();
-      cutOff.setMonth(cutOff.getMonth() - 4);
-      query = query.gte('date', cutOff.toISOString().slice(0, 10));
-    }
-
-    const { data, error } = await query
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setExpenses(data);
-    }
-    setLoading(false);
-  };
-
+/**
+ * useSync Hook (SOLID: Single Responsibility)
+ * RESPONSIBILITY: Write operations, ACID Transactions, and Intelligence Linking.
+ */
+export function useSync(householdId: string | undefined) {
+  
   const addExpense = async (expense: Partial<Expense> | Partial<Expense>[]) => {
     if (!householdId) return;
 
@@ -104,12 +42,10 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
       .from('expenses')
       .insert(payload)
       .select();
+      
     if (error) throw error;
 
-    // Proactively refresh the local list for immediate UI feedback
-    fetchExpenses();
-
-    // Fire-and-forget Neo4j sync
+    // Fire-and-forget Neo4j sync (Handled in background)
     if (data) {
       for (const saved of data) {
         const merchantName = (expense as any).merchant || saved.description || 'Unknown Merchant';
@@ -121,17 +57,12 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
   };
 
   const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string) => {
-    if (!householdId) {
-      console.error('saveReceipt failed: No householdId provided');
-      return;
-    }
+    if (!householdId) throw new Error('No household ID');
 
     const selectedItems = receipt.items.filter(i => i.selected);
-    if (selectedItems.length === 0) {
-      throw new Error('No items selected to save.');
-    }
+    if (selectedItems.length === 0) throw new Error('No items selected');
 
-    // Determine the primary category
+    // Calculate primary category (most items)
     const catCounts: Record<string, number> = {};
     selectedItems.forEach(i => catCounts[i.category] = (catCounts[i.category] || 0) + 1);
     const primaryCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
@@ -157,7 +88,7 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
       category: item.category
     }));
 
-    // Exponential Backoff Retry Logic
+    // Exponential Backoff Retry Logic (ACID Resilience)
     let attempt = 0;
     const maxAttempts = 3;
     let lastError: any = null;
@@ -171,10 +102,7 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
 
         if (error) throw error;
 
-        // Success! Proactively refresh the UI
-        fetchExpenses();
-
-        // Fire-and-forget Neo4j sync
+        // Sync to Neo4j
         normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount).catch(err => 
           console.error('Neo4j Sync Failed:', err)
         );
@@ -184,8 +112,7 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
         lastError = err;
         attempt++;
         if (attempt < maxAttempts) {
-          const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
-          console.warn(`saveReceipt failed (attempt ${attempt}/${maxAttempts}). Retrying in ${delay}ms...`, err);
+          const delay = Math.pow(2, attempt) * 1000;
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -202,13 +129,11 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
       .eq('id', id)
       .eq('household_id', householdId);
     if (error) throw error;
-    fetchExpenses();
   };
 
   const updateExpense = async (id: string, expense: Partial<Expense> & { merchant?: string }) => {
     if (!householdId) return;
 
-    // Strip 'merchant' before sending to Supabase (it's for Neo4j only)
     const { merchant, ...pureExpense } = expense;
 
     const { error } = await supabase
@@ -217,14 +142,12 @@ export function useExpenses(householdId: string | undefined, selectedMonth?: str
       .eq('id', id);
 
     if (error) throw error;
-    fetchExpenses();
 
-    // Update Neo4j as well
     const merchantName = expense.merchant || expense.description || 'Unknown Merchant';
     normalizeAndLinkMerchant(merchantName, id, Number(expense.amount)).catch(err => 
       console.error('Neo4j Update Failed:', err)
     );
   };
 
-  return { expenses, loading, addExpense, saveReceipt, softDeleteExpense, updateExpense, fetchExpenses };
+  return { addExpense, saveReceipt, softDeleteExpense, updateExpense };
 }

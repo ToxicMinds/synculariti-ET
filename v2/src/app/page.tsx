@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { BentoCard } from '@/components/BentoCard';
 import { ExpenseList } from '@/components/ExpenseList';
 import { useHousehold } from '@/hooks/useHousehold';
-import { useExpenses, ReceiptData } from '@/hooks/useExpenses';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useSync, ReceiptData } from '@/hooks/useSync';
 import { calcTotals } from '@/lib/finance';
 import { AuthScreen } from '@/components/AuthScreen';
 import { ReceiptScanner } from '@/components/ReceiptScanner';
@@ -27,7 +28,10 @@ function DashboardContent() {
   const now = new Date();
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedMonth = searchParams.get('m') || currentMonthISO;
-  const { expenses, loading: eLoading, softDeleteExpense, saveReceipt, addExpense, updateExpense } = useExpenses(household?.household_id, selectedMonth);
+  
+  // SOLID Split: Transactions for Read, Sync for Write
+  const { expenses, loading: eLoading } = useTransactions(household?.household_id, selectedMonth);
+  const { softDeleteExpense, saveReceipt, addExpense, updateExpense } = useSync(household?.household_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
   const [manualEntry, setManualEntry] = useState<any | null>(null);
