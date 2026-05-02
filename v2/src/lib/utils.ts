@@ -23,18 +23,8 @@ export async function fetchWithRetry(url: string, options: RequestInit = {}, ret
 }
 
 /**
- * Logs system errors to the Supabase audit_logs table for free backend monitoring.
+ * Logs technical metrics (like eKasa performance) to Supabase.
  */
 export async function systemLog(action: string, errorData: any, householdId?: string) {
-  try {
-    await supabase.from('audit_logs').insert({
-      table_name: 'system',
-      record_id: 'error',
-      action: action,
-      new_data: { error: errorData?.message || errorData, stack: errorData?.stack },
-      household_id: householdId || null
-    });
-  } catch (e) {
-    console.error('Failed to write system log:', e);
-  }
+  // Redundant - use Logger.system from @/lib/logger instead.
 }

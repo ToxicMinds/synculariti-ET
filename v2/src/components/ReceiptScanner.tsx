@@ -6,7 +6,8 @@ import { BentoCard } from './BentoCard';
 import { CategorySelector } from './CategorySelector';
 import { CategoryPill } from './CategoryPill';
 
-import { fetchWithRetry, systemLog } from '@/lib/utils';
+import { fetchWithRetry } from '@/lib/utils';
+import { Logger } from '@/lib/logger';
 
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
@@ -106,7 +107,7 @@ export function ReceiptScanner({
     } catch (e: any) {
       setError(e.message);
       setStep('scan');
-      systemLog('ekasa_scan_error', e);
+      Logger.system('ERROR', 'Scanner', 'eKasa scan failure', e);
     } finally {
       setLoading(false);
     }

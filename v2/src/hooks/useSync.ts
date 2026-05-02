@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/lib/finance';
 import { normalizeAndLinkMerchant } from '@/lib/neo4j';
+import { Logger } from '@/lib/logger';
 
 export interface ReceiptItem {
   name: string;
@@ -43,7 +44,14 @@ export function useSync(householdId: string | undefined) {
       .insert(payload)
       .select();
       
-    if (error) throw error;
+    if (error) {
+      Logger.system('ERROR', 'Sync', 'Failed to add manual expense', error, householdId);
+      throw error;
+    }
+
+    // Success activity
+    const count = Array.isArray(payload) ? payload.length : 1;
+    Logger.user(householdId, 'EXPENSE_ADDED', `Added ${count} manual expense(s)`, 'Household Member');
 
     // Fire-and-forget Neo4j sync (Handled in background)
     if (data) {
@@ -102,7 +110,10 @@ export function useSync(householdId: string | undefined) {
 
         if (error) throw error;
 
-        // Sync to Neo4j
+        // Success activity
+        Logger.user(householdId, 'EXPENSE_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
+
+        // Fire-and-forget Neo4j sync
         normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount).catch(err => 
           console.error('Neo4j Sync Failed:', err)
         );
@@ -113,7 +124,10 @@ export function useSync(householdId: string | undefined) {
         attempt++;
         if (attempt < maxAttempts) {
           const delay = Math.pow(2, attempt) * 1000;
+          Logger.system('WARN', 'Sync', `saveReceipt retry ${attempt}/${maxAttempts}`, { error: err, delay }, householdId);
           await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          Logger.system('ERROR', 'Sync', 'saveReceipt failed after max retries', err, householdId);
         }
       }
     }
