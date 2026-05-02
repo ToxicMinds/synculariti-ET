@@ -1,17 +1,25 @@
 {
-  "name": "Synculariti - Tracker",
+  "name": "Synculariti",
   "short_name": "Synculariti",
-  "description": "Intelligent minimalist household expense tracking",
+  "description": "Premium household expense tracking",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0A",
-  "theme_color": "#0A0A0A",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "categories": ["finance", "productivity"],
   "icons": [
     {
       "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

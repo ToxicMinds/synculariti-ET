@@ -171,19 +171,26 @@ body {
   align-items: center;
   justify-content: space-between;
   background: var(--bg-secondary);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   position: sticky;
   top: 0;
-  /* Respect iOS notch */
   padding-top: var(--safe-top);
   z-index: 100;
+}
+
+.logo-text {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {
   .navbar {
     padding: 0 16px;
     padding-top: var(--safe-top);
+  }
+  .logo-text {
+    display: none !important;
   }
   .hide-mobile {
     display: none !important;
@@ -425,4 +432,92 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ============================================
+   PWA INSTALL PROMPT
+   ============================================ */
+.install-prompt-wrapper {
+  position: fixed;
+  bottom: calc(var(--bottom-nav-height, 64px) + 16px + env(safe-area-inset-bottom));
+  left: 16px;
+  right: 16px;
+  z-index: 2000;
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.install-prompt-card {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 12px 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.install-prompt-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.install-app-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.install-app-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.install-text {
+  flex: 1;
+}
+
+.install-text h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  color: #fff;
+}
+
+.install-text p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.3;
+}
+
+.install-btn-close {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (min-width: 641px) {
+  .install-prompt-wrapper {
+    max-width: 400px;
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+  }
 }

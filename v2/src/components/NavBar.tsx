@@ -30,7 +30,7 @@ function ThemeToggle() {
   );
 }
 
-function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Record<string, string> }) {
+function SwitcherGroup({ createdAt }: { createdAt?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,7 +38,6 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
   const now = new Date();
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedM = searchParams.get('m') || currentMonthISO;
-  const selectedU = searchParams.get('u');
 
   const months = [];
   const startLimit = createdAt ? new Date(createdAt) : new Date(now.getFullYear(), now.getMonth() - 11, 1);
@@ -58,37 +57,22 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const handleUserChange = (val: string) => {
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    params.set('u', val);
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
   const selectStyle: React.CSSProperties = {
-    padding: '10px 14px', // Larger, more reliable touch target
-    borderRadius: 10,
+    padding: '8px 12px',
+    borderRadius: 12,
     border: '1px solid var(--border-color)',
-    background: 'var(--bg-secondary)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    backdropFilter: 'blur(10px)',
     color: 'var(--text-primary)',
-    fontSize: 14, // Slightly larger for readability
+    fontSize: 14,
     fontWeight: 700,
     cursor: 'pointer',
-    pointerEvents: 'auto',
-    position: 'relative',
-    zIndex: 999, // Force to the very front
     outline: 'none',
     width: 'auto'
   };
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      gap: 8, 
-      alignItems: 'center', 
-      pointerEvents: 'auto',
-      position: 'relative',
-      zIndex: 1000 
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center' }}>
       <select 
         value={selectedM} 
         onChange={(e) => handleMonthChange(e.target.value)}
@@ -98,28 +82,19 @@ function SwitcherGroup({ createdAt, names }: { createdAt?: string, names?: Recor
           const [y, mm] = m.split('-');
           const date = new Date(parseInt(y), parseInt(mm) - 1);
           const label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-          return <option key={m} value={m}>{label}</option>;
+          return <option key={m} value={m} style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>{label}</option>;
         })}
       </select>
-      
-      {names && Object.keys(names).length > 0 && (
-        <select 
-          value={selectedU || Object.keys(names)[0]} 
-          onChange={(e) => handleUserChange(e.target.value)}
-          style={{ ...selectStyle, maxWidth: 100 }}
-        >
-          {Object.entries(names).map(([id, name]) => (
-            <option key={id} value={id}>{name as string}</option>
-          ))}
-        </select>
-      )}
     </div>
   );
 }
 
-function ProfileMenu({ householdHandle }: { householdHandle: string }) {
+function ProfileMenu({ resolvedWhoId, names }: { resolvedWhoId: string | null, names: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  
+  const userName = resolvedWhoId ? names[resolvedWhoId] : 'User';
+  const initial = userName.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -127,8 +102,7 @@ function ProfileMenu({ householdHandle }: { householdHandle: string }) {
   };
 
   const handleExport = () => {
-    // Trigger CSV download via the export API
-    window.open(`/api/export?household_id=${encodeURIComponent(householdHandle)}&format=csv`, '_blank');
+    window.open(`/api/export?format=csv`, '_blank');
     setOpen(false);
   };
 
@@ -136,44 +110,44 @@ function ProfileMenu({ householdHandle }: { householdHandle: string }) {
     <div style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen(!open)}
+        className="user-avatar-btn"
         style={{
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-          border: 'none',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-color)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#fff',
-          fontSize: 13,
-          fontWeight: 700
+          color: 'var(--text-primary)',
+          fontSize: 15,
+          fontWeight: 700,
+          boxShadow: 'var(--shadow-sm)'
         }}
       >
-        {householdHandle.charAt(0).toUpperCase()}
+        {initial}
       </button>
 
       {open && (
         <>
-          {/* Backdrop */}
           <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
-          {/* Menu */}
           <div style={{
             position: 'absolute',
             right: 0,
-            top: 44,
+            top: 48,
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
             borderRadius: 14,
             padding: 8,
             minWidth: 180,
-            boxShadow: 'var(--shadow-md)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
             zIndex: 99
           }}>
             <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', marginBottom: 4 }}>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>Household</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{householdHandle}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>Signed in as</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{userName}</p>
             </div>
             <button onClick={handleExport} style={menuItemStyle}>
               📥 Download CSV
@@ -181,6 +155,9 @@ function ProfileMenu({ householdHandle }: { householdHandle: string }) {
             <button onClick={() => { window.print(); setOpen(false); }} style={menuItemStyle}>
               🖨️ Print Report
             </button>
+            <Link href="/settings" onClick={() => setOpen(false)} style={{ ...menuItemStyle, textDecoration: 'none' }}>
+              ⚙️ Settings
+            </Link>
             <div style={{ borderTop: '1px solid var(--border-color)', marginTop: 4, paddingTop: 4 }}>
               <button onClick={handleLogout} style={{ ...menuItemStyle, color: 'var(--accent-danger)' }}>
                 🚪 Logout
@@ -195,7 +172,7 @@ function ProfileMenu({ householdHandle }: { householdHandle: string }) {
 
 const menuItemStyle: React.CSSProperties = {
   width: '100%',
-  padding: '9px 12px',
+  padding: '10px 12px',
   background: 'none',
   border: 'none',
   borderRadius: 8,
@@ -210,48 +187,41 @@ const menuItemStyle: React.CSSProperties = {
 };
 
 export function NavBar() {
-  const pathname = usePathname();
-  const { household } = useHousehold();
+  const { household, resolvedWhoId } = useHousehold();
 
   return (
     <nav className="navbar">
-      <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          {/* Theme-aware SVG icon */}
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
             <img src="/icon.png" alt="Synculariti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <span style={{ 
+          <span className="logo-text" style={{ 
             fontWeight: 800, 
             fontSize: 20, 
             letterSpacing: '-0.5px',
             background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
-            display: 'inline-block'
           }}>
             Synculariti
           </span>
         </Link>
-        <div className="hide-mobile" style={{ display: 'flex', gap: 20 }}>
-          {[{ name: 'Dashboard', href: '/' }, { name: 'Settings', href: '/settings' }].map(item => (
-            <Link key={item.href} href={item.href} style={{ 
-              fontSize: 14, fontWeight: 500, 
-              color: pathname === item.href ? 'var(--text-primary)' : 'var(--text-secondary)',
-              textDecoration: 'none'
-            }}>
-              {item.name}
-            </Link>
-          ))}
-        </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ThemeToggle />
-        <Suspense fallback={<div style={{ width: 140, height: 36, background: 'var(--bg-hover)', borderRadius: 10 }} />}>
-          <SwitcherGroup createdAt={household?.created_at} names={household?.names} />
+      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <Suspense fallback={<div style={{ width: 100, height: 36, background: 'var(--bg-hover)', borderRadius: 12 }} />}>
+          <SwitcherGroup createdAt={household?.created_at} />
         </Suspense>
-        {household && <ProfileMenu householdHandle={household.handle || 'Shanbhag-26'} />}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {household && (
+          <ProfileMenu 
+            resolvedWhoId={resolvedWhoId} 
+            names={household.names} 
+          />
+        )}
       </div>
     </nav>
   );

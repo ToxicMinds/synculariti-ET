@@ -44,6 +44,8 @@ export const viewport: Viewport = {
   ]
 };
 
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -54,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </div>
           <MobileBottomNav />
+          <PWAInstallPrompt />
         </HouseholdProvider>
       </body>
     </html>
