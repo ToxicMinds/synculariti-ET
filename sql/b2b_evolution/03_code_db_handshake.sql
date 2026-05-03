@@ -1,8 +1,14 @@
 -- ==========================================
--- B2B EVOLUTION: TOTAL PLATINUM BUNDLE
+-- B2B EVOLUTION: BUG-FREE PLATINUM BUNDLE
 -- ==========================================
--- Standard: Zero-Join Frontend Initialization (Inc. Locations)
+-- Standard: Null-safe, Column-synced.
 
+-- 1. Ensure columns exist
+ALTER TABLE public.app_state 
+  ADD COLUMN IF NOT EXISTS handle TEXT,
+  ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}'::jsonb;
+
+-- 2. CREATE BUG-FREE BUNDLE RPC
 CREATE OR REPLACE FUNCTION public.get_household_bundle()
 RETURNS JSONB AS $$
 DECLARE
@@ -24,7 +30,8 @@ BEGIN
       ) h
     ),
     'locations', (
-      SELECT jsonb_agg(l) FROM (
+      -- Bug Fix: Ensure [] instead of NULL for new signups
+      SELECT COALESCE(jsonb_agg(l), '[]'::jsonb) FROM (
         SELECT id, name, address, metadata FROM public.locations 
         WHERE household_id = v_session_h_id
       ) l
