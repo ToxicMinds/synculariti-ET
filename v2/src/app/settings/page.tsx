@@ -63,6 +63,8 @@ export default function SettingsPage() {
     setEmails({ ...emails, [nextId]: '' });
   };
 
+  const totalMonthlyBudget = Object.values(budgets).reduce((a, b) => a + Number(b), 0);
+
   if (loading || !household) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Settings...</div>;
 
   return (
@@ -74,116 +76,47 @@ export default function SettingsPage() {
 
       <div style={{ maxWidth: 1000, margin: '0 auto' }} className="bento-grid">
         
-        {/* Household Identity */}
-        <BentoCard colSpan={12} title="Household Identity">
-          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Household Handle</label>
-              <input 
-                type="text" 
-                value={household.handle} 
-                disabled 
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
-              />
+        {/* ROW 1: BUDGET SUMMARY */}
+        <BentoCard colSpan={12} title="Monthly Budget Strategy">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+            <div>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Total Household Limit</p>
+              <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.03em' }}>€{totalMonthlyBudget.toFixed(2)}</div>
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Household ID (Internal)</label>
-              <code style={{ fontSize: 11, color: 'var(--text-muted)' }}>{household.household_id}</code>
+            <div style={{ padding: '12px 20px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 2 }}>Categories</div>
+              <div style={{ fontSize: 20, fontWeight: 600 }}>{Object.keys(budgets).length}</div>
             </div>
           </div>
         </BentoCard>
 
-        {/* Member Management */}
-        <BentoCard colSpan={12} title="Family Members">
+        {/* ROW 2: CATEGORY MANAGEMENT */}
+        <BentoCard colSpan={12} title="Budgets & Categories">
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Link family members to their Google accounts for instant access.
+            Configure the monthly limits for your household spending.
           </p>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {Object.entries(names).map(([id, name], index) => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            {Object.entries(budgets).map(([cat, limit]) => (
               <div 
-                key={id} 
+                key={cat} 
                 style={{ 
                   display: 'flex', 
-                  gap: 16, 
                   alignItems: 'center', 
-                  padding: '16px', 
-                  borderRadius: 12, 
-                  background: 'rgba(255,255,255,0.03)',
+                  justifyContent: 'space-between', 
+                  padding: '12px 16px', 
+                  background: 'rgba(255,255,255,0.02)', 
+                  borderRadius: 10,
                   border: '1px solid var(--border-color)'
                 }}
               >
-                {/* Human ID Circle */}
-                <div style={{ 
-                  width: 32, 
-                  height: 32, 
-                  borderRadius: '50%', 
-                  background: 'var(--bg-secondary)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border-color)',
-                  flexShrink: 0
-                }}>
-                  {id.replace('u', '')}
-                </div>
-
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                    <div style={{ flex: '1 1 200px' }}>
-                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>Display Name</label>
-                      <input 
-                        type="text" 
-                        value={name} 
-                        onChange={(e) => updateMemberName(id, e.target.value)}
-                        placeholder="e.g. Nikhil"
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', fontSize: 14 }}
-                      />
-                    </div>
-                    <div style={{ flex: '1.5 1 240px' }}>
-                      <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.05em' }}>Google Email</label>
-                      <input 
-                        type="email" 
-                        value={emails[id] || ''} 
-                        onChange={(e) => updateMemberEmail(id, e.target.value)}
-                        placeholder="name@gmail.com"
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', fontSize: 14 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button 
-            onClick={addMember} 
-            className="btn btn-secondary" 
-            style={{ marginTop: 20, width: '100%', padding: '12px', fontSize: 13, borderStyle: 'dashed' }}
-          >
-            + Add Another Member
-          </button>
-        </BentoCard>
-
-        {/* Category & Budget Management */}
-        <BentoCard colSpan={6} title="Budgets & Categories">
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-            Set monthly limits for your expense categories.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 300, overflowY: 'auto', paddingRight: 8 }}>
-            {Object.entries(budgets).map(([cat, limit]) => (
-              <div key={cat} style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 14, fontWeight: 500 }}>{cat}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14 }}>€</span>
+                  <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>€</span>
                   <input 
                     type="number" 
                     value={limit} 
                     onChange={(e) => updateBudget(cat, Number(e.target.value))}
-                    style={{ width: 80, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-color)', textAlign: 'right' }}
+                    style={{ width: 80, padding: '8px', borderRadius: 6, border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', textAlign: 'right', fontSize: 14 }}
                   />
                 </div>
               </div>
@@ -191,28 +124,63 @@ export default function SettingsPage() {
           </div>
         </BentoCard>
 
-        {/* Bank & Integrations Placeholder */}
-        <BentoCard colSpan={12} title="Integrations (Coming Soon in v2)">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <div style={{ padding: 16, borderRadius: 8, border: '1px dashed var(--border-color)', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, marginBottom: 8 }}>🏦</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Bank Sync</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Enable Banking</div>
+        {/* ROW 3: ACCOUNT & ACCESS (DEMOTED) */}
+        <BentoCard colSpan={12} title="Account & Access">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            
+            {/* Members Section */}
+            <div>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>Family Member Access</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                {Object.entries(names).map(([id, name]) => (
+                  <div key={id} style={{ flex: '1 1 300px', display: 'flex', gap: 12, alignItems: 'center', padding: '12px', borderRadius: 10, border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}>
+                      {id.replace('u', '')}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <input 
+                        type="text" 
+                        value={name} 
+                        onChange={(e) => updateMemberName(id, e.target.value)}
+                        placeholder="Name"
+                        style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 13, fontWeight: 600, padding: 0 }}
+                      />
+                      <input 
+                        type="email" 
+                        value={emails[id] || ''} 
+                        onChange={(e) => updateMemberEmail(id, e.target.value)}
+                        placeholder="Email"
+                        style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 11, color: 'var(--text-muted)', padding: 0, marginTop: 2 }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                <button 
+                  onClick={addMember} 
+                  className="btn btn-secondary" 
+                  style={{ flex: '1 1 300px', padding: '12px', fontSize: 12, borderStyle: 'dashed' }}
+                >
+                  + Add Another Member
+                </button>
+              </div>
             </div>
-            <div style={{ padding: 16, borderRadius: 8, border: '1px dashed var(--border-color)', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, marginBottom: 8 }}>📅</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Calendar</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Google Calendar</div>
+
+            {/* Technical Section */}
+            <div style={{ paddingTop: 16, borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Household Handle</span>
+                <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 2 }}>@{household.handle}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal ID</span>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>{household.household_id}</div>
+              </div>
             </div>
-            <div style={{ padding: 16, borderRadius: 8, border: '1px dashed var(--border-color)', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, marginBottom: 8 }}>🤖</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Smart Rules</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Auto-categorization</div>
-            </div>
+
           </div>
         </BentoCard>
 
-        {/* Save Action */}
+        {/* ROW 4: SAVE ACTION */}
         <BentoCard colSpan={12}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button 
