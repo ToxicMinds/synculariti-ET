@@ -1,12 +1,12 @@
-# Synculariti - AGENTS.md (Master Source of Truth)
+# Synculariti-ET (SaaS Primitive Fork)
 
-This document is the definitive guide for AI assistants and developers. It consolidates architecture, design principles, and operational rules for the ET Expense platform.
+This document is the definitive guide for AI assistants and developers. It consolidates architecture, design principles, and operational rules for the **Synculariti-ET** platform—the B2B SaaS evolution of the ET Expense engine.
 
 ---
 
 ## 1. Project Overview
-**ET Expense** is a minimalist, high-performance financial management platform. This repository is a **Pure Next.js 14** project (V2). All legacy V1 components and obsolete SQL migrations have been purged.
-*   **Mission**: Multi-User Determinism. Every household member sees the same data, insights, and state regardless of device.
+**Synculariti-ET** is the enterprise-grade evolution of ET Expense. While it shares the core v2 engine, its architectural focus is on **Multi-Location B2B primitives**, generalization for SMBs, and professional-grade financial auditing.
+*   **Mission**: Business-Grade Determinism. Moving from household tracking to multi-location restaurant and SMB financial management.
 *   **Core Stack**: Next.js 14 (App Router), TypeScript, Supabase (Postgres), Neo4j (Graph), Groq AI (Llama 3.3).
 
 ---
@@ -24,8 +24,9 @@ All mutations (Saves, Deletes, Updates) MUST be atomic.
 AI Insights (Groq) are shared across the household to minimize cost and latency.
 *   **TTL**: 24 hours (Cloud-backed).
 *   **Determinism**: Cache is only invalidated if the `dataHash` (totals/count) changes.
-*   **UX**: Insights load instantly for all family members once generated.
-*   **Unified Categories**: Groq always receives the household's master category list from `v2/src/lib/constants.ts` and the database state.
+*   **eKasa Engine**: Dual-Protocol (Online ID + OKP Raw Data). The scanner falls back to OKP metadata extraction if a standard ID is missing.
+*   **Regionality**: eKasa requests are proxied via EU-Central (Paris/Frankfurt) to bypass regional IP blocks.
+*   **Unified Categories**: Groq always receives the household's master category list from `v2/src/lib/constants.ts`.
 
 ### 2.3 PWA Standards (2026)
 *   **Identity**: Minimalist header. No logo text on mobile; personal circular avatar only.
@@ -53,8 +54,9 @@ AI Insights (Groq) are shared across the household to minimize cost and latency.
 ## 4. Tenant Separation Logic (Cross-Device Security)
 To ensure absolute isolation between households:
 1.  **JWT Claims**: Every request to Supabase must include the user's JWT.
-2.  **Server-Side Resolution**: The database uses `auth.uid()` to look up the `household_id` in `app_users`.
-3.  **Memoized Resolution**: Uses `get_my_household()` server-side helper to isolate rows by `household_id`.
+2.  **SSR Auth**: All client-side clients MUST use cookie-based session mirroring (`@supabase/ssr`) to ensure the server can authorize API requests.
+3.  **Server-Side Resolution**: The database uses `auth.uid()` to look up the `household_id` in `app_users` via the `get_my_household()` helper.
+4.  **Memoized Resolution**: Uses `get_my_household()` server-side helper to isolate rows by `household_id`.
 
 ---
 
@@ -62,5 +64,27 @@ To ensure absolute isolation between households:
 *   **`/v2/src/app`**: Core routing and Page layouts.
 *   **`/v2/src/hooks`**: Specialized logic (`useTransactions`, `useSync`, `useHousehold`).
 *   **`/v2/src/components`**: UI layer (Bento cards, Scanners).
-*   **`/v2/src/lib`**: Financial calculations, constants, and server utilities.
-*   **`/sql`**: Hardened security policies and RPC functions.
+*   **`/v2/src/lib`**: Financial calculations, eKasa protocols, and server utilities.
+*   **`/sql`**: Hardened security policies, RPC functions, and Observability.
+---
+
+## 6. Resilience & Observability (The "Black Site" Standard)
+
+To ensure the platform is reliable and observable without technical clutter, we enforce a **Dual-Channel Logging** strategy.
+
+### 6.1 Dual-Channel Strategy
+1.  **System Telemetry (Technical)**:
+    *   **Purpose**: Debugging, performance tracking, and failure analysis.
+    *   **Storage**: `system_telemetry` table.
+    *   **Visibility**: Hidden from users. Mirror to local console during development.
+    *   **Use Case**: Groq API errors, Neo4j timeouts, Database locks.
+2.  **Activity Log (User-Visible)**:
+    *   **Purpose**: Transparency and household history.
+    *   **Storage**: `activity_log` table.
+    *   **Visibility**: Displayed in the "Family Feed" in the UI.
+    *   **Use Case**: "Nik added €50.00 at Lidl", "Monthly Insight generated".
+
+### 6.2 Failure Protocol (ANY Failure)
+1.  **Stage 1: Automatic Recovery**: Attempt 3-stage exponential backoff (1s -> 2s -> 4s) for all network/database operations.
+2.  **Stage 2: Technical Capture**: On final failure, log the full context (Payload + Stack) to `Logger.system('ERROR', ...)`.
+3.  **Stage 3: User Notification**: Surface a non-technical, actionable message to the user. Never show raw database errors to the household.
