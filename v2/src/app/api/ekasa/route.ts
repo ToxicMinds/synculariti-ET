@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server';
  */
 import { createClient } from '@/lib/supabase-server';
 
-export const preferredRegion = 'fra1';
+export const preferredRegion = 'cdg1';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
@@ -23,22 +23,33 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { receiptId } = await request.json();
+    const { receiptId, okpData } = await request.json();
 
-    if (!receiptId) {
-      return NextResponse.json({ error: 'Missing Receipt ID' }, { status: 400 });
+    if (!receiptId && !okpData) {
+      return NextResponse.json({ error: 'Missing Receipt ID or OKP Data' }, { status: 400 });
     }
 
     const targetUrl = `https://ekasa.financnasprava.sk/mdu/api/v1/opd/receipt/find`;
     
+    // Construct the payload based on what we have (Dual-Protocol support)
+    const payload = okpData 
+      ? { 
+          okp: okpData.okp,
+          cashRegisterCode: okpData.cashRegisterCode,
+          issueDate: okpData.date,
+          receiptNumber: okpData.number,
+          amount: okpData.total
+        }
+      : { receiptId };
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'User-Agent': 'Synculariti-V2-Portable-Proxy'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
-      body: JSON.stringify({ receiptId }),
+      body: JSON.stringify(payload),
       next: { revalidate: 3600 }
     });
 
@@ -47,7 +58,8 @@ export async function POST(request: Request) {
       console.error('eKasa Gov API Error:', response.status, errText);
       return NextResponse.json({ 
         error: 'Slovak Gov API returned an error', 
-        status: response.status 
+        status: response.status,
+        detail: errText
       }, { status: response.status });
     }
 

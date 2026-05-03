@@ -8,8 +8,8 @@ import { CategoryPill } from './CategoryPill';
 
 import { fetchWithRetry } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
-
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
+import { extractUniversal, parseEkasaError } from '@/lib/ekasa-protocols';
 
 interface ReceiptItem {
   name: string;
@@ -65,18 +65,26 @@ export function ReceiptScanner({
     setError('');
 
     try {
-      // 1. Extract eKasa ID from QR text
-      const receiptId = extractEkasaId(decodedText);
+      // 1. Extract eKasa ID from QR text (Using Protocol Intelligence)
+      const receiptId = extractUniversal(decodedText);
       if (!receiptId) throw new Error("Could not find a valid eKasa ID in this QR code.");
 
       // 2. Fetch from Portable API Route (Regionally pinned to EU)
+      const payload = typeof receiptId === 'string' 
+        ? { receiptId } 
+        : { okpData: receiptId };
+
       const response = await fetchWithRetry(`/api/ekasa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiptId })
+        body: JSON.stringify(payload)
       });
       
-      if (!response.ok) throw new Error("Failed to fetch receipt data.");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const humanMessage = parseEkasaError(response.status, errorData.detail);
+        throw new Error(humanMessage);
+      }
       const ekasaData = await response.json();
 
       // 3. Categorize with Groq with Retry
