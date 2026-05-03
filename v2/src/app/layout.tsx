@@ -45,11 +45,13 @@ export const viewport: Viewport = {
 };
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { SWRegistration } from "@/components/SWRegistration";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
+        <SWRegistration />
         <HouseholdProvider>
           <NavBar />
           <div className="app-container">
