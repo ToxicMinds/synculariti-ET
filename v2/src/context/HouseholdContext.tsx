@@ -25,16 +25,22 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   // Initialize Session & Auth Listeners
   useEffect(() => {
+    // 1. Initial Quick Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchHouseholdState(session);
-      else setLoading(false);
+      if (session) {
+        fetchHouseholdState(session);
+      } else {
+        setLoading(false); // Immediate resolution for unauth users
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Realtime Auth Sync
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      if (session) fetchHouseholdState(session);
-      else {
+      if (session) {
+        fetchHouseholdState(session);
+      } else if (event === 'SIGNED_OUT') {
         setHousehold(null);
         setResolvedWhoId(null);
         setLoading(false);

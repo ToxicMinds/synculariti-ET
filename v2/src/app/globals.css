@@ -62,8 +62,10 @@
 html {
   /* Prevent text size inflation on iOS rotation */
   -webkit-text-size-adjust: 100%;
-  /* Critical: prevent horizontal overflow globally */
+  /* Allow natural scrolling while preventing horizontal overflow */
   overflow-x: hidden;
+  /* Use dynamic viewport height for modern mobile support */
+  min-height: 100dvh;
 }
 
 body {
@@ -72,10 +74,9 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
   /* Ensure safe area padding on iOS PWA */
-  padding-bottom: calc(var(--safe-bottom) + var(--bottom-nav-height, 0px));
-  min-height: 100vh;
-  min-height: 100dvh; /* dynamic viewport on mobile */
-  /* Prevent any child from causing horizontal scroll */
+  padding-bottom: env(safe-area-inset-bottom);
+  min-height: 100dvh;
+  /* Prevent horizontal scroll while allowing vertical */
   overflow-x: hidden;
   max-width: 100vw;
 }
@@ -87,15 +88,15 @@ body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
-  /* Prevent inner content from overflowing viewport */
+  /* Leave room for the mobile bottom nav + safe areas */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
   overflow-x: hidden;
 }
 
 @media (max-width: 640px) {
   .app-container {
     padding: 0 12px;
-    /* Leave room for the mobile bottom nav */
-    padding-bottom: 80px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }
 }
 

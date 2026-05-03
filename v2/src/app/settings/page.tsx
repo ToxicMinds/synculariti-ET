@@ -12,6 +12,13 @@ export default function SettingsPage() {
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
 
+  // SECURITY: Redirect to home if unauthenticated
+  useEffect(() => {
+    if (!loading && !household) {
+      window.location.href = '/';
+    }
+  }, [loading, household]);
+
   useEffect(() => {
     if (household) {
       setNames(household.names);
@@ -56,7 +63,7 @@ export default function SettingsPage() {
     setEmails({ ...emails, [nextId]: '' });
   };
 
-  if (loading || !household) return <div style={{ padding: 48, textAlign: 'center' }}>Loading Settings...</div>;
+  if (loading || !household) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Settings...</div>;
 
   return (
     <main style={{ padding: '24px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
