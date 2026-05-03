@@ -1,4 +1,4 @@
-# Synculariti-ET (SaaS Primitive Fork)
+# Synculariti-ET (B2B SaaS Primitive)
 
 This document is the definitive guide for AI assistants and developers. It consolidates architecture, design principles, and operational rules for the **Synculariti-ET** platform—the B2B SaaS evolution of the ET Expense engine.
 
@@ -7,18 +7,30 @@ This document is the definitive guide for AI assistants and developers. It conso
 ## 1. Project Overview
 **Synculariti-ET** is the enterprise-grade evolution of ET Expense. While it shares the core v2 engine, its architectural focus is on **Multi-Location B2B primitives**, generalization for SMBs, and professional-grade financial auditing.
 *   **Mission**: Business-Grade Determinism. Moving from household tracking to multi-location restaurant and SMB financial management.
-*   **Core Stack**: Next.js 14 (App Router), TypeScript, Supabase (Postgres), Neo4j (Graph), Groq AI (Llama 3.3).
+*   **Core Stack**: Next.js 16.2 (App Router), TypeScript, Supabase (Postgres), Neo4j (Graph), Groq AI (Llama 3.3).
+*   **Architecture**: "Shared-Nothing" Multi-Tenant Isolation.
 
 ---
 
-## 2. Architecture Standards (The "Must-Follow" Rules)
+## 2. Architecture Standards (The "Platinum" Rules)
 
-### 2.1 Atomic Transactions (ACID)
-All mutations (Saves, Deletes, Updates) MUST be atomic.
-*   **Rule**: Use the `save_receipt_v2` RPC for all receipt saves.
-*   **Performance**: Bulk insert (O(1)) via `unnest` pattern. 
-*   **Integrity**: Mathematical validation (Sum check) is enforced at the database level.
-*   **Resilience**: 3-stage exponential backoff (1s -> 2s -> 4s) on all mutation hooks.
+### 2.1 Platinum Handshake (Initialization)
+*   **Rule**: Use the `get_household_bundle` RPC for all frontend initialization.
+*   **Structure**: Returns `{ household, locations, user, server_time }` in one atomic round-trip.
+*   **Safety**: Must use `COALESCE` for arrays to prevent frontend `null` crashes.
+
+### 2.2 Atomic Transactions & Ledger Guard
+*   **Rule**: Use `save_receipt_v3` for all financial mutations.
+*   **Validation**: Every RPC must perform a **Dual-Layer Check** (Tenant Mismatch + Location Ownership).
+*   **Integrity**: Expenses must have an ISO-4217 currency (length=3) and amount >= 0.
+
+### 2.3 Automatic Auditing (Black Site Standard)
+*   **Rule**: All ledger mutations MUST be captured by the `activity_log`.
+*   **Implementation**: Enforced via database triggers (`trg_audit_expenses`) to capture manual Dashboard edits and API calls alike.
+
+### 2.4 Tenant Separation & RLS
+*   **Standard**: Every table MUST have `FORCE ROW LEVEL SECURITY`.
+*   **Isolation**: All policies must use the memoized `get_my_household()` helper.
 
 ### 2.2 Intelligence Strategy (Cloud-TTL)
 AI Insights (Groq) are shared across the household to minimize cost and latency.
