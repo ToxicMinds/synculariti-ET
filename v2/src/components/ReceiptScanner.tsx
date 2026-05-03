@@ -134,10 +134,20 @@ export function ReceiptScanner({
   }
 
   function extractEkasaId(txt: string) {
-    const m = txt.match(/O-[0-9A-F]{32}/i);
-    if (m) return m[0];
+    if (!txt) return null;
+    
+    // 1. Try official prefix (O- followed by 32 hex)
+    const mOfficial = txt.match(/O-([0-9A-F]{32})/i);
+    if (mOfficial) return `O-${mOfficial[1].toUpperCase()}`;
+    
+    // 2. Try URL parameter (id= followed by 32 hex)
     const mUrl = txt.match(/id=([0-9A-F]{32})/i);
-    if (mUrl && mUrl[1]) return 'O-' + mUrl[1];
+    if (mUrl) return `O-${mUrl[1].toUpperCase()}`;
+
+    // 3. Try standalone 32 hex (last resort, quite specific)
+    const mStandalone = txt.match(/\b([0-9A-F]{32})\b/i);
+    if (mStandalone) return `O-${mStandalone[1].toUpperCase()}`;
+    
     return null;
   }
 
