@@ -53,6 +53,12 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       const activeSession = currentSession || session;
       if (!activeSession) return;
 
+      // PERFORMANCE GUARD: If we already have the state and the user hasn't changed, skip re-fetch
+      if (household?.household_id && activeSession.user?.id === session?.user?.id) {
+        setLoading(false);
+        return;
+      }
+
       // Single network round-trip instead of 3 sequential awaits
       const { data: bundle, error } = await supabase.rpc('get_household_bundle');
       
