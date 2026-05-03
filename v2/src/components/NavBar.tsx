@@ -216,6 +216,27 @@ export function NavBar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Desktop Only: Quick Settings Access */}
+        <Link 
+          href="/settings" 
+          className="hide-mobile"
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 6, 
+            textDecoration: 'none', 
+            color: 'var(--text-secondary)',
+            fontSize: 13,
+            fontWeight: 600,
+            padding: '8px 12px',
+            borderRadius: 10,
+            background: 'var(--bg-hover)',
+            transition: 'all 0.2s'
+          }}
+        >
+          ⚙️ Settings
+        </Link>
+        
         {household && (
           <ProfileMenu 
             resolvedWhoId={resolvedWhoId} 

@@ -519,3 +519,30 @@ body {
     bottom: 24px;
   }
 }
+/* ============================================
+   DESKTOP ENHANCEMENTS (Desktop ONLY)
+   ============================================ */
+@media (min-width: 641px) {
+  .desktop-hover-reveal .actions {
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+  }
+
+  .desktop-hover-reveal:hover .actions {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}

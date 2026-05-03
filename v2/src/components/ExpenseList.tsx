@@ -54,9 +54,9 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
   };
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border-color)' }}>
-      {/* Action Buttons (Hidden Underneath) */}
-      <div style={{
+    <div className="desktop-hover-reveal" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border-color)' }}>
+      {/* Action Buttons (Mobile Swipe Reveal) */}
+      <div className="hide-desktop" style={{
         position: 'absolute',
         right: 0,
         top: 0,
@@ -88,13 +88,13 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '12px 0',
+          padding: '12px 16px', // Added padding for desktop feel
           background: 'var(--bg-card)',
           transform: `translateX(${swipeOffset}px)`,
           transition: isDragging.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
           position: 'relative',
           zIndex: 2,
-          cursor: 'grab'
+          cursor: swipeOffset !== 0 ? 'grabbing' : 'default'
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
@@ -109,10 +109,47 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
             {exp.who && <><span>·</span><span>{exp.who}</span></>}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 12 }}>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>€{Number(exp.amount).toFixed(2)}</span>
-          {/* Subtle indicator for desktop users or to hint swipe */}
-          <div style={{ width: 4, height: 20, background: 'var(--border-color)', borderRadius: 2, marginLeft: 4, opacity: 0.5 }} />
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Desktop Only: Hover Actions */}
+          <div className="actions hide-mobile" style={{ display: 'flex', gap: 8 }}>
+            <button 
+              onClick={() => onEdit(exp)}
+              style={{ 
+                padding: '4px 10px', 
+                borderRadius: 6, 
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-hover)',
+                color: 'var(--text-primary)',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Edit
+            </button>
+            <button 
+              onClick={handleDelete}
+              style={{ 
+                padding: '4px 10px', 
+                borderRadius: 6, 
+                border: '1px solid var(--accent-danger)',
+                background: 'transparent',
+                color: 'var(--accent-danger)',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Delete
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>€{Number(exp.amount).toFixed(2)}</span>
+            {/* Subtle indicator for mobile users or to hint swipe */}
+            <div className="hide-desktop" style={{ width: 4, height: 20, background: 'var(--border-color)', borderRadius: 2, marginLeft: 4, opacity: 0.5 }} />
+          </div>
         </div>
       </div>
     </div>
