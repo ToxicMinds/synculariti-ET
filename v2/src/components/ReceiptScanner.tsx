@@ -70,14 +70,10 @@ export function ReceiptScanner({
       if (!receiptId) throw new Error("Could not find a valid eKasa ID in this QR code.");
 
       // 2. Fetch from Portable API Route (Regionally pinned to EU)
-      const payload = typeof receiptId === 'string' 
-        ? { receiptId } 
-        : { okpData: receiptId };
-
       const response = await fetchWithRetry(`/api/ekasa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ receiptId })
       });
       
       if (!response.ok) throw new Error("Failed to fetch receipt data.");
@@ -138,35 +134,10 @@ export function ReceiptScanner({
   }
 
   function extractEkasaId(txt: string) {
-    if (!txt) return null;
-    
-    // 1. Try RAW OKP DATA STRING (OKP:CODE:DATE:NUMBER:TOTAL)
-    // Example: C44B3977-0E415CC6-EE663AA1-776C973A-A143B660:99920045678900001:180213093414:23:237.23
-    if (txt.includes(':')) {
-      const parts = txt.split(':');
-      if (parts.length >= 5) {
-        return {
-          okp: parts[0],
-          cashRegisterCode: parts[1],
-          date: parts[2],
-          number: parts[3],
-          total: parts[4]
-        };
-      }
-    }
-
-    // 2. Try official URL prefix (O- followed by 32 hex)
-    const mOfficial = txt.match(/O-([0-9A-F]{32})/i);
-    if (mOfficial) return mOfficial[0].toUpperCase();
-    
-    // 3. Try URL parameter (id= followed by 32 hex)
+    const m = txt.match(/O-[0-9A-F]{32}/i);
+    if (m) return m[0].toUpperCase();
     const mUrl = txt.match(/id=([0-9A-F]{32})/i);
-    if (mUrl) return `O-${mUrl[1].toUpperCase()}`;
-
-    // 4. Try standalone 32 hex (last resort)
-    const mStandalone = txt.match(/\b([0-9A-F]{32})\b/i);
-    if (mStandalone) return `O-${mStandalone[1].toUpperCase()}`;
-    
+    if (mUrl && mUrl[1]) return 'O-' + mUrl[1].toUpperCase();
     return null;
   }
 
