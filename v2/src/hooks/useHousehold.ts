@@ -22,6 +22,7 @@ export interface AppState {
   goals: Record<string, any>;
   ai_insight?: { insight: string; hash: string; timestamp: string };
   categories: string[];
+  locations: any[]; // B2B: Multi-location support
   created_at?: string;
 }
 

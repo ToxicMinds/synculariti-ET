@@ -64,38 +64,42 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       const activeSession = currentSession || session;
       if (!activeSession) return;
 
-      // Single network round-trip instead of 3 sequential awaits
       const { data: bundle, error } = await supabase.rpc('get_household_bundle');
       
       if (error) throw error;
-      if (!bundle) return;
+      if (!bundle || !bundle.household) return;
 
-      const { config = {}, ...metadata } = bundle;
+      const { household: h, user: u, locations: l } = bundle;
 
       setHousehold({
-        household_id: metadata.household_id,
-        handle: metadata.handle || '',
-        names: config.names || {},
-        emails: config.emails || {},
-        income: config.income || {},
-        budgets: config.budgets || {},
-        memory: config.memory || {},
-        goals: config.goals || { monthly_savings: 500 },
-        ai_insight: config.ai_insight,
-        categories: config.categories || DEFAULT_CATEGORIES,
-        created_at: metadata.created_at
+        household_id: h.id,
+        handle: h.handle || '',
+        names: h.config?.names || {},
+        emails: h.config?.emails || {},
+        income: h.config?.income || {},
+        budgets: h.config?.budgets || {},
+        memory: h.config?.memory || {},
+        goals: h.config?.goals || { monthly_savings: 500 },
+        ai_insight: h.config?.ai_insight,
+        categories: h.categories || DEFAULT_CATEGORIES,
+        locations: l || [],
+        created_at: h.created_at
       });
 
-      // Identity Resolution: Map email to who_id
+      // Identity Resolution: Use the bundled user profile if available
+      if (u) {
+        // You can now store the full user profile in state if needed
+      }
+
       const email = activeSession.user?.email;
-      if (email && config.emails) {
-        const foundId = Object.keys(config.emails).find(
-          key => config.emails[key]?.toLowerCase() === email.toLowerCase()
+      if (email && h.config?.emails) {
+        const foundId = Object.keys(h.config.emails).find(
+          key => h.config.emails[key]?.toLowerCase() === email.toLowerCase()
         );
         if (foundId) setResolvedWhoId(foundId);
       }
     } catch (e) {
-      console.error('Error fetching household state:', e);
+      console.error('Error fetching state:', e);
     } finally {
       setLoading(false);
     }
