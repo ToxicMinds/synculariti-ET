@@ -2,13 +2,16 @@
 
 This document is the definitive guide for AI assistants and developers. It consolidates architecture, design principles, and operational rules for the **Synculariti-ET** platform—the B2B SaaS evolution of the ET Expense engine.
 
+> For the full developer rulebook (stack, commands, conventions, what NOT to do), see **`RULES.md`**.
+
 ---
 
 ## 1. Project Overview
 **Synculariti-ET** is the enterprise-grade evolution of ET Expense. While it shares the core v2 engine, its architectural focus is on **Multi-Location B2B primitives**, generalization for SMBs, and professional-grade financial auditing.
 *   **Mission**: Business-Grade Determinism. Moving from household tracking to multi-location restaurant and SMB financial management.
-*   **Core Stack**: Next.js 16.2 (App Router), TypeScript, Supabase (Postgres), Neo4j (Graph), Groq AI (Llama 3.3).
+*   **Core Stack**: Next.js 16.2 (App Router), TypeScript 5, Supabase (Postgres 17), Neo4j 6 (Graph), Groq AI (Llama 3.3 70B).
 *   **Architecture**: "Shared-Nothing" Multi-Tenant Isolation.
+*   **Supabase Project**: `Synculariti-B2B` (`xtquhajccuitutvbxisd`, region: `eu-west-1`)
 
 ---
 
@@ -20,7 +23,9 @@ This document is the definitive guide for AI assistants and developers. It conso
 *   **Safety**: Must use `COALESCE` for arrays to prevent frontend `null` crashes.
 
 ### 2.2 Atomic Transactions & Ledger Guard
-*   **Rule**: Use `save_receipt_v3` for all financial mutations.
+*   **Rule**: Use `save_receipt_v3` for all financial mutations. `save_receipt_v2` is **deprecated**.
+*   **Why v3**: Adds dual-layer security (Tenant + Location Ownership), `location_id` field, and ISO-4217 currency propagation to both `expenses` and `receipt_items`.
+*   **Code Status**: `useSync.ts` currently calls `save_receipt_v2` — this is a **known bug** that must be fixed before any new B2B feature ships. See `RULES.md` for the correct pattern.
 *   **Validation**: Every RPC must perform a **Dual-Layer Check** (Tenant Mismatch + Location Ownership).
 *   **Integrity**: Expenses must have an ISO-4217 currency (length=3) and amount >= 0.
 
@@ -32,15 +37,15 @@ This document is the definitive guide for AI assistants and developers. It conso
 *   **Standard**: Every table MUST have `FORCE ROW LEVEL SECURITY`.
 *   **Isolation**: All policies must use the memoized `get_my_household()` helper.
 
-### 2.2 Intelligence Strategy (Cloud-TTL)
+### 2.5 Intelligence Strategy (Cloud-TTL)
 AI Insights (Groq) are shared across the household to minimize cost and latency.
 *   **TTL**: 24 hours (Cloud-backed).
 *   **Determinism**: Cache is only invalidated if the `dataHash` (totals/count) changes.
 *   **eKasa Engine**: Dual-Protocol (Online ID + OKP Raw Data). The scanner falls back to OKP metadata extraction if a standard ID is missing.
-*   **Regionality**: eKasa requests are proxied via EU-Central (Paris/Frankfurt) to bypass regional IP blocks.
-*   **Unified Categories**: Groq always receives the household's master category list from `v2/src/lib/constants.ts`.
+*   **Regionality**: eKasa requests are proxied via EU-Central (Paris/Frankfurt) to bypass regional IP blocks. Proxy config lives in `vercel.json`.
+*   **Unified Categories**: Groq ALWAYS receives the household's master category list from `household.categories` (sourced from `v2/src/lib/constants.ts`). Never let Groq invent categories.
 
-### 2.3 PWA Standards (2026)
+### 2.6 PWA Standards (2026)
 *   **Identity**: Minimalist header. No logo text on mobile; personal circular avatar only.
 *   **Safe Areas**: Adheres to modern mobile safe-area insets and orientation locking.
 
@@ -73,11 +78,24 @@ To ensure absolute isolation between households:
 ---
 
 ## 5. Operational File Map
-*   **`/v2/src/app`**: Core routing and Page layouts.
-*   **`/v2/src/hooks`**: Specialized logic (`useTransactions`, `useSync`, `useHousehold`).
-*   **`/v2/src/components`**: UI layer (Bento cards, Scanners).
-*   **`/v2/src/lib`**: Financial calculations, eKasa protocols, and server utilities.
-*   **`/sql`**: Hardened security policies, RPC functions, and Observability.
+*   **`/v2/src/app`**: Core routing and Page layouts. API routes live under `/api/`.
+*   **`/v2/src/hooks`**: Specialized logic — `useTransactions` (read-only), `useSync` (write-only), `useHousehold` (types).
+*   **`/v2/src/components`**: UI layer (Bento cards, Scanners, Charts, NavBar).
+*   **`/v2/src/lib`**: Financial calculations, eKasa protocols, server utilities.
+    *   `constants.ts` — Category & icon source of truth.
+    *   `finance.ts` — Pure financial functions (tested via `finance.test.ts`).
+    *   `ekasa-protocols.ts` — QR extraction (Baseline + OKP protocol).
+    *   `logger.ts` — `Logger.system()` (telemetry) + `Logger.user()` (Business Feed).
+    *   `neo4j.ts` — `normalizeAndLinkMerchant()` — graph sync after every expense save.
+    *   `supabase.ts` — Client-side Supabase instance.
+    *   `supabase-server.ts` — SSR-safe server-side Supabase instance.
+*   **`/v2/src/context`**: `HouseholdContext.tsx` — global state, `fetchHouseholdState` (calls `get_household_bundle`).
+*   **`/sql/b2b_evolution`**: Ordered DDL migrations (00–03). Never alter applied files; add new numbered files.
+*   **`/sql/security_hardening_v2.sql`**: RLS policies and security enforcement.
+*   **`/sql/observability_v2.sql`**: `system_telemetry` and `activity_log` table setup.
+*   **`/vercel.json`**: eKasa proxy rewrite rules (do not remove).
+*   **`/.agents/skills/`**: Agent skill library — read relevant SKILL.md before executing specialized tasks.
+
 ---
 
 ## 6. Resilience & Observability (The "Black Site" Standard)
@@ -89,14 +107,26 @@ To ensure the platform is reliable and observable without technical clutter, we 
     *   **Purpose**: Debugging, performance tracking, and failure analysis.
     *   **Storage**: `system_telemetry` table.
     *   **Visibility**: Hidden from users. Mirror to local console during development.
+    *   **Implementation**: `Logger.system(level, component, message, metadata, householdId)`
     *   **Use Case**: Groq API errors, Neo4j timeouts, Database locks.
 2.  **Activity Log (User-Visible)**:
-    *   **Purpose**: Transparency and household history.
+    *   **Purpose**: Transparency and business history.
     *   **Storage**: `activity_log` table.
-    *   **Visibility**: Displayed in the "Family Feed" in the UI.
+    *   **Visibility**: Displayed in the **"Business Feed"** in the UI.
+    *   **Implementation**: `Logger.user(householdId, action, description, actorName)`
     *   **Use Case**: "Nik added €50.00 at Lidl", "Monthly Insight generated".
 
 ### 6.2 Failure Protocol (ANY Failure)
-1.  **Stage 1: Automatic Recovery**: Attempt 3-stage exponential backoff (1s -> 2s -> 4s) for all network/database operations.
+1.  **Stage 1: Automatic Recovery**: Attempt 3-stage exponential backoff (1s → 2s → 4s) for all network/database operations. **Already implemented in `useSync.ts` `saveReceipt`.**
 2.  **Stage 2: Technical Capture**: On final failure, log the full context (Payload + Stack) to `Logger.system('ERROR', ...)`.
-3.  **Stage 3: User Notification**: Surface a non-technical, actionable message to the user. Never show raw database errors to the household.
+3.  **Stage 3: User Notification**: Surface a non-technical, actionable message to the user. Never show raw database errors to the business user.
+
+---
+
+## 7. Known Issues & Technical Debt
+
+| Issue | Severity | Location | Fix |
+|-------|----------|----------|-----|
+| ~~`useSync.ts` calls `save_receipt_v2`~~ | ~~🔴 HIGH~~ | ~~`v2/src/hooks/useSync.ts:107`~~ | ✅ **Fixed** — migrated to `save_receipt_v3` with `location_id` + `currency` |
+| `session` typed as `any` in `HouseholdContext` | 🟡 MEDIUM | `HouseholdContext.tsx:9,23` | Replace with `Session` type from `@supabase/supabase-js` |
+| Neo4j errors swallowed with `console.error` | ~~🟡 MEDIUM~~ | ~~`useSync.ts:64,119,170`~~ | ✅ **Fixed** — replaced with `Logger.system('ERROR', 'Neo4j', ...)` |
