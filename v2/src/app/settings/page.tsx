@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useHousehold } from '@/hooks/useHousehold';
+import { useTenant } from '@/hooks/useTenant';
 import { BentoCard } from '@/components/BentoCard';
 import Link from 'next/link';
 
 export default function SettingsPage() {
-  const { household, updateState, loading } = useHousehold();
+  const { tenant, updateState, loading } = useTenant();
   const [names, setNames] = useState<Record<string, string>>({});
   const [emails, setEmails] = useState<Record<string, string>>({});
   const [budgets, setBudgets] = useState<Record<string, number>>({});
@@ -14,18 +14,18 @@ export default function SettingsPage() {
 
   // SECURITY: Redirect to home if unauthenticated
   useEffect(() => {
-    if (!loading && !household) {
+    if (!loading && !tenant) {
       window.location.href = '/';
     }
-  }, [loading, household]);
+  }, [loading, tenant]);
 
   useEffect(() => {
-    if (household) {
-      setNames(household.names);
-      setEmails(household.emails || {});
-      setBudgets(household.budgets);
+    if (tenant) {
+      setNames(tenant.names);
+      setEmails(tenant.emails || {});
+      setBudgets(tenant.budgets);
     }
-  }, [household]);
+  }, [tenant]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -65,7 +65,7 @@ export default function SettingsPage() {
 
   const totalMonthlyBudget = Object.values(budgets).reduce((a, b) => a + Number(b), 0);
 
-  if (loading || !household) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Settings...</div>;
+  if (loading || !tenant) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading Settings...</div>;
 
   return (
     <main style={{ padding: '24px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
@@ -80,7 +80,7 @@ export default function SettingsPage() {
         <BentoCard colSpan={12} title="Monthly Budget Strategy">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
             <div>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Total Household Limit</p>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Total Tenant Limit</p>
               <div style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.03em' }}>€{totalMonthlyBudget.toFixed(2)}</div>
             </div>
             <div style={{ padding: '12px 20px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
@@ -93,7 +93,7 @@ export default function SettingsPage() {
         {/* ROW 2: CATEGORY MANAGEMENT */}
         <BentoCard colSpan={12} title="Budgets & Categories">
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Configure the monthly limits for your household spending.
+            Configure the monthly limits for your tenant spending.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
             {Object.entries(budgets).map(([cat, limit]) => (
@@ -168,12 +168,12 @@ export default function SettingsPage() {
             {/* Technical Section */}
             <div style={{ paddingTop: 16, borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
               <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Household Handle</span>
-                <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 2 }}>@{household.handle}</div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tenant Handle</span>
+                <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 2 }}>@{tenant.handle}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal ID</span>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>{household.household_id}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>{tenant.tenant_id}</div>
               </div>
             </div>
 

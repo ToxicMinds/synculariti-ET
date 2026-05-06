@@ -7,7 +7,7 @@ import { CategorySelector } from './CategorySelector';
 
 interface ManualEntryProps {
   prefill?: Partial<Expense> & { merchant?: string };
-  household: any;
+  tenant: any;
   selectedUser: string;
   onSave: (entry: {
     id?: string;
@@ -23,15 +23,15 @@ interface ManualEntryProps {
   onClose: () => void;
 }
 
-export function ManualEntryModal({ prefill, household, selectedUser, onSave, onAddCategory, onClose }: ManualEntryProps) {
+export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddCategory, onClose }: ManualEntryProps) {
   const isEdit = !!prefill?.id;
 
   const [description, setDescription] = useState(prefill?.description || '');
   const [merchant, setMerchant] = useState(prefill?.merchant || '');
   const [amount, setAmount] = useState(prefill?.amount?.toString() || '');
 
-  const names = household.names || {};
-  const categories = household.categories || [];
+  const names = tenant.names || {};
+  const categories = tenant.categories || [];
 
   const [category, setCategory] = useState(prefill?.category || '');
   const [who_id, setWhoId] = useState(prefill?.who_id || selectedUser || Object.keys(names)[0] || '');

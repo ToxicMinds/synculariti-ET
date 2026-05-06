@@ -4,26 +4,26 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { AppState } from '@/hooks/useHousehold';
+import { AppState } from '@/hooks/useTenant';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
-interface HouseholdContextType {
+interface TenantContextType {
   session: Session | null;
-  household: AppState | null;
+  tenant: AppState | null;
   resolvedWhoId: string | null;
   loading: boolean;
   syncToken: number;
   triggerRefresh: () => void;
-  fetchHouseholdState: () => Promise<void>;
+  fetchTenantState: () => Promise<void>;
   updateState: (updates: Partial<AppState>) => Promise<void>;
   addCategory: (name: string) => Promise<void>;
 }
 
-const HouseholdContext = createContext<HouseholdContextType | undefined>(undefined);
+const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
-export function HouseholdProvider({ children }: { children: ReactNode }) {
+export function TenantProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [household, setHousehold] = useState<AppState | null>(null);
+  const [tenant, setTenant] = useState<AppState | null>(null);
   const [resolvedWhoId, setResolvedWhoId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncToken, setSyncToken] = useState(0);
@@ -36,7 +36,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        fetchHouseholdState(session);
+        fetchTenantState(session);
       } else {
         setLoading(false); // Immediate resolution for unauth users
       }
@@ -46,9 +46,9 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session) {
-        fetchHouseholdState(session);
+        fetchTenantState(session);
       } else if (event === 'SIGNED_OUT') {
-        setHousehold(null);
+        setTenant(null);
         setResolvedWhoId(null);
         setLoading(false);
       }
@@ -61,20 +61,20 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
    * PERFORMANCE FIX: Using the bundled RPC
    * Reduces network traffic by 66% per instance.
    */
-  const fetchHouseholdState = async (currentSession?: Session | null) => {
+  const fetchTenantState = async (currentSession?: Session | null) => {
     try {
       const activeSession = currentSession || session;
       if (!activeSession) return;
 
-      const { data: bundle, error } = await supabase.rpc('get_household_bundle');
+      const { data: bundle, error } = await supabase.rpc('get_tenant_bundle');
       
       if (error) throw error;
-      if (!bundle || !bundle.household) return;
+      if (!bundle || !bundle.tenant) return;
 
-      const { household: h, user: u, locations: l } = bundle;
+      const { tenant: h, user: u, locations: l } = bundle;
 
-      setHousehold({
-        household_id: h.id,
+      setTenant({
+        tenant_id: h.id,
         handle: h.handle || '',
         names: h.config?.names || {},
         emails: h.config?.emails || {},
@@ -101,50 +101,50 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         if (foundId) setResolvedWhoId(foundId);
       }
     } catch (e) {
-      Logger.system('ERROR', 'Auth', 'Failed to fetch household bundle', { error: e });
+      Logger.system('ERROR', 'Auth', 'Failed to fetch tenant bundle', { error: e });
     } finally {
       setLoading(false);
     }
   };
 
   const updateState = async (updates: Partial<AppState>) => {
-    if (!household?.household_id) return;
+    if (!tenant?.tenant_id) return;
     
     // Get latest config from DB to avoid race conditions
     const { data: stateData } = await supabase
       .from('app_state')
       .select('config')
-      .eq('id', household.household_id)
+      .eq('id', tenant.tenant_id)
       .single();
 
     const currentConfig = stateData?.config || {};
 
     const newConfig = {
       ...currentConfig,
-      names: updates.names || household.names,
-      income: updates.income || household.income,
-      budgets: updates.budgets || household.budgets,
-      memory: updates.memory || household.memory,
-      goals: updates.goals || household.goals,
-      ai_insight: updates.ai_insight || household.ai_insight,
-      categories: updates.categories || household.categories
+      names: updates.names || tenant.names,
+      income: updates.income || tenant.income,
+      budgets: updates.budgets || tenant.budgets,
+      memory: updates.memory || tenant.memory,
+      goals: updates.goals || tenant.goals,
+      ai_insight: updates.ai_insight || tenant.ai_insight,
+      categories: updates.categories || tenant.categories
     };
 
     const { error } = await supabase
       .from('app_state')
-      .upsert({ id: household.household_id, config: newConfig });
+      .upsert({ id: tenant.tenant_id, config: newConfig });
 
     if (error) throw error;
-    setHousehold({ ...household, ...updates });
+    setTenant({ ...tenant, ...updates });
   };
 
   const addCategory = async (name: string) => {
-    if (!household) return;
+    if (!tenant) return;
     const cleanName = name.trim();
     if (!cleanName) return;
     
-    const existingBudgets = household.budgets || {};
-    const existingCategories = household.categories || [];
+    const existingBudgets = tenant.budgets || {};
+    const existingCategories = tenant.categories || [];
     
     // Skip if already exists
     if (existingCategories.includes(cleanName)) return;
@@ -159,26 +159,26 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <HouseholdContext.Provider value={{ 
+    <TenantContext.Provider value={{ 
       session, 
-      household, 
+      tenant, 
       resolvedWhoId,
       loading, 
       syncToken,
       triggerRefresh,
-      fetchHouseholdState, 
+      fetchTenantState, 
       updateState,
       addCategory
     }}>
       {children}
-    </HouseholdContext.Provider>
+    </TenantContext.Provider>
   );
 }
 
-export function useHouseholdContext() {
-  const context = useContext(HouseholdContext);
+export function useTenantContext() {
+  const context = useContext(TenantContext);
   if (context === undefined) {
-    throw new Error('useHouseholdContext must be used within a HouseholdProvider');
+    throw new Error('useTenantContext must be used within a TenantProvider');
   }
   return context;
 }

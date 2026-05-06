@@ -9,17 +9,17 @@ const supabase = createClient(
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const householdId = searchParams.get('household_id');
+  const tenantId = searchParams.get('tenant_id');
   const format = searchParams.get('format') || 'csv';
 
-  if (!householdId) {
-    return NextResponse.json({ error: 'Missing household_id' }, { status: 400 });
+  if (!tenantId) {
+    return NextResponse.json({ error: 'Missing tenant_id' }, { status: 400 });
   }
 
   const { data: expenses, error } = await supabase
     .from('expenses')
     .select('date, description, category, amount, who, who_id')
-    .eq('household_id', householdId)
+    .eq('tenant_id', tenantId)
     .eq('is_deleted', false)
     .order('date', { ascending: false });
 

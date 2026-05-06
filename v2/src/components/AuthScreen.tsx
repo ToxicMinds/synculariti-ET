@@ -27,7 +27,7 @@ export function AuthScreen({ session }: { session: any }) {
 
   const handleJoin = async () => {
     if (!handle) {
-      setError('Enter Household Handle');
+      setError('Enter Tenant Handle');
       return;
     }
     
@@ -40,14 +40,14 @@ export function AuthScreen({ session }: { session: any }) {
       // 1. Verify handle exists
       const { data: lookupData, error: lErr } = await supabase.rpc('verify_household_access', { input_code: lowerHandle });
       if (lErr) throw lErr;
-      if (!lookupData || lookupData.length === 0) throw new Error("Household handle not found.");
+      if (!lookupData || lookupData.length === 0) throw new Error("Tenant handle not found.");
       
-      const householdId = lookupData[0].target_id;
+      const tenantId = lookupData[0].target_id;
       
       // 2. Link user (using upsert to prevent duplicate key errors)
       const { error: linkErr } = await supabase
         .from('app_users')
-        .upsert({ id: session.user.id, household_id: householdId });
+        .upsert({ id: session.user.id, tenant_id: tenantId });
         
       if (linkErr) throw linkErr;
       
@@ -65,7 +65,7 @@ export function AuthScreen({ session }: { session: any }) {
         
         {!session ? (
           <div>
-            <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>Sign in with Google to manage your household finances.</p>
+            <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>Sign in with Google to manage your tenant finances.</p>
             <button 
               className="btn btn-primary" 
               onClick={handleGoogleLogin}
@@ -78,13 +78,13 @@ export function AuthScreen({ session }: { session: any }) {
         ) : (
           <div>
             <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>
-              You are signed in as {session.user.email}, but you aren't part of a household yet.
+              You are signed in as {session.user.email}, but you aren't part of a tenant yet.
             </p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input 
                 type="text" 
-                placeholder="Household Handle (e.g. smith-42)" 
+                placeholder="Tenant Handle (e.g. smith-42)" 
                 value={handle}
                 onChange={e => setHandle(e.target.value)}
                 style={{ padding: 12, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
@@ -95,7 +95,7 @@ export function AuthScreen({ session }: { session: any }) {
                 disabled={loading}
                 style={{ width: '100%', padding: '12px', marginTop: 8 }}
               >
-                {loading ? 'Joining...' : 'Join Household'}
+                {loading ? 'Joining...' : 'Join Tenant'}
               </button>
             </div>
           </div>

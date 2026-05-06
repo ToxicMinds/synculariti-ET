@@ -4,17 +4,17 @@ import { useState, useEffect, useRef } from 'react';
 import { BentoCard } from './BentoCard';
 
 export function AIInsights({
-  householdId,
+  tenantId,
   expenseCount,
   dataHash,
   updateState,
-  household
+  tenant
 }: {
-  householdId: string | undefined;
+  tenantId: string | undefined;
   expenseCount?: number;
   dataHash?: string;
   updateState?: (s: any) => Promise<void>;
-  household?: any;
+  tenant?: any;
 }) {
   const [insight, setInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,14 +24,14 @@ export function AIInsights({
   const lastFetchedHash = useRef<string | null>(null);
   const isFetching = useRef(false);
 
-  // Stable cache key: only changes when household or expense count/totals change
-  const cacheHash = householdId ? (dataHash || `${householdId}_${expenseCount ?? 0}`) : null;
+  // Stable cache key: only changes when tenant or expense count/totals change
+  const cacheHash = tenantId ? (dataHash || `${tenantId}_${expenseCount ?? 0}`) : null;
 
   useEffect(() => {
-    if (!householdId || !household || !cacheHash) return;
+    if (!tenantId || !tenant || !cacheHash) return;
 
     // 1. Serve from Supabase-backed cache if valid AND < 24h old
-    const cached = household?.ai_insight;
+    const cached = tenant?.ai_insight;
     const isHashMatch = cached?.hash === cacheHash;
     const isFresh = cached?.timestamp && (Date.now() - new Date(cached.timestamp).getTime() < 24 * 60 * 60 * 1000);
 
@@ -51,7 +51,7 @@ export function AIInsights({
 
     fetchInsight(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [householdId, cacheHash]);
+  }, [tenantId, cacheHash]);
 
   async function fetchInsight(forceRefresh = false) {
     if (isFetching.current) return;

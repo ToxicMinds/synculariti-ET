@@ -18,7 +18,7 @@ export class Logger {
     component: LogComponent, 
     message: string, 
     metadata: any = {}, 
-    householdId?: string
+    tenantId?: string
   ) {
     // 1. Local Development visibility
     if (level === 'ERROR') console.error(`[${component}] 🔴 ${message}`, metadata);
@@ -36,7 +36,7 @@ export class Logger {
           stack: metadata?.stack,
           timestamp: new Date().toISOString()
         },
-        household_id: householdId || null
+        tenant_id: tenantId || null
       });
     } catch (e) {
       console.error('CRITICAL: Failed to write system telemetry:', e);
@@ -45,10 +45,10 @@ export class Logger {
 
   /**
    * USER LOGGING (The "Family Feed")
-   * Human-readable activity for household visibility.
+   * Human-readable activity for tenant visibility.
    */
   static async user(
-    householdId: string,
+    tenantId: string,
     action: string,
     description: string,
     actorName: string,
@@ -56,14 +56,14 @@ export class Logger {
   ) {
     try {
       await supabase.from('activity_log').insert({
-        household_id: householdId,
+        tenant_id: tenantId,
         action,
         description,
         actor_name: actorName,
         metadata
       });
     } catch (e) {
-      this.system('ERROR', 'Sync', 'Failed to write user activity log', e, householdId);
+      this.system('ERROR', 'Sync', 'Failed to write user activity log', e, tenantId);
     }
   }
 }

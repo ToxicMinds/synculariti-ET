@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/lib/finance';
-import { useHouseholdContext } from '@/context/HouseholdContext';
+import { useTenantContext } from '@/context/TenantContext';
 
 /**
  * useTransactions Hook (SOLID: Single Responsibility)
  * RESPONSIBILITY: Read-only state management, Filtering, and Realtime Sync.
  */
-export function useTransactions(householdId: string | undefined, selectedMonth?: string) {
+export function useTransactions(tenantId: string | undefined, selectedMonth?: string) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { syncToken } = useHouseholdContext();
+  const { syncToken } = useTenantContext();
 
   useEffect(() => {
-    if (!householdId) {
+    if (!tenantId) {
       setExpenses([]);
       setLoading(false);
       return;
@@ -28,7 +28,7 @@ export function useTransactions(householdId: string | undefined, selectedMonth?:
         event: '*',
         schema: 'public',
         table: 'expenses',
-        filter: `household_id=eq.${householdId}`
+        filter: `tenant_id=eq.${tenantId}`
       }, () => {
         fetchExpenses();
       })
@@ -37,15 +37,15 @@ export function useTransactions(householdId: string | undefined, selectedMonth?:
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [householdId, selectedMonth, syncToken]);
+  }, [tenantId, selectedMonth, syncToken]);
 
   const fetchExpenses = async () => {
-    if (!householdId) return;
+    if (!tenantId) return;
     
     let query = supabase
       .from('expenses')
       .select('*')
-      .eq('household_id', householdId)
+      .eq('tenant_id', tenantId)
       .eq('is_deleted', false);
 
     if (selectedMonth) {

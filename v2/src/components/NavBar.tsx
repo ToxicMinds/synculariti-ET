@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useHousehold } from '@/hooks/useHousehold';
+import { useTenant } from '@/hooks/useTenant';
 import { Suspense, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -187,7 +187,7 @@ const menuItemStyle: React.CSSProperties = {
 };
 
 export function NavBar() {
-  const { household, resolvedWhoId } = useHousehold();
+  const { tenant, resolvedWhoId } = useTenant();
 
   return (
     <nav className="navbar">
@@ -211,7 +211,7 @@ export function NavBar() {
 
       <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
         <Suspense fallback={<div style={{ width: 100, height: 36, background: 'var(--bg-hover)', borderRadius: 12 }} />}>
-          <SwitcherGroup createdAt={household?.created_at} />
+          <SwitcherGroup createdAt={tenant?.created_at} />
         </Suspense>
       </div>
 
@@ -237,10 +237,10 @@ export function NavBar() {
           ⚙️ Settings
         </Link>
         
-        {household && (
+        {tenant && (
           <ProfileMenu 
             resolvedWhoId={resolvedWhoId} 
-            names={household.names} 
+            names={tenant.names} 
           />
         )}
       </div>

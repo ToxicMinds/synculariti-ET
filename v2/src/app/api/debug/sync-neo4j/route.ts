@@ -35,13 +35,13 @@ export async function GET(req: Request) {
         for (const exp of expenses) {
           const rawName = (exp.description || 'Unknown Merchant').trim();
 
-          // Query 1: MERGE/update Transaction node with household_id
+          // Query 1: MERGE/update Transaction node with tenant_id
           await tx.run(
             `MERGE (t:Transaction {id: $id})
-             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.household_id = $household_id
-             ON MATCH SET  t.household_id = $household_id, t.amount = $amount, t.date = $date, t.category = $category
+             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.tenant_id = $tenant_id
+             ON MATCH SET  t.tenant_id = $tenant_id, t.amount = $amount, t.date = $date, t.category = $category
              RETURN t.id AS id`,
-            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, household_id: exp.household_id }
+            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, tenant_id: exp.tenant_id }
           );
 
           // Query 2: MERGE Merchant + link to Transaction

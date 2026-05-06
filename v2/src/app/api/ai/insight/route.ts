@@ -11,12 +11,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 2. Resolve Household ID (Server-Side Secure)
-  // We call our hardened RPC to get the memoized household ID
-  const { data: householdId, error: hError } = await supabase.rpc('get_my_household');
+  // 2. Resolve Tenant ID (Server-Side Secure)
+  // We call our hardened RPC to get the memoized tenant ID
+  const { data: tenantId, error: hError } = await supabase.rpc('get_my_tenant');
   
-  if (hError || !householdId) {
-    return NextResponse.json({ error: 'Household not found' }, { status: 404 });
+  if (hError || !tenantId) {
+    return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
   }
 
   const driver = getNeo4jDriver();
@@ -25,20 +25,20 @@ export async function GET() {
   const session = driver.session();
   try {
     const merchantResult = await session.run(`
-      MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {household_id: $householdId})
+      MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {tenant_id: $tenantId})
       WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
       ORDER BY visits DESC
       LIMIT 15
       RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
-    `, { householdId });
+    `, { tenantId });
     
     const categoryResult = await session.run(`
-      MATCH (t:Transaction {household_id: $householdId})
+      MATCH (t:Transaction {tenant_id: $tenantId})
       WHERE t.category IS NOT NULL
       WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
       ORDER BY total DESC
       RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
-    `, { householdId });
+    `, { tenantId });
 
     const facts = merchantResult.records[0]?.get('topMerchants') || [];
     const categories = categoryResult.records[0]?.get('categories') || [];
@@ -67,7 +67,7 @@ export async function GET() {
         messages: [
           {
             role: "system",
-            content: `You are a sharp, caring financial advisor for a Slovak-based household.
+            content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
 Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
           },
           {

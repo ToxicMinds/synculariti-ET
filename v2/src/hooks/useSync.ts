@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Expense } from '@/lib/finance';
 import { normalizeAndLinkMerchant } from '@/lib/neo4j';
 import { Logger } from '@/lib/logger';
-import { useHouseholdContext } from '@/context/HouseholdContext';
+import { useTenantContext } from '@/context/TenantContext';
 
 export interface ReceiptItem {
   name: string;
@@ -26,18 +26,18 @@ export interface ReceiptData {
  * useSync Hook (SOLID: Single Responsibility)
  * RESPONSIBILITY: Write operations, ACID Transactions, and Intelligence Linking.
  */
-export function useSync(householdId: string | undefined) {
-  const { triggerRefresh } = useHouseholdContext();
+export function useSync(tenantId: string | undefined) {
+  const { triggerRefresh } = useTenantContext();
   
   const addExpense = async (expense: Partial<Expense> | Partial<Expense>[]) => {
-    if (!householdId) return;
+    if (!tenantId) return;
 
     const normalize = (e: Partial<Expense> & { merchant?: string }) => {
       const { merchant, id, ...pureExpense } = e;
       return {
         id: id || crypto.randomUUID(),
         ...pureExpense,
-        household_id: householdId,
+        tenant_id: tenantId,
       };
     };
 
@@ -51,13 +51,13 @@ export function useSync(householdId: string | undefined) {
       .select();
       
     if (error) {
-      Logger.system('ERROR', 'Sync', 'Failed to add manual expense', error, householdId);
+      Logger.system('ERROR', 'Sync', 'Failed to add manual expense', error, tenantId);
       throw error;
     }
 
     // Success activity & Signal
     const count = Array.isArray(payload) ? payload.length : 1;
-    Logger.user(householdId, 'EXPENSE_ADDED', `Added ${count} manual expense(s)`, 'Household Member');
+    Logger.user(tenantId, 'EXPENSE_ADDED', `Added ${count} manual expense(s)`, 'Tenant Member');
     triggerRefresh();
 
     // Fire-and-forget Neo4j sync
@@ -65,14 +65,14 @@ export function useSync(householdId: string | undefined) {
       for (const saved of data) {
         const merchantName = (expense as any).merchant || saved.description || 'Unknown Merchant';
         normalizeAndLinkMerchant(merchantName, saved.id, Number(saved.amount)).catch(
-          err => Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed for manual expense', { error: err, expenseId: saved.id }, householdId)
+          err => Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed for manual expense', { error: err, expenseId: saved.id }, tenantId)
         );
       }
     }
   };
 
   const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string, locationId?: string, currency: string = 'EUR') => {
-    if (!householdId) throw new Error('No household ID');
+    if (!tenantId) throw new Error('No tenant ID');
 
     const selectedItems = receipt.items.filter(i => i.selected);
     if (selectedItems.length === 0) throw new Error('No items selected');
@@ -86,7 +86,7 @@ export function useSync(householdId: string | undefined) {
 
     const expensePayload = {
       id: expenseId,
-      household_id: householdId,
+      tenant_id: tenantId,
       location_id: locationId || null,  // B2B: which location this spend belongs to
       who_id: whoId,
       who: whoName,
@@ -122,11 +122,11 @@ export function useSync(householdId: string | undefined) {
         if (error) throw error;
 
         // Success activity & Signal
-        Logger.user(householdId, 'EXPENSE_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
+        Logger.user(tenantId, 'EXPENSE_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
         triggerRefresh();
 
         normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount, receipt.ico).catch(err =>
-          Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after saveReceipt', { error: err, store: receipt.store }, householdId)
+          Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after saveReceipt', { error: err, store: receipt.store }, tenantId)
         );
 
         return data;
@@ -135,10 +135,10 @@ export function useSync(householdId: string | undefined) {
         attempt++;
         if (attempt < maxAttempts) {
           const delay = Math.pow(2, attempt) * 1000;
-          Logger.system('WARN', 'Sync', `saveReceipt retry ${attempt}/${maxAttempts}`, { error: err, delay }, householdId);
+          Logger.system('WARN', 'Sync', `saveReceipt retry ${attempt}/${maxAttempts}`, { error: err, delay }, tenantId);
           await new Promise(resolve => setTimeout(resolve, delay));
         } else {
-          Logger.system('ERROR', 'Sync', 'saveReceipt failed after max retries', err, householdId);
+          Logger.system('ERROR', 'Sync', 'saveReceipt failed after max retries', err, tenantId);
         }
       }
     }
@@ -147,37 +147,37 @@ export function useSync(householdId: string | undefined) {
   };
 
   const softDeleteExpense = async (id: string) => {
-    if (!householdId) return;
+    if (!tenantId) return;
     const { error } = await supabase
       .from('expenses')
       .update({ is_deleted: true })
       .eq('id', id)
-      .eq('household_id', householdId);
+      .eq('tenant_id', tenantId);
 
     if (error) throw error;
 
-    Logger.user(householdId, 'EXPENSE_DELETED', `Removed an expense record`, 'Household Member');
+    Logger.user(tenantId, 'EXPENSE_DELETED', `Removed an expense record`, 'Tenant Member');
     triggerRefresh();
   };
 
   const updateExpense = async (id: string, expense: Partial<Expense> & { merchant?: string }) => {
-    if (!householdId) return;
+    if (!tenantId) return;
 
     const { merchant, ...pureExpense } = expense;
 
     const { error } = await supabase
       .from('expenses')
-      .update({ ...pureExpense, household_id: householdId })
+      .update({ ...pureExpense, tenant_id: tenantId })
       .eq('id', id);
 
     if (error) throw error;
 
-    Logger.user(householdId, 'EXPENSE_UPDATED', `Updated details for ${expense.description || 'an expense'}`, 'Household Member');
+    Logger.user(tenantId, 'EXPENSE_UPDATED', `Updated details for ${expense.description || 'an expense'}`, 'Tenant Member');
     triggerRefresh();
 
     const merchantName = expense.merchant || expense.description || 'Unknown Merchant';
     normalizeAndLinkMerchant(merchantName, id, Number(expense.amount)).catch(err =>
-      Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after expense update', { error: err, expenseId: id }, householdId)
+      Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after expense update', { error: err, expenseId: id }, tenantId)
     );
   };
 

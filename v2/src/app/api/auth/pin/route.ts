@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 1. Find household by PIN (using the alias lookup)
+    // 1. Find tenant by PIN (using the alias lookup)
     const { data: lookup, error: lErr } = await supabaseAdmin.rpc('verify_household_access', { 
       input_code: pin 
     });
@@ -21,11 +21,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
     }
 
-    const householdId = lookup[0].target_id;
+    const tenantId = lookup[0].target_id;
 
     // 2. Verify PIN
     const { data: isValid, error: vErr } = await supabaseAdmin.rpc('check_household_pin', {
-      h_id: householdId,
+      h_id: tenantId,
       input_pin: pin
     });
 
@@ -33,20 +33,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 });
     }
 
-    // 3. Log in as the "Virtual Household User"
+    // 3. Log in as the "Virtual Tenant User"
     // We use a standardized email format for virtual accounts
     const { data: houseData } = await supabaseAdmin
-      .from('households')
+      .from('tenants')
       .select('handle')
-      .eq('id', householdId)
+      .eq('id', tenantId)
       .single();
 
     if (!houseData) {
-      return NextResponse.json({ error: 'Household metadata not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Tenant metadata not found' }, { status: 404 });
     }
 
     const virtualEmail = `h_${houseData.handle}@synculariti.com`;
-    const virtualPass = `pin_${pin}_${householdId.substring(0, 8)}`;
+    const virtualPass = `pin_${pin}_${tenantId.substring(0, 8)}`;
 
     const { data: authData, error: authErr } = await supabaseAdmin.auth.signInWithPassword({
       email: virtualEmail,

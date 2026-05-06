@@ -3,13 +3,13 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { HouseholdProvider } from "@/context/HouseholdContext";
+import { TenantProvider } from "@/context/TenantContext";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Synculariti - Tracker",
-  description: "Intelligent household expense tracking",
+  description: "Intelligent tenant expense tracking",
   manifest: "/manifest.json",
   // Next.js 14 proper favicon handling
   icons: {
@@ -51,14 +51,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={inter.className}>
-        <HouseholdProvider>
+        <TenantProvider>
           <NavBar />
           <div className="app-container">
             {children}
           </div>
           <MobileBottomNav />
           <PWAInstallPrompt />
-        </HouseholdProvider>
+        </TenantProvider>
       </body>
     </html>
   );

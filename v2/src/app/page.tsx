@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BentoCard } from '@/components/BentoCard';
 import { ExpenseList } from '@/components/ExpenseList';
-import { useHousehold } from '@/hooks/useHousehold';
+import { useTenant } from '@/hooks/useTenant';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useSync, ReceiptData } from '@/hooks/useSync';
 import { calcTotals } from '@/lib/finance';
@@ -24,25 +24,25 @@ import { MonthlyPerformance } from '@/components/MonthlyPerformance';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
-  const { session, household, loading: hLoading, updateState, addCategory } = useHousehold();
+  const { session, tenant, loading: hLoading, updateState, addCategory } = useTenant();
   const now = new Date();
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedMonth = searchParams.get('m') || currentMonthISO;
   
   // SOLID Split: Transactions for Read, Sync for Write
-  const { expenses, loading: eLoading } = useTransactions(household?.household_id, selectedMonth);
-  const { softDeleteExpense, saveReceipt, addExpense, updateExpense } = useSync(household?.household_id);
+  const { expenses, loading: eLoading } = useTransactions(tenant?.tenant_id, selectedMonth);
+  const { softDeleteExpense, saveReceipt, addExpense, updateExpense } = useSync(tenant?.tenant_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
   const [manualEntry, setManualEntry] = useState<any | null>(null);
 
-  const selectedUser = searchParams.get('u') || (household ? Object.keys(household.names)[0] : null);
-  const loading = hLoading || (household && eLoading);
+  const selectedUser = searchParams.get('u') || (tenant ? Object.keys(tenant.names)[0] : null);
+  const loading = hLoading || (tenant && eLoading);
 
   const handleSaveReceipt = async (data: ReceiptData, whoId?: string) => {
     const finalWhoId = whoId || selectedUser;
-    if (!finalWhoId || !household) return;
-    await saveReceipt(data, finalWhoId, household.names[finalWhoId]);
+    if (!finalWhoId || !tenant) return;
+    await saveReceipt(data, finalWhoId, tenant.names[finalWhoId]);
     setShowScanner(false);
   };
 
@@ -68,28 +68,28 @@ function DashboardContent() {
   if (loading) return (
     <div style={{ padding: 64, textAlign: 'center', color: 'var(--text-secondary)' }}>
       <div className="spinner-small" style={{ margin: '0 auto 12px' }} />
-      <p style={{ fontSize: 14 }}>Loading your household data…</p>
+      <p style={{ fontSize: 14 }}>Loading your tenant data…</p>
     </div>
   );
 
-  if (!household) return <AuthScreen session={session} />;
+  if (!tenant) return <AuthScreen session={session} />;
 
   // Filter expenses for current month components (useExpenses returns current + prev for comparison)
   const displayExpenses = expenses.filter(e => e.date?.startsWith(selectedMonth));
   const totals = calcTotals(displayExpenses);
-  const totalIncome = Object.values(household.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
-  const totalBudget = Object.values(household.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
-  const monthlySavingsGoal = household.goals?.monthly_savings || 500;
+  const totalIncome = Object.values(tenant.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
+  const totalBudget = Object.values(tenant.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
+  const monthlySavingsGoal = tenant.goals?.monthly_savings || 500;
 
-  if (Object.keys(household.names || {}).length === 0) {
+  if (Object.keys(tenant.names || {}).length === 0) {
     return (
       <main style={{ padding: '48px 24px', maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <BentoCard colSpan={12} title="Welcome to Synculariti!">
           <div style={{ padding: '32px 0' }}>
-            <h2 style={{ fontSize: 24, marginBottom: 16 }}>Let's set up your household</h2>
+            <h2 style={{ fontSize: 24, marginBottom: 16 }}>Let's set up your tenant</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
-              It looks like you don't have any members in your household yet. 
-              Before you can start tracking expenses, you need to add yourself (and anyone else) to the household.
+              It looks like you don't have any members in your tenant yet. 
+              Before you can start tracking expenses, you need to add yourself (and anyone else) to the tenant.
             </p>
             <a href="/settings" className="btn btn-primary" style={{ padding: '14px 32px', fontSize: 16, textDecoration: 'none', display: 'inline-block' }}>
               Go to Settings →
@@ -105,9 +105,9 @@ function DashboardContent() {
       {/* Statement Scanner Modal */}
       {showStatement && (
         <StatementScanner
-          names={household.names}
-          categories={household.categories}
-          selectedUser={selectedUser || Object.keys(household.names)[0]}
+          names={tenant.names}
+          categories={tenant.categories}
+          selectedUser={selectedUser || Object.keys(tenant.names)[0]}
           onSave={handleSaveStatement}
           onClose={() => setShowStatement(false)}
         />
@@ -117,8 +117,8 @@ function DashboardContent() {
       {manualEntry !== null && (
         <ManualEntryModal
           prefill={manualEntry}
-          household={household}
-          selectedUser={selectedUser || Object.keys(household.names)[0]}
+          tenant={tenant}
+          selectedUser={selectedUser || Object.keys(tenant.names)[0]}
           onSave={handleManualSave}
           onAddCategory={addCategory}
           onClose={() => setManualEntry(null)}
@@ -131,8 +131,8 @@ function DashboardContent() {
             <ReceiptScanner 
               onSave={handleSaveReceipt} 
               onAddCategory={addCategory}
-              categories={household.categories}
-              names={household.names}
+              categories={tenant.categories}
+              names={tenant.names}
             />
             <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowScanner(false)}>
               ← Back to Dashboard
@@ -149,17 +149,17 @@ function DashboardContent() {
             />
 
             {/* ROW 2: FAMILY & BUDGET */}
-            <FamilySpends expenses={displayExpenses} names={household.names} colSpan={6} />
+            <FamilySpends expenses={displayExpenses} names={tenant.names} colSpan={6} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} colSpan={6} />
 
             {/* ROW 3: STATUS & INTELLIGENCE */}
             <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
             <AIInsights 
-              householdId={household.household_id} 
+              tenantId={tenant.tenant_id} 
               expenseCount={expenses.length} 
               dataHash={expenses.length + '_' + totals.spent.toFixed(0)}
               updateState={updateState} 
-              household={household} 
+              tenant={tenant} 
             />
 
             {/* ROW 5: TRENDS & CONTEXT */}
@@ -168,7 +168,7 @@ function DashboardContent() {
               title={`Total Spent (${selectedMonth})`}
               tooltip={{
                 title: "Total Spent",
-                explanation: "Sum of all non-Savings, non-Adjustment expenses for your household for the selected month.",
+                explanation: "Sum of all non-Savings, non-Adjustment expenses for your tenant for the selected month.",
                 formula: "Σ(amount) WHERE category ≠ 'Savings' AND is_deleted = false"
               }}
             >
@@ -198,7 +198,7 @@ function DashboardContent() {
 
             {/* ROW 7: DEEP ANALYTICS */}
             <BentoCard colSpan={12} title="Top Items (Deep Analytics)">
-              <ItemAnalytics householdId={household.household_id} />
+              <ItemAnalytics tenantId={tenant.tenant_id} />
             </BentoCard>
 
             {displayExpenses.length === 0 && (

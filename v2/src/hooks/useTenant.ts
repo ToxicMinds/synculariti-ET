@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * PROXY HOOK: useHousehold
+ * PROXY HOOK: useTenant
  * 
- * This hook now acts as a proxy for the centralized HouseholdProvider.
- * This ensures that ALL components share the same instance of household data,
+ * This hook now acts as a proxy for the centralized TenantProvider.
+ * This ensures that ALL components share the same instance of tenant data,
  * preventing redundant network requests.
  * 
  * Zero-Regression: The interface remains identical to the previous version.
  */
-import { useHouseholdContext } from '@/context/HouseholdContext';
+import { useTenantContext } from '@/context/TenantContext';
 
 export interface AppState {
-  household_id: string;
+  tenant_id: string;
   handle: string;
   names: Record<string, string>;
   emails?: Record<string, string>;
@@ -26,15 +26,15 @@ export interface AppState {
   created_at?: string;
 }
 
-export function useHousehold() {
-  const context = useHouseholdContext();
+export function useTenant() {
+  const context = useTenantContext();
   
   return { 
     session: context.session, 
-    household: context.household, 
+    tenant: context.tenant, 
     resolvedWhoId: context.resolvedWhoId,
     loading: context.loading, 
-    fetchHouseholdState: context.fetchHouseholdState, 
+    fetchTenantState: context.fetchTenantState, 
     updateState: context.updateState,
     addCategory: context.addCategory
   };

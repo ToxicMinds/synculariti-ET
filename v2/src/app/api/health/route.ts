@@ -12,7 +12,7 @@ export async function GET() {
 
   // 1. Check Supabase
   try {
-    const { error } = await supabase.from('households').select('id').limit(1);
+    const { error } = await supabase.from('tenants').select('id').limit(1);
     if (!error) checks.supabase = 'ok';
     else {
       checks.supabase = `error: ${error.message}`;

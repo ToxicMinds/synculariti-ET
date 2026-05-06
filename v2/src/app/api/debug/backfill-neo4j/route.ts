@@ -3,16 +3,16 @@ import { supabase } from '@/lib/supabase';
 import { getNeo4jDriver } from '@/lib/neo4j';
 
 /**
- * BACKFILL API: Stamps household_id onto all existing Neo4j Transaction nodes.
+ * BACKFILL API: Stamps tenant_id onto all existing Neo4j Transaction nodes.
  * Splits queries so every statement ends with RETURN (Cypher 5 compliant).
  *
  * Usage: GET /api/debug/backfill-neo4j?key=et-secret-sync
- * Optional: ?householdId=xxx to only backfill one household
+ * Optional: ?tenantId=xxx to only backfill one tenant
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
-  const filterHouseholdId = searchParams.get('householdId');
+  const filterHouseholdId = searchParams.get('tenantId');
 
   if (key !== 'et-secret-sync') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,11 +24,11 @@ export async function GET(req: Request) {
   try {
     let query = supabase
       .from('expenses')
-      .select('id, household_id, description, amount, date, category')
+      .select('id, tenant_id, description, amount, date, category')
       .eq('is_deleted', false);
 
     if (filterHouseholdId) {
-      query = query.eq('household_id', filterHouseholdId);
+      query = query.eq('tenant_id', filterHouseholdId);
     }
 
     const { data: expenses, error } = await query;
@@ -41,17 +41,17 @@ export async function GET(req: Request) {
     try {
       await sessionNeo.executeWrite(async (tx) => {
         for (const exp of expenses) {
-          if (!exp.household_id) { skippedCount++; continue; }
+          if (!exp.tenant_id) { skippedCount++; continue; }
 
           const rawName = (exp.description || 'Unknown Merchant').trim();
 
-          // Query 1: MERGE Transaction node + stamp household_id (Cypher 5: ends with RETURN)
+          // Query 1: MERGE Transaction node + stamp tenant_id (Cypher 5: ends with RETURN)
           await tx.run(
             `MERGE (t:Transaction {id: $id})
-             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.household_id = $household_id
-             ON MATCH SET  t.household_id = $household_id, t.amount = $amount, t.date = $date, t.category = $category
+             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.tenant_id = $tenant_id
+             ON MATCH SET  t.tenant_id = $tenant_id, t.amount = $amount, t.date = $date, t.category = $category
              RETURN t.id AS id`,
-            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, household_id: exp.household_id }
+            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, tenant_id: exp.tenant_id }
           );
 
           // Query 2: MERGE Merchant + link to Transaction
@@ -71,7 +71,7 @@ export async function GET(req: Request) {
       await sessionNeo.close();
     }
 
-    // Verify isolation — count how many nodes now have household_id
+    // Verify isolation — count how many nodes now have tenant_id
     const verifySession = driver.session();
     let verifyResult;
     try {
@@ -79,8 +79,8 @@ export async function GET(req: Request) {
         `MATCH (t:Transaction)
          RETURN
            count(t) AS totalNodes,
-           count(t.household_id) AS nodesWithHouseholdId,
-           count(DISTINCT t.household_id) AS distinctHouseholds`
+           count(t.tenant_id) AS nodesWithHouseholdId,
+           count(DISTINCT t.tenant_id) AS distinctHouseholds`
       );
     } finally {
       await verifySession.close();
@@ -95,10 +95,10 @@ export async function GET(req: Request) {
       skipped: skippedCount,
       neo4j_verification: {
         total_transaction_nodes: toNum(stats.get('totalNodes')),
-        nodes_with_household_id: toNum(stats.get('nodesWithHouseholdId')),
+        nodes_with_tenant_id: toNum(stats.get('nodesWithHouseholdId')),
         distinct_households: toNum(stats.get('distinctHouseholds')),
       },
-      isolation_proof: 'Each household_id maps to exactly one household. All graph queries filter by this ID — cross-tenant leakage is structurally impossible.'
+      isolation_proof: 'Each tenant_id maps to exactly one tenant. All graph queries filter by this ID — cross-tenant leakage is structurally impossible.'
     });
 
   } catch (e: any) {

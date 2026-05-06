@@ -12,15 +12,15 @@ interface AggregatedItem {
   last_date: string;
 }
 
-export function ItemAnalytics({ householdId }: { householdId: string | undefined }) {
+export function ItemAnalytics({ tenantId }: { tenantId: string | undefined }) {
   const [items, setItems] = useState<AggregatedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (householdId) {
+    if (tenantId) {
       fetchTopItems();
     }
-  }, [householdId]);
+  }, [tenantId]);
 
   async function fetchTopItems() {
     setLoading(true);
@@ -36,7 +36,7 @@ export function ItemAnalytics({ householdId }: { householdId: string | undefined
             date
           )
         `)
-        .eq('household_id', householdId);
+        .eq('tenant_id', tenantId);
 
       if (error) throw error;
 

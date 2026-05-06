@@ -25,6 +25,6 @@ export async function fetchWithRetry(url: string, options: RequestInit = {}, ret
 /**
  * Logs technical metrics (like eKasa performance) to Supabase.
  */
-export async function systemLog(action: string, errorData: any, householdId?: string) {
+export async function systemLog(action: string, errorData: any, tenantId?: string) {
   // Redundant - use Logger.system from @/lib/logger instead.
 }
