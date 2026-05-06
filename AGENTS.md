@@ -35,15 +35,15 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ### 2.4 Tenant Separation & RLS
 *   **Standard**: Every table MUST have `FORCE ROW LEVEL SECURITY`.
-*   **Isolation**: All policies must use the memoized `get_my_household()` helper.
+*   **Isolation**: All policies must use the memoized `get_my_tenant()` helper (formerly `get_my_household`).
 
 ### 2.5 Intelligence Strategy (Cloud-TTL)
-AI Insights (Groq) are shared across the household to minimize cost and latency.
+AI Insights (Groq) are shared across the tenant organization to minimize cost and latency.
 *   **TTL**: 24 hours (Cloud-backed).
 *   **Determinism**: Cache is only invalidated if the `dataHash` (totals/count) changes.
 *   **eKasa Engine**: Dual-Protocol (Online ID + OKP Raw Data). The scanner falls back to OKP metadata extraction if a standard ID is missing.
 *   **Regionality**: eKasa requests are proxied via EU-Central (Paris/Frankfurt) to bypass regional IP blocks. Proxy config lives in `vercel.json`.
-*   **Unified Categories**: Groq ALWAYS receives the household's master category list from `household.categories` (sourced from `v2/src/lib/constants.ts`). Never let Groq invent categories.
+*   **Unified Categories**: Groq ALWAYS receives the tenant's master category list from `tenant.categories` (sourced from `v2/src/lib/constants.ts`). Never let Groq invent categories.
 
 ### 2.6 PWA Standards (2026)
 *   **Identity**: Minimalist header. No logo text on mobile; personal circular avatar only.
@@ -56,8 +56,8 @@ AI Insights (Groq) are shared across the household to minimize cost and latency.
 ### 3.1 Standards Enforced
 1.  **DRY (Don't Repeat Yourself)**:
     *   **Status**: **ENFORCED**.
-    *   **Solution**: Categories and Icons are centralized in `v2/src/lib/constants.ts` and managed via the `HouseholdContext`.
-    *   **Rule**: NEVER hardcode categories in components. Always pull from `household.categories`.
+    *   **Solution**: Categories and Icons are centralized in `v2/src/lib/constants.ts` and managed via the `TenantContext`.
+    *   **Rule**: NEVER hardcode categories in components. Always pull from `tenant.categories`.
 2.  **Single Responsibility (SOLID)**:
     *   **Status**: **ENFORCED**.
     *   **Solution**: Fetch logic (`useTransactions`) and mutation logic (`useSync`) are strictly isolated.
@@ -69,17 +69,17 @@ AI Insights (Groq) are shared across the household to minimize cost and latency.
 ---
 
 ## 4. Tenant Separation Logic (Cross-Device Security)
-To ensure absolute isolation between households:
+To ensure absolute isolation between tenants:
 1.  **JWT Claims**: Every request to Supabase must include the user's JWT.
 2.  **SSR Auth**: All client-side clients MUST use cookie-based session mirroring (`@supabase/ssr`) to ensure the server can authorize API requests.
-3.  **Server-Side Resolution**: The database uses `auth.uid()` to look up the `household_id` in `app_users` via the `get_my_household()` helper.
-4.  **Memoized Resolution**: Uses `get_my_household()` server-side helper to isolate rows by `household_id`.
+3.  **Server-Side Resolution**: The database uses `auth.uid()` to look up the `tenant_id` in `app_users` via the `get_my_tenant()` helper.
+4.  **Memoized Resolution**: Uses `get_my_tenant()` server-side helper to isolate rows by `tenant_id`.
 
 ---
 
 ## 5. Operational File Map
 *   **`/v2/src/app`**: Core routing and Page layouts. API routes live under `/api/`.
-*   **`/v2/src/hooks`**: Specialized logic — `useTransactions` (read-only), `useSync` (write-only), `useHousehold` (types).
+*   **`/v2/src/hooks`**: Specialized logic — `useTransactions` (read-only), `useSync` (write-only), `useTenant` (types).
 *   **`/v2/src/components`**: UI layer (Bento cards, Scanners, Charts, NavBar).
 *   **`/v2/src/lib`**: Financial calculations, eKasa protocols, server utilities.
     *   `constants.ts` — Category & icon source of truth.
@@ -89,7 +89,7 @@ To ensure absolute isolation between households:
     *   `neo4j.ts` — `normalizeAndLinkMerchant()` — graph sync after every expense save.
     *   `supabase.ts` — Client-side Supabase instance.
     *   `supabase-server.ts` — SSR-safe server-side Supabase instance.
-*   **`/v2/src/context`**: `HouseholdContext.tsx` — global state, `fetchHouseholdState` (calls `get_household_bundle`).
+*   **`/v2/src/context`**: `TenantContext.tsx` — global state, `fetchTenantState` (calls `get_tenant_bundle`).
 *   **`/sql/b2b_evolution`**: Ordered DDL migrations (00–03). Never alter applied files; add new numbered files.
 *   **`/sql/security_hardening_v2.sql`**: RLS policies and security enforcement.
 *   **`/sql/observability_v2.sql`**: `system_telemetry` and `activity_log` table setup.

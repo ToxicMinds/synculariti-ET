@@ -19,11 +19,11 @@ Use these scopes to match the codebase structure:
 
 | Scope | When to Use |
 |-------|-------------|
-| `rpc` | Supabase RPC changes (`save_receipt_v3`, `get_household_bundle`) |
+| `rpc` | Supabase RPC changes (`save_receipt_v3`, `get_tenant_bundle`) |
 | `rls` | Row Level Security policy changes |
 | `schema` | SQL migration files in `/sql/` |
 | `sync` | `useSync.ts` or financial write logic |
-| `context` | `HouseholdContext.tsx` or `useHousehold.ts` |
+| `context` | `TenantContext.tsx` or `useTenant.ts` |
 | `scanner` | `ReceiptScanner.tsx`, `ekasa-protocols.ts` |
 | `ai` | Groq integration, AI insights, prompt changes |
 | `neo4j` | Graph database / merchant linking |

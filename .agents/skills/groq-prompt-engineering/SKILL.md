@@ -9,11 +9,11 @@ description: How to call the Groq API in Synculariti-ET without hallucination. U
 Any time you write, modify, or debug a Groq (Llama 3.3) integration.
 
 ## The #1 Rule Against Hallucination
-> **Always inject the household's category list into every prompt.** Never let Groq invent categories. If you don't constrain the output, it will hallucinate category names that don't exist in the system.
+> **Always inject the tenant's category list into every prompt.** Never let Groq invent categories. If you don't constrain the output, it will hallucinate category names that don't exist in the system.
 
 ```typescript
 // ✅ Correct — categories are constrained
-const categories = household.categories; // From HouseholdContext, never hardcoded
+const categories = tenant.categories; // From TenantContext, never hardcoded
 const prompt = `
 Categorize this expense. You MUST use ONLY one of these categories:
 ${categories.join(', ')}
@@ -40,12 +40,12 @@ const response = await groq.chat.completions.create({
 ```
 
 ## AI Insights Cache (TTL Strategy)
-AI Insights are **shared across the household** to minimize Groq API cost.
+AI Insights are **shared across the tenant** to minimize Groq API cost.
 
 ```typescript
 // Only call Groq if data has changed
 const dataHash = `${totalAmount}-${expenseCount}`; // Simple determinism signal
-const cached = household.ai_insight;
+const cached = tenant.ai_insight;
 
 if (cached?.dataHash === dataHash && cached?.generatedAt) {
   const age = Date.now() - new Date(cached.generatedAt).getTime();
@@ -127,7 +127,7 @@ try {
   const result = await groq.chat.completions.create(...);
   // process...
 } catch (err) {
-  Logger.system('ERROR', 'AI', 'Groq API call failed', { error: err }, householdId);
+  Logger.system('ERROR', 'AI', 'Groq API call failed', { error: err }, tenantId);
   // Surface non-technical message to user:
   throw new Error('AI insights temporarily unavailable. Your data is safe.');
 }
@@ -138,5 +138,5 @@ try {
 - ❌ Storing raw Groq output directly to DB without validation
 - ❌ Calling Groq from client-side code — API key exposure
 - ❌ Omitting category list — the #1 cause of hallucinated categories
-- ❌ Trusting `parsed.category` without checking it's in `household.categories`
+- ❌ Trusting `parsed.category` without checking it's in `tenant.categories`
 - ❌ Calling Groq on every render — always check TTL/cache first

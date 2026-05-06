@@ -36,7 +36,7 @@ NEO4J_PASSWORD
 - [ ] No `.env.local` values have leaked into source files (run `git grep "supabase.co"` to check)
 - [ ] Any new SQL migration has been applied to the Supabase project
 - [ ] `vercel.json` rewrite for eKasa proxy is intact if eKasa was touched
-- [ ] `get_household_bundle` RPC still returns expected shape (test in Supabase SQL editor)
+- [ ] `get_tenant_bundle` RPC still returns expected shape (test in Supabase SQL editor)
 
 ## Deploy Flow
 
@@ -58,7 +58,7 @@ git push origin main
 ## Post-Deploy Verification
 1. Open the production URL and confirm the app loads (PWA install prompt should appear)
 2. Check Supabase logs (`get_logs` for `api` and `auth` services) for 500 errors
-3. Trigger a `get_household_bundle` call by logging in — confirm no null crashes
+3. Trigger a `get_tenant_bundle` call by logging in — confirm no null crashes
 4. If eKasa was touched: scan a real receipt QR and confirm the proxy responds
 
 ## Rollback

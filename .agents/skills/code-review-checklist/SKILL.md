@@ -16,9 +16,9 @@ Read the changed files. Work through each section below. Report pass/fail per it
 ---
 
 ## 1. Security (Hard Failures — Block Merge)
-- [ ] No `household_id` passed as a URL param or query string (must be server-resolved)
-- [ ] No raw `supabase.from('expenses').insert()` without `household_id` — use `save_receipt_v3` RPC
-- [ ] No new table without `FORCE ROW LEVEL SECURITY` + policy using `get_my_household()`
+- [ ] No `tenant_id` passed as a URL param or query string (must be server-resolved)
+- [ ] No raw `supabase.from('expenses').insert()` without `tenant_id` — use `save_receipt_v3` RPC
+- [ ] No new table without `FORCE ROW LEVEL SECURITY` + policy using `get_my_tenant()`
 - [ ] No secrets, `.env` values, or API keys in source code
 - [ ] `@supabase/ssr` used for all server-side auth — no plain `supabase-js` in API routes
 - [ ] JWT is never decoded or inspected client-side for access decisions
@@ -31,9 +31,9 @@ Read the changed files. Work through each section below. Report pass/fail per it
 
 ## 3. Data Layer
 - [ ] Read hooks (`useTransactions`) and write hooks (`useSync`) are NOT mixed in the same component
-- [ ] `get_household_bundle` is used for initialization — not individual table queries
+- [ ] `get_tenant_bundle` is used for initialization — not individual table queries
 - [ ] `COALESCE` used for any array returned from Supabase RPC (prevents null crashes)
-- [ ] No direct `.from('app_state')` mutations outside of `updateState()` in `HouseholdContext`
+- [ ] No direct `.from('app_state')` mutations outside of `updateState()` in `TenantContext`
 
 ## 4. Observability
 - [ ] Any `catch` block either calls `Logger.system('ERROR', ...)` or rethrows
@@ -42,7 +42,7 @@ Read the changed files. Work through each section below. Report pass/fail per it
 - [ ] Retry logic (3-stage exponential backoff) exists for all network/DB write operations
 
 ## 5. DRY & Constants
-- [ ] No hardcoded category strings in components — must come from `household.categories`
+- [ ] No hardcoded category strings in components — must come from `tenant.categories`
 - [ ] No hardcoded category icons — must come from `CATEGORY_ICONS` in `constants.ts`
 - [ ] No duplicated Supabase client instantiation — use `@/lib/supabase` or `@/lib/supabase-server`
 
@@ -53,7 +53,7 @@ Read the changed files. Work through each section below. Report pass/fail per it
 - [ ] No `.js` files — TypeScript only (`*.ts`, `*.tsx`)
 
 ## 7. AI / Groq
-- [ ] Groq calls include the household's category list from `household.categories`
+- [ ] Groq calls include the tenant's category list from `tenant.categories`
 - [ ] AI responses are validated before being stored (no raw LLM output to DB)
 - [ ] Cache TTL logic checks `dataHash` (totals + count) before calling Groq
 - [ ] No Groq API key in client-side code — only in server API routes

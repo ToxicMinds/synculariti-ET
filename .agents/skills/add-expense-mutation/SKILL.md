@@ -25,11 +25,11 @@ Any time you need to write a new function that creates, updates, or deletes expe
 
 ```typescript
 const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string, locationId?: string) => {
-  if (!householdId) throw new Error('No household ID');
+  if (!tenantId) throw new Error('No tenant ID');
 
   const expensePayload = {
     id: crypto.randomUUID(),
-    household_id: householdId,   // Required — v3 validates this
+    tenant_id: tenantId,   // Required — v3 validates this
     location_id: locationId,      // Required for B2B locations
     who_id: whoId,
     who: whoName,
@@ -48,8 +48,8 @@ const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string,
 ```
 
 ## Mandatory After Any Mutation
-1. **Log user activity**: `Logger.user(householdId, 'EXPENSE_ADDED', description, actorName)`
-2. **Signal state refresh**: `triggerRefresh()` from `useHouseholdContext()`
+1. **Log user activity**: `Logger.user(tenantId, 'EXPENSE_ADDED', description, actorName)`
+2. **Signal state refresh**: `triggerRefresh()` from `useTenantContext()`
 3. **Neo4j sync** (fire-and-forget): `normalizeAndLinkMerchant(store, expenseId, amount).catch(...)`
 
 ## Exponential Backoff Template
@@ -67,7 +67,7 @@ while (attempt < maxAttempts) {
       const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
       await new Promise(resolve => setTimeout(resolve, delay));
     } else {
-      Logger.system('ERROR', 'Sync', 'Mutation failed after max retries', err, householdId);
+      Logger.system('ERROR', 'Sync', 'Mutation failed after max retries', err, tenantId);
       throw err;
     }
   }
@@ -77,7 +77,7 @@ while (attempt < maxAttempts) {
 ## What NOT to Do
 - ❌ `supabase.from('expenses').insert(...)` — bypasses RLS and dual-layer check
 - ❌ Calling `save_receipt_v2` — it's deprecated and missing B2B columns
-- ❌ Omitting `household_id` from the payload — v3 will throw a security exception
+- ❌ Omitting `tenant_id` from the payload — v3 will throw a security exception
 - ❌ Using a string like `"€50"` for amount — must be a `NUMERIC` (number)
 - ❌ Skipping `Logger.user(...)` — the Business Feed won't show the action
 - ❌ Skipping `triggerRefresh()` — the UI won't update until page reload

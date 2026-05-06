@@ -61,9 +61,9 @@ synculariti-ET/
         │   └── page.tsx    ← Main dashboard
         ├── components/    ← Reusable UI components (Bento cards, scanner, charts)
         ├── context/
-        │   └── HouseholdContext.tsx ← Global app state provider
+        │   └── TenantContext.tsx    ← Global app state provider
         ├── hooks/
-        │   ├── useHousehold.ts    ← Type definitions for app state
+        │   ├── useTenant.ts       ← Type definitions for app state
         │   ├── useTransactions.ts ← READ-ONLY: fetches expenses
         │   └── useSync.ts         ← WRITE-ONLY: financial mutations
         └── lib/
@@ -96,9 +96,9 @@ synculariti-ET/
 
 ### Categories — Single Source of Truth
 - Categories live in `v2/src/lib/constants.ts` (`DEFAULT_CATEGORIES`, `CATEGORY_ICONS`).
-- At runtime, the live list comes from `household.categories` via `HouseholdContext`.
+- At runtime, the live list comes from `tenant.categories` via `TenantContext`.
 - **NEVER** hardcode a category string in a component. Always read from context.
-- Groq MUST receive `household.categories` in every prompt — never let it invent categories.
+- Groq MUST receive `tenant.categories` in every prompt — never let it invent categories.
 
 ### Financial Mutations
 - All expense writes go through the `save_receipt_v3` Supabase RPC. No exceptions.
@@ -107,8 +107,8 @@ synculariti-ET/
 - All network/DB writes MUST have 3-stage exponential backoff (1s → 2s → 4s).
 
 ### Logging
-- **Technical errors** → `Logger.system('ERROR', component, message, metadata, householdId)`
-- **User-visible events** → `Logger.user(householdId, action, description, actorName)`
+- **Technical errors** → `Logger.system('ERROR', component, message, metadata, tenantId)`
+- **User-visible events** → `Logger.user(tenantId, action, description, actorName)`
 - **NEVER** surface raw Supabase/PostgreSQL error messages to the user UI.
 - Log component names: `'API' | 'Neo4j' | 'Scanner' | 'Auth' | 'Sync' | 'AI'`
 
@@ -126,8 +126,8 @@ synculariti-ET/
 
 ## Security Rules
 
-1. **Tenant Isolation**: Every table has `FORCE ROW LEVEL SECURITY`. Every policy uses `get_my_household()`.
-2. **No Client-Side IDs**: `household_id` is never passed as a URL param or client payload. The DB resolves it from `auth.uid()`.
+1. **Tenant Isolation**: Every table has `FORCE ROW LEVEL SECURITY`. Every policy uses `get_my_tenant()`.
+2. **No Client-Side IDs**: `tenant_id` is never passed as a URL param or client payload. The DB resolves it from `auth.uid()`.
 3. **Server-Side Auth**: All API routes use `createServerClient` from `@supabase/ssr`. No client Supabase instances in API routes.
 4. **Secrets**: `GROQ_API_KEY`, `NEO4J_*` credentials are server-side env vars only. Never in `NEXT_PUBLIC_*`.
 5. **Dual-Layer Check**: Any RPC touching expenses must check both Tenant Mismatch AND Location Ownership.
@@ -137,8 +137,8 @@ synculariti-ET/
 ## Database Rules
 
 - **Canonical RPC for all writes**: `save_receipt_v3` — includes dual-layer security, location_id, ISO-4217 currency.
-- **Initialization RPC**: `get_household_bundle` — returns `{ household, locations, user, server_time }` in one round-trip.
-- **New table checklist**: `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + policy using `get_my_household()`.
+- **Initialization RPC**: `get_tenant_bundle` — returns `{ tenant, locations, user, server_time }` in one round-trip.
+- **New table checklist**: `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + policy using `get_my_tenant()`.
 - SQL migrations are numbered files in `/sql/b2b_evolution/`. Never alter applied migrations — add a new file instead.
 - After any DDL change: run Supabase security advisors to catch missing RLS.
 
@@ -148,7 +148,7 @@ synculariti-ET/
 
 - Model: `llama-3.3-70b-versatile` (current canonical).
 - Temperature: `0.1` for categorization, `0.3` for narrative insights.
-- **Always** inject `household.categories` into categorization prompts.
+- **Always** inject `tenant.categories` into categorization prompts.
 - **Always** validate and sanitize Groq responses before storing to DB.
 - Cache insights for 24h, keyed on `dataHash` (totals + expense count). Don't call Groq if hash unchanged.
 - Groq calls are server-side only (API routes). Never in client components.
@@ -169,13 +169,13 @@ synculariti-ET/
 |---------|-------------|
 | `supabase.from('expenses').insert(...)` in app code | Use `save_receipt_v3` RPC |
 | Call `save_receipt_v2` | Use `save_receipt_v3` |
-| Hardcode categories like `'Groceries'` in components | Read from `household.categories` |
+| Hardcode categories like `'Groceries'` in components | Read from `tenant.categories` |
 | Put `GROQ_API_KEY` in a `NEXT_PUBLIC_*` variable | Use server-side env var in API routes |
 | Show raw DB errors to the user | Map to a friendly message |
 | Mix read/write logic in one hook | Keep `useTransactions` and `useSync` separate |
 | Add a new table without RLS | Always add `FORCE ROW LEVEL SECURITY` |
-| Pass `household_id` in a URL param | Let the DB resolve it from `auth.uid()` |
-| Call Groq without injecting the category list | Always pass `household.categories` to the prompt |
+| Pass `tenant_id` in a URL param | Let the DB resolve it from `auth.uid()` |
+| Call Groq without injecting the category list | Always pass `tenant.categories` to the prompt |
 | Deploy without `npm run build` passing | Build must be clean before any push to `main` |
 | Alter an applied SQL migration file | Add a new numbered migration file |
 | Commit `.env.local` | It's in `.gitignore` — keep it there |

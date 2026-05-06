@@ -44,7 +44,7 @@ describe('yourFunction', () => {
 - Any new function in `v2/src/lib/`
 - Financial calculation changes (amount, currency, rounding)
 - eKasa protocol extraction logic (`ekasa-protocols.ts`)
-- Any function that touches `household_id` or `location_id` validation
+- Any function that touches `tenant_id` or `location_id` validation
 
 ## What Does NOT Need Tests
 - React components (test manually via browser)
