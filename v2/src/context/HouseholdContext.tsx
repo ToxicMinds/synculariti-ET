@@ -1,12 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { AppState } from '@/hooks/useHousehold';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 interface HouseholdContextType {
-  session: any;
+  session: Session | null;
   household: AppState | null;
   resolvedWhoId: string | null;
   loading: boolean;
@@ -20,7 +22,7 @@ interface HouseholdContextType {
 const HouseholdContext = createContext<HouseholdContextType | undefined>(undefined);
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [household, setHousehold] = useState<AppState | null>(null);
   const [resolvedWhoId, setResolvedWhoId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
    * PERFORMANCE FIX: Using the bundled RPC
    * Reduces network traffic by 66% per instance.
    */
-  const fetchHouseholdState = async (currentSession?: any) => {
+  const fetchHouseholdState = async (currentSession?: Session | null) => {
     try {
       const activeSession = currentSession || session;
       if (!activeSession) return;
@@ -99,7 +101,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         if (foundId) setResolvedWhoId(foundId);
       }
     } catch (e) {
-      console.error('Error fetching state:', e);
+      Logger.system('ERROR', 'Auth', 'Failed to fetch household bundle', { error: e });
     } finally {
       setLoading(false);
     }

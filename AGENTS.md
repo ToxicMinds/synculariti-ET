@@ -128,5 +128,5 @@ To ensure the platform is reliable and observable without technical clutter, we 
 | Issue | Severity | Location | Fix |
 |-------|----------|----------|-----|
 | ~~`useSync.ts` calls `save_receipt_v2`~~ | ~~🔴 HIGH~~ | ~~`v2/src/hooks/useSync.ts:107`~~ | ✅ **Fixed** — migrated to `save_receipt_v3` with `location_id` + `currency` |
-| `session` typed as `any` in `HouseholdContext` | 🟡 MEDIUM | `HouseholdContext.tsx:9,23` | Replace with `Session` type from `@supabase/supabase-js` |
+| `session` typed as `any` in `HouseholdContext` | ~~🟡 MEDIUM~~ | ~~`HouseholdContext.tsx:9,23`~~ | ✅ **Fixed** — replaced with `Session` from `@supabase/supabase-js`; also fixed `console.error` → `Logger.system` |
 | Neo4j errors swallowed with `console.error` | ~~🟡 MEDIUM~~ | ~~`useSync.ts:64,119,170`~~ | ✅ **Fixed** — replaced with `Logger.system('ERROR', 'Neo4j', ...)` |
