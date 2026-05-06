@@ -16,6 +16,10 @@ export interface ReceiptData {
   date: string;
   total: number;
   items: ReceiptItem[];
+  ico?: string | null;
+  receiptNumber?: string | null;
+  transactedAt?: string | null;
+  vatDetail?: any;
 }
 
 /**
@@ -91,6 +95,10 @@ export function useSync(householdId: string | undefined) {
       currency,                          // ISO-4217: propagated to receipt_items by v3
       date: receipt.date,
       description: receipt.store,
+      ico: receipt.ico || null,
+      receipt_number: receipt.receiptNumber || null,
+      transacted_at: receipt.transactedAt || null,
+      vat_detail: receipt.vatDetail || null,
     };
 
     const itemsPayload = selectedItems.map(item => ({
@@ -117,7 +125,7 @@ export function useSync(householdId: string | undefined) {
         Logger.user(householdId, 'EXPENSE_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
         triggerRefresh();
 
-        normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount).catch(err =>
+        normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount, receipt.ico).catch(err =>
           Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after saveReceipt', { error: err, store: receipt.store }, householdId)
         );
 

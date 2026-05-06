@@ -23,6 +23,10 @@ interface ReceiptData {
   date: string;
   total: number;
   items: ReceiptItem[];
+  ico?: string | null;
+  receiptNumber?: string | null;
+  transactedAt?: string | null;
+  vatDetail?: any;
 }
 
 export function ReceiptScanner({ 
@@ -104,7 +108,11 @@ export function ReceiptScanner({
         items: (parsed.items || []).map((it: any) => ({
           ...it,
           selected: true
-        }))
+        })),
+        ico: parsed.ico,
+        receiptNumber: parsed.receiptNumber,
+        transactedAt: parsed.transactedAt,
+        vatDetail: parsed.vatDetail
       });
       
       if (!parsed.date) {

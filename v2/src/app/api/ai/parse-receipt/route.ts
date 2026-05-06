@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { Groq } from 'groq-sdk';
+import { createClient } from '@/lib/supabase-server';
+import { parseEkasaMetadata } from '@/lib/ekasa-parser';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
-
-import { createClient } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -24,57 +24,10 @@ export async function POST(req: Request) {
     }
 
     // 1. EXTRACT GROUND TRUTH FROM EKASA JSON (DO NOT LET AI TOUCH FINANCIALS)
-    const receipt = ekasaData.receipt || ekasaData.data || ekasaData;
-    
-    // Deep extraction for Store Name
-    const rawStore = 
-      receipt.organization?.name || 
-      receipt.seller?.name || 
-      receipt.organizationName || 
-      receipt.merchantName || 
-      receipt.name || 
-      ekasaData.organization?.name || 
-      ekasaData.organizationName || 
-      null;
-
-    const dic = receipt.organization?.dic || receipt.dic || ekasaData.dic || null;
-
-    const cleanStoreName = (name: string | null) => {
-      if (!name || name === 'Slovak Receipt') return 'Slovak Receipt';
-      return name
-        .replace(/,?\s*(s\.r\.o\.|v\.o\.s\.|a\.s\.|k\.s\.|o\.z\.)/gi, '')
-        .replace(/Slovenská republika/gi, '')
-        .trim();
-    };
-
-    let store = cleanStoreName(rawStore);
-    
-    // Improved Date Extraction
-    let date = null;
-    const rawDate = String(receipt.createDate || receipt.issueDate || receipt.date || '');
-    
-    // Try YYYY-MM-DD (ISO)
-    const isoMatch = rawDate.match(/(\d{4})-(\d{2})-(\d{2})/);
-    if (isoMatch) {
-      date = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-    } else {
-      // Try DD.MM.YYYY (Slovak common)
-      const skMatch = rawDate.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-      if (skMatch) {
-        date = `${skMatch[3]}-${skMatch[2]}-${skMatch[1]}`;
-      }
-    }
-
-    const rawItems = receipt.items || receipt.receiptItems || receipt.lines || [];
-    const items = rawItems.map((it: any) => ({
-      originalName: it.name || it.itemName || it.description || 'Unknown Item',
-      amount: Number(it.itemTotalPrice || it.lineTotal || it.price || it.amount || 0)
-    }));
-
-    const total = Number(receipt.totalPrice || receipt.total || items.reduce((acc: number, curr: any) => acc + curr.amount, 0));
+    const metadata = parseEkasaMetadata(ekasaData);
 
     // 2. ASK AI FOR CATEGORIZATION AND STORE INFERENCE (IF NEEDED)
-    const needsStoreInference = store === 'Slovak Receipt';
+    const needsStoreInference = metadata.store === 'Slovak Receipt';
     const systemPrompt = `
       You are a specialized financial analyst for the Slovak market.
       I will provide a list of items from a receipt.
@@ -91,7 +44,7 @@ export async function POST(req: Request) {
       }
     `;
 
-    const userPrompt = `Analyze these items: ${items.map((i: any) => i.originalName).join(', ')}`;
+    const userPrompt = `Analyze these items: ${metadata.items.map((i: any) => i.originalName).join(', ')}`;
 
     const completion = await groq.chat.completions.create({
       messages: [
@@ -108,21 +61,21 @@ export async function POST(req: Request) {
     const aiParsed = JSON.parse(content);
     const aiItems = aiParsed.items || [];
     const finalStore = (needsStoreInference && aiParsed.inferredStore) 
-      ? cleanStoreName(aiParsed.inferredStore) 
-      : store;
+      ? aiParsed.inferredStore 
+      : metadata.store;
 
     // Log for auditing (The "Black Site" Standard)
     const { Logger } = await import('@/lib/logger');
     Logger.system('INFO', 'AI', 'Merchant Extraction Detail', {
-      dic,
-      rawStore,
+      dic: metadata.dic,
+      rawStore: metadata.store,
       inferredStore: aiParsed.inferredStore,
       finalStore,
-      itemCount: items.length
+      itemCount: metadata.items.length
     });
 
     // 3. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
-    const mergedItems = items.map((orig: any, idx: number) => ({
+    const mergedItems = metadata.items.map((orig: any, idx: number) => ({
       name: aiItems[idx]?.name || orig.originalName,
       amount: orig.amount,
       category: aiItems[idx]?.category || 'Others'
@@ -130,9 +83,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       store: finalStore,
-      date,
-      total,
-      items: mergedItems
+      date: metadata.date,
+      total: metadata.total,
+      items: mergedItems,
+      ico: metadata.ico,
+      receiptNumber: metadata.receiptNumber,
+      transactedAt: metadata.transactedAt,
+      vatDetail: metadata.vatDetail
     });
 
   } catch (error: any) {
