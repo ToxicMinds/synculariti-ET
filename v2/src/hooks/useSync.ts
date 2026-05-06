@@ -61,13 +61,13 @@ export function useSync(householdId: string | undefined) {
       for (const saved of data) {
         const merchantName = (expense as any).merchant || saved.description || 'Unknown Merchant';
         normalizeAndLinkMerchant(merchantName, saved.id, Number(saved.amount)).catch(
-          err => console.error('Neo4j sync failed for manual entry:', err)
+          err => Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed for manual expense', { error: err, expenseId: saved.id }, householdId)
         );
       }
     }
   };
 
-  const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string) => {
+  const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string, locationId?: string, currency: string = 'EUR') => {
     if (!householdId) throw new Error('No household ID');
 
     const selectedItems = receipt.items.filter(i => i.selected);
@@ -83,10 +83,12 @@ export function useSync(householdId: string | undefined) {
     const expensePayload = {
       id: expenseId,
       household_id: householdId,
+      location_id: locationId || null,  // B2B: which location this spend belongs to
       who_id: whoId,
       who: whoName,
       category: primaryCategory,
       amount: totalAmount,
+      currency,                          // ISO-4217: propagated to receipt_items by v3
       date: receipt.date,
       description: receipt.store,
     };
@@ -104,7 +106,7 @@ export function useSync(householdId: string | undefined) {
 
     while (attempt < maxAttempts) {
       try {
-        const { data, error } = await supabase.rpc('save_receipt_v2', {
+        const { data, error } = await supabase.rpc('save_receipt_v3', {
           p_expense: expensePayload,
           p_items: itemsPayload
         });
@@ -115,8 +117,8 @@ export function useSync(householdId: string | undefined) {
         Logger.user(householdId, 'EXPENSE_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
         triggerRefresh();
 
-        normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount).catch(err => 
-          console.error('Neo4j Sync Failed:', err)
+        normalizeAndLinkMerchant(receipt.store, expenseId, totalAmount).catch(err =>
+          Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after saveReceipt', { error: err, store: receipt.store }, householdId)
         );
 
         return data;
@@ -166,8 +168,8 @@ export function useSync(householdId: string | undefined) {
     triggerRefresh();
 
     const merchantName = expense.merchant || expense.description || 'Unknown Merchant';
-    normalizeAndLinkMerchant(merchantName, id, Number(expense.amount)).catch(err => 
-      console.error('Neo4j Update Failed:', err)
+    normalizeAndLinkMerchant(merchantName, id, Number(expense.amount)).catch(err =>
+      Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed after expense update', { error: err, expenseId: id }, householdId)
     );
   };
 
