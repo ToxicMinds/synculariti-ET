@@ -38,7 +38,7 @@ export function AuthScreen({ session }: { session: any }) {
       const lowerHandle = handle.toLowerCase();
       
       // 1. Verify handle exists
-      const { data: lookupData, error: lErr } = await supabase.rpc('verify_household_access', { input_code: lowerHandle });
+      const { data: lookupData, error: lErr } = await supabase.rpc('verify_tenant_access', { input_code: lowerHandle });
       if (lErr) throw lErr;
       if (!lookupData || lookupData.length === 0) throw new Error("Tenant handle not found.");
       

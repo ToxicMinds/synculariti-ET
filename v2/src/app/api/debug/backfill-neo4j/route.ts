@@ -12,7 +12,7 @@ import { getNeo4jDriver } from '@/lib/neo4j';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
-  const filterHouseholdId = searchParams.get('tenantId');
+  const filterTenantId = searchParams.get('tenantId');
 
   if (key !== 'et-secret-sync') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,8 +27,8 @@ export async function GET(req: Request) {
       .select('id, tenant_id, description, amount, date, category')
       .eq('is_deleted', false);
 
-    if (filterHouseholdId) {
-      query = query.eq('tenant_id', filterHouseholdId);
+    if (filterTenantId) {
+      query = query.eq('tenant_id', filterTenantId);
     }
 
     const { data: expenses, error } = await query;
@@ -79,8 +79,8 @@ export async function GET(req: Request) {
         `MATCH (t:Transaction)
          RETURN
            count(t) AS totalNodes,
-           count(t.tenant_id) AS nodesWithHouseholdId,
-           count(DISTINCT t.tenant_id) AS distinctHouseholds`
+           count(t.tenant_id) AS nodesWithTenantId,
+           count(DISTINCT t.tenant_id) AS distinctTenants`
       );
     } finally {
       await verifySession.close();
@@ -95,8 +95,8 @@ export async function GET(req: Request) {
       skipped: skippedCount,
       neo4j_verification: {
         total_transaction_nodes: toNum(stats.get('totalNodes')),
-        nodes_with_tenant_id: toNum(stats.get('nodesWithHouseholdId')),
-        distinct_households: toNum(stats.get('distinctHouseholds')),
+        nodes_with_tenant_id: toNum(stats.get('nodesWithTenantId')),
+        distinct_tenants: toNum(stats.get('distinctTenants')),
       },
       isolation_proof: 'Each tenant_id maps to exactly one tenant. All graph queries filter by this ID — cross-tenant leakage is structurally impossible.'
     });

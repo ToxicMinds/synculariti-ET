@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     );
 
     // 1. Find tenant by PIN (using the alias lookup)
-    const { data: lookup, error: lErr } = await supabaseAdmin.rpc('verify_household_access', { 
+    const { data: lookup, error: lErr } = await supabaseAdmin.rpc('verify_tenant_access', { 
       input_code: pin 
     });
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const tenantId = lookup[0].target_id;
 
     // 2. Verify PIN
-    const { data: isValid, error: vErr } = await supabaseAdmin.rpc('check_household_pin', {
+    const { data: isValid, error: vErr } = await supabaseAdmin.rpc('check_tenant_pin', {
       h_id: tenantId,
       input_pin: pin
     });
