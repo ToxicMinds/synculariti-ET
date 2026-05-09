@@ -57,6 +57,7 @@ CREATE POLICY "Tenant Isolation" ON public.purchase_orders FOR ALL TO authentica
 -- 4. PO LINE ITEMS
 CREATE TABLE IF NOT EXISTS public.po_line_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   po_id UUID NOT NULL REFERENCES public.purchase_orders(id) ON DELETE CASCADE,
   item_id UUID NOT NULL REFERENCES public.inventory_items(id) ON DELETE RESTRICT,
   quantity_ordered NUMERIC NOT NULL,
