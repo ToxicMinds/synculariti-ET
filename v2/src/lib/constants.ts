@@ -1,29 +1,27 @@
 export const DEFAULT_CATEGORIES = [
-  'Groceries',
-  'Dining Out',
-  'Transport',
-  'Housing',
+  'Food Costs',
+  'Beverages',
+  'Supplies',
+  'Rent & Lease',
   'Utilities',
-  'Health',
-  'Shopping',
-  'Entertainment',
-  'Clothing',
-  'Savings',
-  'Adjustment',
+  'Labor & Wages',
+  'Marketing',
+  'Maintenance',
+  'Professional Services',
+  'Taxes & Fees',
   'Other'
 ];
 
 export const CATEGORY_ICONS: Record<string, string> = {
-  'Groceries': '🛒',
-  'Dining Out': '🍽️',
-  'Transport': '🚗',
-  'Housing': '🏠',
+  'Food Costs': '🍎',
+  'Beverages': '🥤',
+  'Supplies': '📦',
+  'Rent & Lease': '🏢',
   'Utilities': '⚡',
-  'Health': '💊',
-  'Shopping': '🛍️',
-  'Entertainment': '🎬',
-  'Clothing': '👕',
-  'Savings': '💰',
-  'Adjustment': '⚙️',
-  'Other': '📦'
+  'Labor & Wages': '👥',
+  'Marketing': '📢',
+  'Maintenance': '🛠️',
+  'Professional Services': '💼',
+  'Taxes & Fees': '⚖️',
+  'Other': '❓'
 };
