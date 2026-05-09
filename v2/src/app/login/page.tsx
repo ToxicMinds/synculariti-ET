@@ -15,6 +15,7 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
     try {
+      if (action === 'signup') {
         const { error } = await supabase.auth.signUp({ 
           email, 
           password,
