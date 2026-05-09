@@ -36,13 +36,15 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8 p-8 bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl">
         
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(59,130,246,0.3)]">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
+          <div className="w-20 h-20 mx-auto bg-zinc-800 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(59,130,246,0.2)] overflow-hidden border border-white/5">
+            <img 
+              src="/home/nik/.gemini/antigravity/brain/397c29fc-3420-4a9c-8a26-c3c9c008ff17/synculariti_identity_logo_1778355891824.png" 
+              alt="Identity" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Synculariti Finance</h2>
-          <p className="mt-2 text-sm text-zinc-400">Sign in to your B2B dashboard</p>
+          <h2 className="text-3xl font-bold tracking-tight text-white">Synculariti Identity</h2>
+          <p className="mt-2 text-sm text-zinc-400">Secure enterprise access gatekeeper</p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>

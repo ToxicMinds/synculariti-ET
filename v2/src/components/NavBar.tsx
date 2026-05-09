@@ -193,8 +193,23 @@ export function NavBar() {
     <nav className="navbar">
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-            <img src="/icon.png" alt="Synculariti" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ 
+            width: 36, 
+            height: 36, 
+            borderRadius: 10, 
+            background: 'var(--bg-hover)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            flexShrink: 0, 
+            overflow: 'hidden',
+            border: '1px solid var(--border-color)'
+          }}>
+            <img 
+              src="/home/nik/.gemini/antigravity/brain/397c29fc-3420-4a9c-8a26-c3c9c008ff17/synculariti_finance_v3_logo_1778355420258.png" 
+              alt="Finance" 
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            />
           </div>
           <span className="logo-text" style={{ 
             fontWeight: 800, 
