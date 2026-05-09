@@ -119,7 +119,7 @@ export function NewItemModal({
           </div>
 
           <div className="flex-col gap-1">
-            <label className="card-subtitle" style={{ fontSize: 11, fontWeight: 700 }}>CONVERSION FACTOR (Purchasing -> Inventory)</label>
+            <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>CONVERSION FACTOR (Purchasing &rarr; Inventory)</label>
             <input 
               required
               type="number"
