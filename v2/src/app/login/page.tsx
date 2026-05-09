@@ -15,8 +15,13 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
     try {
-      if (action === 'signup') {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          }
+        });
         if (error) throw error;
         setMessage({ text: 'Check your email for the confirmation link.', type: 'success' });
       } else {
