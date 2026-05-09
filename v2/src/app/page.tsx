@@ -30,8 +30,8 @@ function DashboardContent() {
   const selectedMonth = searchParams.get('m') || currentMonthISO;
   
   // SOLID Split: Transactions for Read, Sync for Write
-  const { expenses, loading: eLoading } = useTransactions(tenant?.tenant_id, selectedMonth);
-  const { softDeleteExpense, saveReceipt, addExpense, updateExpense } = useSync(tenant?.tenant_id);
+  const { transactions, loading: eLoading } = useTransactions(tenant?.tenant_id, selectedMonth);
+  const { softDeleteTransaction, saveReceipt, addTransaction, updateTransaction } = useSync(tenant?.tenant_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
   const [manualEntry, setManualEntry] = useState<any | null>(null);
@@ -46,21 +46,21 @@ function DashboardContent() {
     setShowScanner(false);
   };
 
-  const handleSaveStatement = async (transactions: any[], whoId: string, whoName: string) => {
-    const payload = transactions.map(tx => ({
+  const handleSaveStatement = async (newTransactions: any[], whoId: string, whoName: string) => {
+    const payload = newTransactions.map(tx => ({
       ...tx,
       who_id: whoId,
       who: whoName,
       date: tx.date || new Date().toISOString().slice(0, 10),
     }));
-    await addExpense(payload);
+    await addTransaction(payload);
   };
 
   const handleManualSave = async (entry: any) => {
     if (entry.id) {
-      await updateExpense(entry.id, entry);
+      await updateTransaction(entry.id, entry);
     } else {
-      await addExpense(entry);
+      await addTransaction(entry);
     }
     setManualEntry(null);
   };
@@ -74,9 +74,9 @@ function DashboardContent() {
 
   if (!tenant) return <AuthScreen session={session} />;
 
-  // Filter expenses for current month components (useExpenses returns current + prev for comparison)
-  const displayExpenses = expenses.filter(e => e.date?.startsWith(selectedMonth));
-  const totals = calcTotals(displayExpenses);
+  // Filter transactions for current month components
+  const displayTransactions = transactions.filter(t => t.date?.startsWith(selectedMonth));
+  const totals = calcTotals(displayTransactions);
   const totalIncome = Object.values(tenant.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const totalBudget = Object.values(tenant.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const monthlySavingsGoal = tenant.goals?.monthly_savings || 500;
@@ -89,7 +89,7 @@ function DashboardContent() {
             <h2 style={{ fontSize: 24, marginBottom: 16 }}>Let's set up your tenant</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
               It looks like you don't have any members in your tenant yet. 
-              Before you can start tracking expenses, you need to add yourself (and anyone else) to the tenant.
+              Before you can start tracking transactions, you need to add yourself (and anyone else) to the tenant.
             </p>
             <a href="/settings" className="btn btn-primary" style={{ padding: '14px 32px', fontSize: 16, textDecoration: 'none', display: 'inline-block' }}>
               Go to Settings →
@@ -141,7 +141,7 @@ function DashboardContent() {
         ) : (
           <>
             {/* ROW 1: ACTION & PERFORMANCE */}
-            <MonthlyPerformance expenses={expenses} selectedMonth={selectedMonth} colSpan={8} />
+            <MonthlyPerformance transactions={transactions} selectedMonth={selectedMonth} colSpan={8} />
             <CommandCenter
               onScan={() => setShowScanner(true)}
               onManual={(prefill) => setManualEntry({ ...prefill, who_id: selectedUser })}
@@ -149,15 +149,15 @@ function DashboardContent() {
             />
 
             {/* ROW 2: FAMILY & BUDGET */}
-            <FamilySpends expenses={displayExpenses} names={tenant.names} colSpan={6} />
+            <FamilySpends transactions={displayTransactions} names={tenant.names} colSpan={6} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} colSpan={6} />
 
             {/* ROW 3: STATUS & INTELLIGENCE */}
             <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
             <AIInsights 
               tenantId={tenant.tenant_id} 
-              expenseCount={expenses.length} 
-              dataHash={expenses.length + '_' + totals.spent.toFixed(0)}
+              transactionCount={transactions.length} 
+              dataHash={transactions.length + '_' + totals.spent.toFixed(0)}
               updateState={updateState} 
               tenant={tenant} 
             />
@@ -168,7 +168,7 @@ function DashboardContent() {
               title={`Total Spent (${selectedMonth})`}
               tooltip={{
                 title: "Total Spent",
-                explanation: "Sum of all non-Savings, non-Adjustment expenses for your tenant for the selected month.",
+                explanation: "Sum of all non-Savings, non-Adjustment transactions for your tenant for the selected month.",
                 formula: "Σ(amount) WHERE category ≠ 'Savings' AND is_deleted = false"
               }}
             >
@@ -176,24 +176,24 @@ function DashboardContent() {
                 €{totals.spent.toFixed(2)}
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Spending for {selectedMonth}</p>
-              <div style={{ marginTop: 20 }}><DailyTrend expenses={displayExpenses} /></div>
+              <div style={{ marginTop: 20 }}><DailyTrend transactions={displayTransactions} /></div>
             </BentoCard>
 
-            <MarketTrends expenses={expenses} selectedMonth={selectedMonth} colSpan={8} />
+            <MarketTrends transactions={transactions} selectedMonth={selectedMonth} colSpan={8} />
 
             {/* ROW 6: LIST & BREAKDOWN */}
-            <BentoCard colSpan={8} rowSpan={2} title="All Expenses">
+            <BentoCard colSpan={8} rowSpan={2} title="All Transactions">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
-                   expenses={displayExpenses} 
-                  onDelete={softDeleteExpense} 
-                  onEdit={(exp) => setManualEntry(exp)}
+                   expenses={displayTransactions} 
+                  onDelete={softDeleteTransaction} 
+                  onEdit={(tx) => setManualEntry(tx)}
                 />
               </div>
             </BentoCard>
 
             <BentoCard colSpan={4} title="Category Breakdown">
-              <SpendingBreakdown expenses={displayExpenses} />
+              <SpendingBreakdown transactions={displayTransactions} />
             </BentoCard>
 
             {/* ROW 7: DEEP ANALYTICS */}
@@ -201,13 +201,13 @@ function DashboardContent() {
               <ItemAnalytics tenantId={tenant.tenant_id} />
             </BentoCard>
 
-            {displayExpenses.length === 0 && (
+            {displayTransactions.length === 0 && (
               <BentoCard colSpan={12} title="Timeframe Status">
                 <div style={{ textAlign: 'center', padding: '48px 0' }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>🗓️</div>
                   <h3 style={{ fontSize: 20, marginBottom: 8 }}>No data for {selectedMonth}</h3>
                   <p style={{ color: 'var(--text-secondary)', maxWidth: 400, margin: '0 auto' }}>
-                    There are no recorded expenses for this month. 
+                    There are no recorded transactions for this month. 
                     Scan a receipt or add a manual entry to start tracking your {selectedMonth} spending.
                   </p>
                 </div>
@@ -217,6 +217,14 @@ function DashboardContent() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div style={{ padding: 64, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
 

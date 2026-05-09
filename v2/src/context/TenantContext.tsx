@@ -112,7 +112,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     
     // Get latest config from DB to avoid race conditions
     const { data: stateData } = await supabase
-      .from('app_state')
+      .from('tenants')
       .select('config')
       .eq('id', tenant.tenant_id)
       .single();
@@ -131,7 +131,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     };
 
     const { error } = await supabase
-      .from('app_state')
+      .from('tenants')
       .upsert({ id: tenant.tenant_id, config: newConfig });
 
     if (error) throw error;

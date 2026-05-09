@@ -65,15 +65,20 @@ export function AuthScreen({ session }: { session: any }) {
         
         {!session ? (
           <div>
-            <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>Sign in with Google to manage your tenant finances.</p>
+            <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>Sign in to manage your tenant finances.</p>
             <button 
               className="btn btn-primary" 
               onClick={handleGoogleLogin}
               disabled={loading}
-              style={{ width: '100%', padding: '12px' }}
+              style={{ width: '100%', padding: '12px', marginBottom: 12 }}
             >
               {loading ? 'Connecting...' : 'Sign in with Google'}
             </button>
+            <div style={{ textAlign: 'center' }}>
+              <a href="/login" style={{ fontSize: 13, color: 'var(--accent-primary)', textDecoration: 'none', opacity: 0.8 }}>
+                Or use Email & Password →
+              </a>
+            </div>
           </div>
         ) : (
           <div>

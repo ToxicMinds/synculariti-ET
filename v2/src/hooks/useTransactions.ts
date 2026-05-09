@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Expense } from '@/lib/finance';
+import { Transaction } from '@/lib/finance';
 import { useTenantContext } from '@/context/TenantContext';
 
 /**
@@ -8,29 +8,29 @@ import { useTenantContext } from '@/context/TenantContext';
  * RESPONSIBILITY: Read-only state management, Filtering, and Realtime Sync.
  */
 export function useTransactions(tenantId: string | undefined, selectedMonth?: string) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   const { syncToken } = useTenantContext();
 
   useEffect(() => {
     if (!tenantId) {
-      setExpenses([]);
+      setTransactions([]);
       setLoading(false);
       return;
     }
 
-    fetchExpenses();
+    fetchTransactions();
 
     // Set up Realtime Subscription for automatic UI updates when useSync mutates data
-    const channel = supabase.channel('expenses-changes')
+    const channel = supabase.channel('transactions-changes')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'expenses',
+        table: 'transactions',
         filter: `tenant_id=eq.${tenantId}`
       }, () => {
-        fetchExpenses();
+        fetchTransactions();
       })
       .subscribe();
 
@@ -39,11 +39,11 @@ export function useTransactions(tenantId: string | undefined, selectedMonth?: st
     };
   }, [tenantId, selectedMonth, syncToken]);
 
-  const fetchExpenses = async () => {
+  const fetchTransactions = async () => {
     if (!tenantId) return;
     
     let query = supabase
-      .from('expenses')
+      .from('transactions')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('is_deleted', false);
@@ -68,10 +68,10 @@ export function useTransactions(tenantId: string | undefined, selectedMonth?: st
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setExpenses(data);
+      setTransactions(data);
     }
     setLoading(false);
   };
 
-  return { expenses, loading, fetchExpenses };
+  return { transactions, loading, fetchTransactions };
 }

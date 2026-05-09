@@ -1,7 +1,5 @@
-'use client';
-
 import { useState, useRef } from 'react';
-import { Expense } from '@/lib/finance';
+import { Transaction } from '@/lib/finance';
 import { CategoryPill } from './CategoryPill';
 
 type ViewMode = 'list' | 'calendar';
@@ -10,10 +8,10 @@ type ViewMode = 'list' | 'calendar';
  * SwipeableRow: Replicates the v1 mobile UX.
  * Left swipe reveals Edit/Delete.
  */
-function SwipeableRow({ exp, onDelete, onEdit }: { 
-  exp: Expense; 
+function SwipeableRow({ tx, onDelete, onEdit }: { 
+  tx: Transaction; 
   onDelete: (id: string) => void;
-  onEdit: (exp: Expense) => void;
+  onEdit: (tx: Transaction) => void;
 }) {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const startX = useRef(0);
@@ -47,8 +45,8 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
   };
 
   const handleDelete = () => {
-    if (exp.id && window.confirm('Are you sure you want to delete this expense?')) {
-      onDelete(exp.id);
+    if (tx.id && window.confirm('Are you sure you want to delete this transaction?')) {
+      onDelete(tx.id);
       setSwipeOffset(0);
     }
   };
@@ -66,7 +64,7 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
         alignItems: 'stretch'
       }}>
         <button 
-          onClick={() => { onEdit(exp); setSwipeOffset(0); }}
+          onClick={() => { onEdit(tx); setSwipeOffset(0); }}
           style={{ flex: 1, background: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
         >
           Edit
@@ -99,14 +97,14 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CategoryPill category={exp.category} />
+            <CategoryPill category={tx.category} />
             <span style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {exp.description || 'Unnamed Expense'}
+              {tx.description || 'Unnamed Transaction'}
             </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', gap: 6 }}>
-            <span>{exp.date}</span>
-            {exp.who && <><span>·</span><span>{exp.who}</span></>}
+            <span>{tx.date}</span>
+            {tx.who && <><span>·</span><span>{tx.who}</span></>}
           </div>
         </div>
         
@@ -114,7 +112,7 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
           {/* Desktop Only: Hover Actions */}
           <div className="actions hide-mobile" style={{ display: 'flex', gap: 8 }}>
             <button 
-              onClick={() => onEdit(exp)}
+              onClick={() => onEdit(tx)}
               style={{ 
                 padding: '4px 10px', 
                 borderRadius: 6, 
@@ -146,7 +144,9 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>€{Number(exp.amount).toFixed(2)}</span>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>
+              {tx.currency === 'EUR' || !tx.currency ? '€' : tx.currency}{Number(tx.amount).toFixed(2)}
+            </span>
             {/* Subtle indicator for mobile users or to hint swipe */}
             <div className="hide-desktop" style={{ width: 4, height: 20, background: 'var(--border-color)', borderRadius: 2, marginLeft: 4, opacity: 0.5 }} />
           </div>
@@ -156,7 +156,7 @@ function SwipeableRow({ exp, onDelete, onEdit }: {
   );
 }
 
-function CalendarView({ expenses }: { expenses: Expense[] }) {
+function CalendarView({ transactions }: { transactions: Transaction[] }) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -164,13 +164,13 @@ function CalendarView({ expenses }: { expenses: Expense[] }) {
 
   // Build day totals
   const dayTotals: Record<number, number> = {};
-  const dayExpenses: Record<number, Expense[]> = {};
-  expenses.forEach(e => {
-    const d = new Date(e.date);
+  const dayTransactions: Record<number, Transaction[]> = {};
+  transactions.forEach(t => {
+    const d = new Date(t.date);
     if (d.getMonth() === month && d.getFullYear() === year) {
       const day = d.getDate();
-      dayTotals[day] = (dayTotals[day] || 0) + Number(e.amount);
-      dayExpenses[day] = [...(dayExpenses[day] || []), e];
+      dayTotals[day] = (dayTotals[day] || 0) + Number(t.amount);
+      dayTransactions[day] = [...(dayTransactions[day] || []), t];
     }
   });
   const maxSpend = Math.max(...Object.values(dayTotals), 1);
@@ -219,15 +219,15 @@ function CalendarView({ expenses }: { expenses: Expense[] }) {
           );
         })}
       </div>
-      {selectedDay && dayExpenses[selectedDay] && (
+      {selectedDay && dayTransactions[selectedDay] && (
         <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-hover)', borderRadius: 12 }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>
             {now.toLocaleString('default', { month: 'long' })} {selectedDay}
           </p>
-          {dayExpenses[selectedDay].map(e => (
-            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0' }}>
-              <span style={{ color: 'var(--text-primary)' }}>{e.description || e.category}</span>
-              <span style={{ fontWeight: 600 }}>€{Number(e.amount).toFixed(2)}</span>
+          {dayTransactions[selectedDay].map(t => (
+            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0' }}>
+              <span style={{ color: 'var(--text-primary)' }}>{t.description || t.category}</span>
+              <span style={{ fontWeight: 600 }}>€{Number(t.amount).toFixed(2)}</span>
             </div>
           ))}
         </div>
@@ -237,9 +237,9 @@ function CalendarView({ expenses }: { expenses: Expense[] }) {
 }
 
 export function ExpenseList({ expenses, onDelete, onEdit }: { 
-  expenses: Expense[]; 
+  expenses: Transaction[]; 
   onDelete: (id: string) => void;
-  onEdit: (exp: Expense) => void;
+  onEdit: (tx: Transaction) => void;
 }) {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [whoFilter, setWhoFilter] = useState('All');
@@ -309,19 +309,19 @@ export function ExpenseList({ expenses, onDelete, onEdit }: {
       </div>
 
       {viewMode === 'calendar' ? (
-        <CalendarView expenses={filtered} />
+        <CalendarView transactions={filtered} />
       ) : (
         <>
           {filtered.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '12px 0', textAlign: 'center' }}>
-              No expenses match your filters.
+              No transactions match your filters.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {filtered.map(exp => (
+              {filtered.map(tx => (
                 <SwipeableRow 
-                  key={exp.id} 
-                  exp={exp} 
+                  key={tx.id} 
+                  tx={tx} 
                   onDelete={onDelete} 
                   onEdit={onEdit} 
                 />
