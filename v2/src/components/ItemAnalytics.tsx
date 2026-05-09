@@ -30,8 +30,8 @@ export function ItemAnalytics({ tenantId }: { tenantId: string | undefined }) {
         .select(`
           name, 
           amount, 
-          expense_id,
-          expenses (
+          transaction_id,
+          transactions (
             description,
             date
           )
@@ -43,7 +43,7 @@ export function ItemAnalytics({ tenantId }: { tenantId: string | undefined }) {
       const aggregated = (data || []).reduce((acc: Record<string, AggregatedItem>, curr: any) => {
         const rawName = curr.name || 'Unknown Item';
         const nameKey = rawName.trim().toUpperCase();
-        const parent = curr.expenses;
+        const parent = curr.transactions;
         
         if (!acc[nameKey]) {
           acc[nameKey] = { 

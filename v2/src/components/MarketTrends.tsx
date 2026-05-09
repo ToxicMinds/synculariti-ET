@@ -2,6 +2,7 @@
 
 import { BentoCard } from './BentoCard';
 import { Line } from 'react-chartjs-2';
+import { Transaction } from '@/lib/finance';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -25,8 +26,8 @@ ChartJS.register(
   Filler
 );
 
-export function MarketTrends({ expenses, selectedMonth, colSpan = 8 }: { expenses: any[], selectedMonth: string, colSpan?: number }) {
-  // Logic: Group expenses by month for the last 6 months
+export function MarketTrends({ transactions, selectedMonth, colSpan = 8 }: { transactions: Transaction[], selectedMonth: string, colSpan?: number }) {
+  // Logic: Group transactions by month for the last 6 months
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const [y, m] = selectedMonth.split('-');
   const baseDate = new Date(parseInt(y), parseInt(m) - 1, 1);
@@ -37,9 +38,9 @@ export function MarketTrends({ expenses, selectedMonth, colSpan = 8 }: { expense
   });
 
   const dataPoints = last6Months.map(m => {
-    return expenses
-      .filter(e => {
-        const d = new Date(e.date);
+    return transactions
+      .filter(t => {
+        const d = new Date(t.date || '');
         return d.getMonth() === m.month && d.getFullYear() === m.year;
       })
       .reduce((acc, curr) => acc + Number(curr.amount), 0);
@@ -93,7 +94,7 @@ export function MarketTrends({ expenses, selectedMonth, colSpan = 8 }: { expense
           💡 Insight
         </span>
         <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          Your spending peaked in {last6Months[dataPoints.indexOf(Math.max(...dataPoints))].name} due to higher 'Food' transactions.
+          Your spending peaked in {last6Months[dataPoints.indexOf(Math.max(...dataPoints))].name} due to higher transactional activity.
         </p>
       </div>
     </BentoCard>

@@ -13,7 +13,7 @@ import {
   LineElement,
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { Expense, calcCategoryTotals } from '@/lib/finance';
+import { Transaction, calcCategoryTotals } from '@/lib/finance';
 
 ChartJS.register(
   ArcElement,
@@ -32,8 +32,8 @@ const CHART_COLORS = [
   '#F59E0B', '#10B981', '#06B6D4', '#3B82F6'
 ];
 
-export function SpendingBreakdown({ expenses }: { expenses: Expense[] }) {
-  const totals = calcCategoryTotals(expenses);
+export function SpendingBreakdown({ transactions }: { transactions: Transaction[] }) {
+  const totals = calcCategoryTotals(transactions);
   const categories = Object.keys(totals).filter(c => c !== 'Adjustment'); // Adjustments usually skew charts
   const values = categories.map(c => totals[c]);
 
@@ -71,12 +71,12 @@ export function SpendingBreakdown({ expenses }: { expenses: Expense[] }) {
   );
 }
 
-export function DailyTrend({ expenses }: { expenses: Expense[] }) {
+export function DailyTrend({ transactions }: { transactions: Transaction[] }) {
   // Aggregate spend by day
-  const daily = expenses.reduce((acc: Record<string, number>, e) => {
-    if (e.category === 'Savings' || e.category === 'Adjustment') return acc;
-    const day = e.date.slice(8, 10); // DD
-    acc[day] = (acc[day] || 0) + (Number(e.amount) || 0);
+  const daily = transactions.reduce((acc: Record<string, number>, t) => {
+    if (t.category === 'Savings' || t.category === 'Adjustment') return acc;
+    const day = t.date?.slice(8, 10) || '01'; // DD
+    acc[day] = (acc[day] || 0) + (Number(t.amount) || 0);
     return acc;
   }, {});
 

@@ -236,8 +236,8 @@ function CalendarView({ transactions }: { transactions: Transaction[] }) {
   );
 }
 
-export function ExpenseList({ expenses, onDelete, onEdit }: { 
-  expenses: Transaction[]; 
+export function ExpenseList({ transactions, onDelete, onEdit }: { 
+  transactions: Transaction[]; 
   onDelete: (id: string) => void;
   onEdit: (tx: Transaction) => void;
 }) {
@@ -246,10 +246,10 @@ export function ExpenseList({ expenses, onDelete, onEdit }: {
   const [whatFilter, setWhatFilter] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
-  const uniqueCategories = ['All', ...Array.from(new Set(expenses.map(e => e.category).filter(Boolean)))];
-  const uniqueWhos = ['All', ...Array.from(new Set(expenses.map(e => e.who).filter(Boolean)))];
+  const uniqueCategories = ['All', ...Array.from(new Set(transactions.map(e => e.category).filter(Boolean)))];
+  const uniqueWhos = ['All', ...Array.from(new Set(transactions.map(e => e.who).filter(Boolean)))];
 
-  const filtered = expenses.filter(e => {
+  const filtered = transactions.filter(e => {
     if (categoryFilter !== 'All' && e.category !== categoryFilter) return false;
     if (whoFilter !== 'All' && e.who !== whoFilter) return false;
     if (whatFilter && !(e.description?.toLowerCase().includes(whatFilter.toLowerCase()) || e.category.toLowerCase().includes(whatFilter.toLowerCase()))) return false;

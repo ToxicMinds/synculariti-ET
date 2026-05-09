@@ -185,7 +185,7 @@ function DashboardContent() {
             <BentoCard colSpan={8} rowSpan={2} title="All Transactions">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
-                   expenses={displayTransactions} 
+                   transactions={displayTransactions} 
                   onDelete={softDeleteTransaction} 
                   onEdit={(tx) => setManualEntry(tx)}
                 />

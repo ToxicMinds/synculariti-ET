@@ -1,14 +1,14 @@
 'use client';
 
 import { BentoCard } from './BentoCard';
-import { Expense } from '@/lib/finance';
+import { Transaction } from '@/lib/finance';
 
 export function MonthlyPerformance({ 
-  expenses, 
+  transactions, 
   selectedMonth,
   colSpan = 4
 }: { 
-  expenses: Expense[], 
+  transactions: Transaction[], 
   selectedMonth: string,
   colSpan?: number
 }) {
@@ -17,11 +17,11 @@ export function MonthlyPerformance({
   const prevDate = new Date(parseInt(y), parseInt(m) - 2, 1);
   const prevPrefix = prevDate.toISOString().slice(0, 7);
 
-  const currentMonthExpenses = expenses.filter(e => e.date?.startsWith(currentPrefix) && e.category !== 'Savings' && e.category !== 'Adjustment');
-  const prevMonthExpenses = expenses.filter(e => e.date?.startsWith(prevPrefix) && e.category !== 'Savings' && e.category !== 'Adjustment');
+  const currentMonthTx = transactions.filter(t => t.date?.startsWith(currentPrefix) && t.category !== 'Savings' && t.category !== 'Adjustment');
+  const prevMonthTx = transactions.filter(t => t.date?.startsWith(prevPrefix) && t.category !== 'Savings' && t.category !== 'Adjustment');
 
-  const currentTotal = currentMonthExpenses.reduce((acc, e) => acc + Number(e.amount), 0);
-  const prevTotal = prevMonthExpenses.reduce((acc, e) => acc + Number(e.amount), 0);
+  const currentTotal = currentMonthTx.reduce((acc, t) => acc + Number(t.amount), 0);
+  const prevTotal = prevMonthTx.reduce((acc, t) => acc + Number(t.amount), 0);
 
   const diff = currentTotal - prevTotal;
   const pct = prevTotal > 0 ? (diff / prevTotal) * 100 : 0;
@@ -31,15 +31,15 @@ export function MonthlyPerformance({
 
   // Smart states
   const isNewMonthNoData = currentTotal === 0;
-  const isFirstMonthEver = prevMonthExpenses.length === 0;
-  const hasSomeData = currentMonthExpenses.length > 0 || prevMonthExpenses.length > 0;
+  const isFirstMonthEver = prevMonthTx.length === 0;
+  const hasSomeData = currentMonthTx.length > 0 || prevMonthTx.length > 0;
 
   // Find biggest category increase
   const currentCats: Record<string, number> = {};
-  currentMonthExpenses.forEach(e => currentCats[e.category] = (currentCats[e.category] || 0) + Number(e.amount));
+  currentMonthTx.forEach(t => currentCats[t.category] = (currentCats[t.category] || 0) + Number(t.amount));
   
   const prevCats: Record<string, number> = {};
-  prevMonthExpenses.forEach(e => prevCats[e.category] = (prevCats[e.category] || 0) + Number(e.amount));
+  prevMonthTx.forEach(t => prevCats[t.category] = (prevCats[t.category] || 0) + Number(t.amount));
 
   let biggestIncreaseCat = '';
   let maxIncrease = 0;

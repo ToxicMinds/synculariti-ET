@@ -5,13 +5,13 @@ import { BentoCard } from './BentoCard';
 
 export function AIInsights({
   tenantId,
-  expenseCount,
+  transactionCount,
   dataHash,
   updateState,
   tenant
 }: {
   tenantId: string | undefined;
-  expenseCount?: number;
+  transactionCount?: number;
   dataHash?: string;
   updateState?: (s: any) => Promise<void>;
   tenant?: any;
@@ -24,8 +24,8 @@ export function AIInsights({
   const lastFetchedHash = useRef<string | null>(null);
   const isFetching = useRef(false);
 
-  // Stable cache key: only changes when tenant or expense count/totals change
-  const cacheHash = tenantId ? (dataHash || `${tenantId}_${expenseCount ?? 0}`) : null;
+  // Stable cache key: only changes when tenant or transaction count/totals change
+  const cacheHash = tenantId ? (dataHash || `${tenantId}_${transactionCount ?? 0}`) : null;
 
   useEffect(() => {
     if (!tenantId || !tenant || !cacheHash) return;
@@ -82,7 +82,7 @@ export function AIInsights({
         }
       } else {
         // API returned 200 but no meaningful insight — show a soft message, don't retry
-        setInsight('💡 Your spending patterns are being analyzed. Add more expenses and sync to see AI-powered insights.');
+        setInsight('💡 Your spending patterns are being analyzed. Add more transactions and sync to see AI-powered insights.');
         setSource('error');
         lastFetchedHash.current = cacheHash; // Mark as fetched so we don't loop
       }

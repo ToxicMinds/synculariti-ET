@@ -1,11 +1,11 @@
 'use client';
 
 import { BentoCard } from './BentoCard';
-import { calcPerUserSpend } from '@/lib/finance';
+import { Transaction, calcPerUserSpend } from '@/lib/finance';
 
-export function FamilySpends({ expenses, names, colSpan = 4 }: { expenses: any[], names: Record<string, string>, colSpan?: number }) {
+export function FamilySpends({ transactions, names, colSpan = 4 }: { transactions: Transaction[], names: Record<string, string>, colSpan?: number }) {
   // FIXED: Use the proper hybrid resolver that handles BOTH who_id AND legacy who-name
-  const userSpends = calcPerUserSpend(expenses, names);
+  const userSpends = calcPerUserSpend(transactions, names);
 
   const sortedUsers = Object.entries(names).map(([id, name]) => ({
     id,
