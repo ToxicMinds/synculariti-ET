@@ -132,7 +132,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
     const { error } = await supabase
       .from('tenants')
-      .upsert({ id: tenant.tenant_id, config: newConfig });
+      .update({ config: newConfig })
+      .eq('id', tenant.tenant_id);
 
     if (error) throw error;
     setTenant({ ...tenant, ...updates });
