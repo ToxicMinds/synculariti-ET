@@ -30,7 +30,7 @@ export function ChartOfAccounts({ tenantId }: { tenantId: string }) {
       if (error) throw error;
       setAccounts(data || []);
     } catch (e) {
-      Logger.system('ERROR', 'CoA', 'Failed to fetch CoA', e, tenantId);
+      Logger.system('ERROR', 'Finance', 'Failed to fetch CoA', e, tenantId);
     } finally {
       setLoading(false);
     }

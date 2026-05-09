@@ -34,7 +34,7 @@ export function InvoiceManager({ tenantId }: { tenantId: string }) {
       if (error) throw error;
       setInvoices(data || []);
     } catch (e) {
-      Logger.system('ERROR', 'Invoices', 'Failed to fetch invoices', e, tenantId);
+      Logger.system('ERROR', 'Finance', 'Failed to fetch invoices', e, tenantId);
     } finally {
       setLoading(false);
     }
