@@ -227,11 +227,3 @@ export default function Home() {
     </Suspense>
   );
 }
-
-export default function Home() {
-  return (
-    <Suspense fallback={<div style={{ padding: 64, textAlign: 'center', color: 'var(--text-secondary)' }}>Loading…</div>}>
-      <DashboardContent />
-    </Suspense>
-  );
-}
