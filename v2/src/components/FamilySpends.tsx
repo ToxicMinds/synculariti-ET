@@ -20,26 +20,14 @@ export function FamilySpends({ transactions, names, colSpan = 4 }: { transaction
 
   return (
     <BentoCard title="Family Spends" colSpan={colSpan}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="flex-col gap-4">
         {sortedUsers.map((user) => (
-          <div key={user.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ 
-              width: 36, 
-              height: 36, 
-              borderRadius: '50%', 
-              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 14,
-              fontWeight: 700,
-              color: '#fff',
-              flexShrink: 0
-            }}>
+          <div key={user.id} className="flex-row items-center gap-3">
+            <div className="avatar-circle">
               {user.name.charAt(0)}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div className="flex-between" style={{ marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{user.name}</span>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>€{user.amount.toFixed(2)}</span>
               </div>
@@ -59,22 +47,13 @@ export function FamilySpends({ transactions, names, colSpan = 4 }: { transaction
         ))}
 
         {champion && (
-          <div style={{ 
-            marginTop: 4, 
-            padding: '10px 14px', 
-            background: 'rgba(16, 185, 129, 0.08)', 
-            borderRadius: 12,
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            fontSize: 12,
-            color: '#10b981',
-            fontWeight: 600
-          }}>
+          <div className="status-badge status-success" style={{ marginTop: 4, padding: '10px 14px', fontSize: 12 }}>
             🏆 {champion.name} is the Budget Champion this month!
           </div>
         )}
 
         {activeUsers.length === 0 && (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No spending data attributed to members yet.</p>
+          <p className="card-subtitle">No spending data attributed to members yet.</p>
         )}
       </div>
     </BentoCard>

@@ -27,7 +27,8 @@ export function MonthlyPerformance({
   const pct = prevTotal > 0 ? (diff / prevTotal) * 100 : 0;
   
   const isBetter = diff <= 0; // Spending less is better
-  const color = isBetter ? 'var(--accent-success)' : 'var(--accent-danger)';
+  const colorClass = isBetter ? 'status-success' : 'status-danger';
+  const colorHex = isBetter ? '#10b981' : '#ef4444';
 
   // Smart states
   const isNewMonthNoData = currentTotal === 0;
@@ -54,65 +55,62 @@ export function MonthlyPerformance({
 
   return (
     <BentoCard title="Monthly Performance" colSpan={colSpan}>
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>Spent this month</p>
-        <div style={{ fontSize: 32, fontWeight: 700 }}>€{currentTotal.toFixed(2)}</div>
-      </div>
+      <div className="flex-col gap-4">
+        <div>
+          <p className="card-subtitle">Spent this month</p>
+          <div className="card-title" style={{ fontSize: 32 }}>€{currentTotal.toFixed(2)}</div>
+        </div>
 
-      {!hasSomeData ? (
-        <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
-          <p style={{ fontSize: 13 }}>No data found for this period.</p>
-        </div>
-      ) : isNewMonthNoData ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', background: 'var(--bg-secondary)', borderRadius: 12 }}>
-          <div style={{ fontSize: 20 }}>✨</div>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>It's a new month! Start scanning receipts to see your performance.</p>
-        </div>
-      ) : isFirstMonthEver ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px', background: 'var(--accent-primary)15', borderRadius: 12 }}>
-          <div style={{ fontSize: 20 }}>🚀</div>
-          <div>
-            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-primary)' }}>First month of tracking!</p>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>We'll show comparisons once you have two months of data.</p>
+        {!hasSomeData ? (
+          <div className="flex-col items-center gap-2 py-4">
+            <div style={{ fontSize: 24 }}>📊</div>
+            <p className="card-subtitle">No data found for this period.</p>
           </div>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ 
-              width: 40, height: 40, borderRadius: 10, 
-              background: `${color}20`, color: color,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20
-            }}>
-              {isBetter ? '↓' : '↑'}
-            </div>
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: color }}>
-                {Math.abs(pct).toFixed(1)}% {isBetter ? 'less' : 'more'}
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                vs last month (€{prevTotal.toFixed(0)})
-              </p>
+        ) : isNewMonthNoData ? (
+          <div className="flex-row items-center gap-3 p-3 glass-card rounded-xl">
+            <div style={{ fontSize: 20 }}>✨</div>
+            <p className="card-subtitle">It's a new month! Start scanning receipts to see your performance.</p>
+          </div>
+        ) : isFirstMonthEver ? (
+          <div className="flex-row items-center gap-3 p-3 glass-card rounded-xl">
+            <div style={{ fontSize: 20 }}>🚀</div>
+            <div className="flex-col">
+              <p className="card-title" style={{ fontSize: 14 }}>First month of tracking!</p>
+              <p className="card-subtitle">We'll show comparisons once you have two months of data.</p>
             </div>
           </div>
-          
-          <div style={{ marginTop: 24, padding: '12px', background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--border-color)' }}>
-            <p style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
-              {maxIncrease > 20 ? (
-                <>
-                  ⚠️ Your <strong>{biggestIncreaseCat}</strong> spending is up by <strong>€{maxIncrease.toFixed(0)}</strong> compared to last month.
-                </>
-              ) : isBetter ? (
-                "✨ Great job! You're trending lower than last month. Keep it up!"
-              ) : (
-                "You've spent slightly more than last month. Watch your variable expenses."
-              )}
-            </p>
-          </div>
-        </>
-      )}
+        ) : (
+          <>
+            <div className="flex-row items-center gap-3">
+              <div className={`flex-center status-badge ${colorClass}`} style={{ width: 40, height: 40, fontSize: 20, borderRadius: 10 }}>
+                {isBetter ? '↓' : '↑'}
+              </div>
+              <div className="flex-col">
+                <p className="card-title" style={{ fontSize: 14, color: colorHex }}>
+                  {Math.abs(pct).toFixed(1)}% {isBetter ? 'less' : 'more'}
+                </p>
+                <p className="card-subtitle">
+                  vs last month (€{prevTotal.toFixed(0)})
+                </p>
+              </div>
+            </div>
+            
+            <div className="p-3 glass-card rounded-xl">
+              <p className="card-subtitle" style={{ lineHeight: 1.5 }}>
+                {maxIncrease > 20 ? (
+                  <>
+                    ⚠️ Your <strong>{biggestIncreaseCat}</strong> spending is up by <strong>€{maxIncrease.toFixed(0)}</strong> compared to last month.
+                  </>
+                ) : isBetter ? (
+                  "✨ Great job! You're trending lower than last month. Keep it up!"
+                ) : (
+                  "You've spent slightly more than last month. Watch your variable expenses."
+                )}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
     </BentoCard>
   );
 }

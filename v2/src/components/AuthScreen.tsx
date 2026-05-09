@@ -27,7 +27,7 @@ export function AuthScreen({ session }: { session: any }) {
 
   const handleJoin = async () => {
     if (!handle) {
-      setError('Enter Tenant Handle');
+      setError('Enter Tenant Access Code');
       return;
     }
     
@@ -36,19 +36,12 @@ export function AuthScreen({ session }: { session: any }) {
     
     try {
       const lowerHandle = handle.toLowerCase();
-      
-      // 1. Verify handle exists
       const { data: lookupData, error: lErr } = await supabase.rpc('verify_tenant_access', { input_code: lowerHandle });
       if (lErr) throw lErr;
-      if (!lookupData || lookupData.length === 0) throw new Error("Tenant handle not found.");
+      if (!lookupData || lookupData.length === 0) throw new Error("Invalid access code.");
       
       const tenantId = lookupData[0].target_id;
-      
-      // 2. Link user (using upsert to prevent duplicate key errors)
-      const { error: linkErr } = await supabase
-        .from('app_users')
-        .upsert({ id: session.user.id, tenant_id: tenantId });
-        
+      const { error: linkErr } = await supabase.from('app_users').upsert({ id: session.user.id, tenant_id: tenantId });
       if (linkErr) throw linkErr;
       
       window.location.reload();
@@ -59,53 +52,62 @@ export function AuthScreen({ session }: { session: any }) {
   };
 
   return (
-    <div className="bento-grid" style={{ minHeight: '100vh', alignContent: 'center' }}>
-      <BentoCard colSpan={12} title="Welcome to ET Expense">
-        {error && <div style={{ color: 'var(--accent-danger)', marginBottom: 16 }}>{error}</div>}
+    <div className="flex-center" style={{ minHeight: '80vh', padding: 24 }}>
+      <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: 40, borderRadius: 28, textAlign: 'center' }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--bg-hover)', margin: '0 auto 24px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+          <img src="/brand/identity.png" alt="Identity" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+        
+        <h1 className="text-gradient" style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Synculariti Identity</h1>
+        <p className="card-subtitle" style={{ marginBottom: 32 }}>Secure enterprise access gatekeeper</p>
+
+        {error && <div className="status-badge status-danger" style={{ marginBottom: 24, width: '100%', justifyContent: 'center' }}>{error}</div>}
         
         {!session ? (
-          <div>
-            <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>Sign in to manage your tenant finances.</p>
+          <div className="flex-col gap-4">
             <button 
               className="btn btn-primary" 
               onClick={handleGoogleLogin}
               disabled={loading}
-              style={{ width: '100%', padding: '12px', marginBottom: 12 }}
+              style={{ width: '100%', padding: '14px', fontSize: 15 }}
             >
-              {loading ? 'Connecting...' : 'Sign in with Google'}
+              <span style={{ marginRight: 8 }}>🔑</span>
+              {loading ? 'Authenticating...' : 'Sign in with Google'}
             </button>
-            <div style={{ textAlign: 'center' }}>
-              <a href="/login" style={{ fontSize: 13, color: 'var(--accent-primary)', textDecoration: 'none', opacity: 0.8 }}>
-                Or use Email & Password →
+            <div className="flex-row items-center gap-2" style={{ justifyContent: 'center' }}>
+              <span className="card-subtitle" style={{ fontSize: 13 }}>First time?</span>
+              <a href="/login" style={{ fontSize: 13, color: 'var(--accent-primary)', fontWeight: 700, textDecoration: 'none' }}>
+                Join Organization →
               </a>
             </div>
           </div>
         ) : (
-          <div>
-            <p style={{ marginBottom: 24, color: 'var(--text-secondary)' }}>
-              You are signed in as {session.user.email}, but you aren't part of a tenant yet.
+          <div className="flex-col gap-4">
+            <p className="card-subtitle" style={{ fontSize: 14 }}>
+              Logged in as <strong style={{ color: 'var(--text-primary)' }}>{session.user.email}</strong>
             </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex-col gap-2">
+              <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>ORGANIZATION ACCESS CODE</label>
               <input 
                 type="text" 
-                placeholder="Tenant Handle (e.g. smith-42)" 
+                placeholder="e.g. ALPHA-99" 
                 value={handle}
                 onChange={e => setHandle(e.target.value)}
-                style={{ padding: 12, borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                className="btn btn-secondary"
+                style={{ textAlign: 'left', width: '100%', padding: '12px 16px' }}
               />
               <button 
                 className="btn btn-primary" 
                 onClick={handleJoin}
                 disabled={loading}
-                style={{ width: '100%', padding: '12px', marginTop: 8 }}
+                style={{ width: '100%', padding: '14px', marginTop: 12 }}
               >
-                {loading ? 'Joining...' : 'Join Tenant'}
+                {loading ? 'Verifying...' : 'Link Organization'}
               </button>
             </div>
           </div>
         )}
-      </BentoCard>
+      </div>
     </div>
   );
 }

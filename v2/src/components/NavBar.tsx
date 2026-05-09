@@ -186,43 +186,84 @@ const menuItemStyle: React.CSSProperties = {
   transition: 'background 0.15s'
 };
 
+function ModuleSwitcher() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  const modules = [
+    { name: 'Finance', icon: '💰', path: '/', logo: '/brand/finance.png' },
+    { name: 'Logistics', icon: '📦', path: '/logistics', logo: '/brand/logistics.png' },
+    { name: 'Identity', icon: '👤', path: '/settings', logo: '/brand/identity.png' },
+  ];
+
+  const activeModule = modules.find(m => m.path === pathname) || modules[0];
+
+  return (
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+      <button 
+        onClick={() => setOpen(!open)}
+        className="flex-row items-center gap-2"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+      >
+        <div style={{ 
+          width: 36, height: 36, borderRadius: 10, 
+          background: 'var(--bg-hover)', display: 'flex', 
+          alignItems: 'center', justifyContent: 'center', 
+          overflow: 'hidden', border: '1px solid var(--border-color)' 
+        }}>
+          <img src={activeModule.logo} alt={activeModule.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+        <div className="flex-col items-start hide-mobile">
+          <span className="logo-text" style={{ fontWeight: 800, fontSize: 16, lineHeight: 1, color: 'var(--text-primary)' }}>Synculariti</span>
+          <span className="status-badge" style={{ fontSize: 9, padding: '1px 5px', marginTop: 2, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+            {activeModule.name}
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
+          <div className="glass-card" style={{
+            position: 'absolute', top: 48, left: 0, 
+            borderRadius: 16, padding: 8, minWidth: 220,
+            boxShadow: 'var(--shadow-md)', zIndex: 99
+          }}>
+            <p className="card-subtitle" style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Switch Module</p>
+            {modules.map(m => (
+              <Link 
+                key={m.name} 
+                href={m.path} 
+                onClick={() => setOpen(false)}
+                className="flex-row items-center gap-3"
+                style={{ 
+                  padding: '10px 12px', borderRadius: 10, 
+                  textDecoration: 'none', color: 'var(--text-primary)',
+                  background: m.path === pathname ? 'var(--bg-hover)' : 'none'
+                }}
+              >
+                <div style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                  <img src={m.logo} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div className="flex-col">
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>{m.name}</span>
+                  <span className="card-subtitle" style={{ fontSize: 11 }}>Synculariti : {m.name}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function NavBar() {
   const { tenant, resolvedWhoId } = useTenant();
 
   return (
     <nav className="navbar">
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ 
-            width: 36, 
-            height: 36, 
-            borderRadius: 10, 
-            background: 'var(--bg-hover)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            flexShrink: 0, 
-            overflow: 'hidden',
-            border: '1px solid var(--border-color)'
-          }}>
-            <img 
-              src="/home/nik/.gemini/antigravity/brain/397c29fc-3420-4a9c-8a26-c3c9c008ff17/synculariti_finance_v3_logo_1778355420258.png" 
-              alt="Finance" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-            />
-          </div>
-          <span className="logo-text" style={{ 
-            fontWeight: 800, 
-            fontSize: 20, 
-            letterSpacing: '-0.5px',
-            background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}>
-            Synculariti
-          </span>
-        </Link>
-      </div>
+      <ModuleSwitcher />
 
       <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
         <Suspense fallback={<div style={{ width: 100, height: 36, background: 'var(--bg-hover)', borderRadius: 12 }} />}>
@@ -231,44 +272,18 @@ export function NavBar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Desktop Only: Quick Settings Access */}
         <Link 
           href="/ledger" 
           className="hide-mobile"
           style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 6, 
-            textDecoration: 'none', 
             color: 'var(--text-secondary)',
             fontSize: 13,
             fontWeight: 600,
             padding: '8px 12px',
-            borderRadius: 10,
-            background: 'var(--bg-hover)',
-            transition: 'all 0.2s'
+            textDecoration: 'none'
           }}
         >
           📊 Ledger
-        </Link>
-        <Link 
-          href="/settings" 
-          className="hide-mobile"
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 6, 
-            textDecoration: 'none', 
-            color: 'var(--text-secondary)',
-            fontSize: 13,
-            fontWeight: 600,
-            padding: '8px 12px',
-            borderRadius: 10,
-            background: 'var(--bg-hover)',
-            transition: 'all 0.2s'
-          }}
-        >
-          ⚙️ Settings
         </Link>
         
         {tenant && (

@@ -32,73 +32,67 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950 px-4">
-      <div className="max-w-md w-full space-y-8 p-8 bg-zinc-900/50 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl">
+    <div className="flex-center" style={{ minHeight: '90vh', padding: 24 }}>
+      <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: 40, borderRadius: 28, textAlign: 'center' }}>
         
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto bg-zinc-800 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(59,130,246,0.2)] overflow-hidden border border-white/5">
-            <img 
-              src="/home/nik/.gemini/antigravity/brain/397c29fc-3420-4a9c-8a26-c3c9c008ff17/synculariti_identity_logo_1778355891824.png" 
-              alt="Identity" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Synculariti Identity</h2>
-          <p className="mt-2 text-sm text-zinc-400">Secure enterprise access gatekeeper</p>
+        <div style={{ width: 80, height: 80, borderRadius: 20, background: 'var(--bg-hover)', margin: '0 auto 24px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 0 30px rgba(99, 102, 241, 0.15)' }}>
+          <img src="/brand/identity.png" alt="Identity" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
-          <div className="space-y-4 rounded-md shadow-sm">
-            <div>
-              <label htmlFor="email-address" className="sr-only">Email address</label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none rounded-xl relative block w-full px-4 py-3 bg-zinc-950/50 border border-zinc-800 placeholder-zinc-500 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm transition-all"
-                placeholder="Email address"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-xl relative block w-full px-4 py-3 bg-zinc-950/50 border border-zinc-800 placeholder-zinc-500 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm transition-all"
-                placeholder="Password"
-              />
-            </div>
+        <h1 className="text-gradient" style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Synculariti Identity</h1>
+        <p className="card-subtitle" style={{ marginBottom: 32 }}>Secure enterprise access gatekeeper</p>
+
+        {message && (
+          <div className={`status-badge ${message.type === 'error' ? 'status-danger' : 'status-success'}`} style={{ marginBottom: 24, width: '100%', justifyContent: 'center', padding: '10px' }}>
+            {message.text}
+          </div>
+        )}
+
+        <form className="flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+          <div className="flex-col gap-1">
+            <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>EMAIL ADDRESS</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="btn btn-secondary"
+              style={{ textAlign: 'left', width: '100%', padding: '12px 16px' }}
+              placeholder="name@company.com"
+            />
           </div>
 
-          {message && (
-            <div className={`p-4 rounded-xl text-sm ${message.type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
-              {message.text}
-            </div>
-          )}
+          <div className="flex-col gap-1">
+            <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>PASSWORD</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="btn btn-secondary"
+              style={{ textAlign: 'left', width: '100%', padding: '12px 16px' }}
+              placeholder="••••••••"
+            />
+          </div>
 
-          <div className="flex gap-4">
+          <div className="flex-row gap-3" style={{ marginTop: 12 }}>
             <button
               onClick={() => handleAuth('login')}
               disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all shadow-lg shadow-blue-500/25"
+              className="btn btn-primary"
+              style={{ flex: 1, padding: '14px' }}
             >
-              Sign In
+              {loading ? 'Authenticating...' : 'Sign In'}
             </button>
-            <button
-              onClick={() => handleAuth('signup')}
-              disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-zinc-700 text-sm font-medium rounded-xl text-zinc-300 bg-zinc-800 hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-600 disabled:opacity-50 transition-all"
+          </div>
+
+          <div className="flex-row items-center gap-2" style={{ justifyContent: 'center', marginTop: 16 }}>
+            <span className="card-subtitle" style={{ fontSize: 13 }}>New here?</span>
+            <button 
+              onClick={() => handleAuth('signup')} 
+              style={{ background: 'none', border: 'none', fontSize: 13, color: 'var(--accent-primary)', fontWeight: 700, cursor: 'pointer', padding: 0 }}
             >
-              Sign Up
+              Create Account →
             </button>
           </div>
         </form>

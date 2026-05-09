@@ -28,7 +28,7 @@ export function PWAInstallPrompt() {
       <div className="install-prompt-card">
         <div className="install-prompt-content">
           <div className="install-app-icon">
-            <img src="/icon.png" alt="App Icon" />
+            <img src="/brand/identity.png" alt="App Icon" />
           </div>
           <div className="install-text">
             <h4>Install Synculariti</h4>

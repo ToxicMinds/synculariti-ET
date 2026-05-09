@@ -14,12 +14,12 @@ export const metadata: Metadata = {
   // Next.js 14 proper favicon handling
   icons: {
     icon: [
-      { url: "/icon.png", type: "image/png" },
+      { url: "/brand/identity.png", type: "image/png" },
     ],
     apple: [
-      { url: "/icon.png" },
+      { url: "/brand/identity.png" },
     ],
-    shortcut: "/icon.png",
+    shortcut: "/brand/identity.png",
   },
   appleWebApp: {
     capable: true,
