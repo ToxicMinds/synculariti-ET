@@ -5,7 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { BentoCard } from './BentoCard';
 
 export function AuthScreen({ session }: { session: any }) {
+  const [mode, setMode] = useState<'join' | 'create'>('join');
   const [handle, setHandle] = useState('');
+  const [orgName, setOrgName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -51,6 +53,29 @@ export function AuthScreen({ session }: { session: any }) {
     }
   };
 
+  const handleCreate = async () => {
+    if (!orgName || !handle) {
+      setError('Organization Name and Access Code are required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const { error: cErr } = await supabase.rpc('create_organization', { 
+        p_name: orgName, 
+        p_handle: handle.toLowerCase() 
+      });
+      if (cErr) throw cErr;
+      
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex-center" style={{ minHeight: '80vh', padding: 24 }}>
       <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: 40, borderRadius: 28, textAlign: 'center' }}>
@@ -86,8 +111,42 @@ export function AuthScreen({ session }: { session: any }) {
             <p className="card-subtitle" style={{ fontSize: 14 }}>
               Logged in as <strong style={{ color: 'var(--text-primary)' }}>{session.user.email}</strong>
             </p>
+
+            <div className="flex-row gap-2" style={{ marginBottom: 12 }}>
+              <button 
+                onClick={() => { setMode('join'); setError(''); }} 
+                className={`btn ${mode === 'join' ? 'btn-primary' : 'btn-secondary'}`} 
+                style={{ flex: 1, minHeight: 38, fontSize: 12 }}
+              >
+                Join
+              </button>
+              <button 
+                onClick={() => { setMode('create'); setError(''); }} 
+                className={`btn ${mode === 'create' ? 'btn-primary' : 'btn-secondary'}`} 
+                style={{ flex: 1, minHeight: 38, fontSize: 12 }}
+              >
+                Create
+              </button>
+            </div>
+            
             <div className="flex-col gap-2">
-              <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>ORGANIZATION ACCESS CODE</label>
+              {mode === 'create' && (
+                <div className="flex-col gap-1">
+                  <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>ORGANIZATION NAME</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Acme Corp" 
+                    value={orgName}
+                    onChange={e => setOrgName(e.target.value)}
+                    className="btn btn-secondary"
+                    style={{ textAlign: 'left', width: '100%', padding: '12px 16px', marginBottom: 8 }}
+                  />
+                </div>
+              )}
+              
+              <label className="card-subtitle" style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: 700 }}>
+                {mode === 'join' ? 'ORGANIZATION ACCESS CODE' : 'DESIRED ACCESS CODE'}
+              </label>
               <input 
                 type="text" 
                 placeholder="e.g. ALPHA-99" 
@@ -96,13 +155,14 @@ export function AuthScreen({ session }: { session: any }) {
                 className="btn btn-secondary"
                 style={{ textAlign: 'left', width: '100%', padding: '12px 16px' }}
               />
+              
               <button 
                 className="btn btn-primary" 
-                onClick={handleJoin}
+                onClick={mode === 'join' ? handleJoin : handleCreate}
                 disabled={loading}
                 style={{ width: '100%', padding: '14px', marginTop: 12 }}
               >
-                {loading ? 'Verifying...' : 'Link Organization'}
+                {loading ? 'Verifying...' : mode === 'join' ? 'Link Organization' : 'Create Organization'}
               </button>
             </div>
           </div>
