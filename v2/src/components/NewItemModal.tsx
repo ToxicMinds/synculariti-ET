@@ -9,7 +9,7 @@ export function NewItemModal({
   onClose 
 }: { 
   categories: InventoryCategory[], 
-  onSave: (item: any) => Promise<void>,
+  onSave: (item: any) => Promise<any>,
   onClose: () => void 
 }) {
   const [formData, setFormData] = useState({
