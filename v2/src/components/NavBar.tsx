@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { Suspense, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import styles from './NavBar.module.css';
 
 function ThemeToggle() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -24,7 +25,7 @@ function ThemeToggle() {
   };
 
   return (
-    <button onClick={toggleTheme} className="btn btn-secondary" style={{ padding: 0, width: 38, height: 38, borderRadius: '50%', fontSize: 16 }}>
+    <button onClick={toggleTheme} className={`btn btn-secondary ${styles.themeToggle}`}>
       {theme === 'light' ? '🌙' : '☀️'}
     </button>
   );
@@ -57,32 +58,18 @@ function SwitcherGroup({ createdAt }: { createdAt?: string }) {
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const selectStyle: React.CSSProperties = {
-    padding: '8px 12px',
-    borderRadius: 12,
-    border: '1px solid var(--border-color)',
-    background: 'rgba(255, 255, 255, 0.05)',
-    backdropFilter: 'blur(10px)',
-    color: 'var(--text-primary)',
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-    outline: 'none',
-    width: 'auto'
-  };
-
   return (
-    <div style={{ display: 'flex', alignItems: 'center' }}>
+    <div className={styles.selectGroup}>
       <select 
         value={selectedM} 
         onChange={(e) => handleMonthChange(e.target.value)}
-        style={selectStyle}
+        className={styles.monthSelect}
       >
         {months.map(m => {
           const [y, mm] = m.split('-');
           const date = new Date(parseInt(y), parseInt(mm) - 1);
           const label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-          return <option key={m} value={m} style={{ background: 'var(--bg-card)', color: 'var(--text-primary)' }}>{label}</option>;
+          return <option key={m} value={m} className={styles.monthOption}>{label}</option>;
         })}
       </select>
     </div>
@@ -107,59 +94,33 @@ function ProfileMenu({ resolvedWhoId, names }: { resolvedWhoId: string | null, n
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className={styles.profileWrapper}>
       <button
         onClick={() => setOpen(!open)}
-        className="user-avatar-btn"
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: '50%',
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border-color)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--text-primary)',
-          fontSize: 15,
-          fontWeight: 700,
-          boxShadow: 'var(--shadow-sm)'
-        }}
+        className={styles.avatarBtn}
       >
         {initial}
       </button>
 
       {open && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
-          <div style={{
-            position: 'absolute',
-            right: 0,
-            top: 48,
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 14,
-            padding: 8,
-            minWidth: 180,
-            boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
-            zIndex: 99
-          }}>
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', marginBottom: 4 }}>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>Signed in as</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{userName}</p>
+          <div className={styles.dropdownOverlay} onClick={() => setOpen(false)} />
+          <div className={styles.profileDropdown}>
+            <div className={styles.profileHeader}>
+              <p className={styles.profileRole}>Signed in as</p>
+              <p className={styles.profileName}>{userName}</p>
             </div>
-            <button onClick={handleExport} style={menuItemStyle}>
+            <button onClick={handleExport} className={styles.menuItem}>
               📥 Download CSV
             </button>
-            <button onClick={() => { window.print(); setOpen(false); }} style={menuItemStyle}>
+            <button onClick={() => { window.print(); setOpen(false); }} className={styles.menuItem}>
               🖨️ Print Report
             </button>
-            <Link href="/settings" onClick={() => setOpen(false)} style={{ ...menuItemStyle, textDecoration: 'none' }}>
+            <Link href="/settings" onClick={() => setOpen(false)} className={styles.menuItem}>
               ⚙️ Settings
             </Link>
-            <div style={{ borderTop: '1px solid var(--border-color)', marginTop: 4, paddingTop: 4 }}>
-              <button onClick={handleLogout} style={{ ...menuItemStyle, color: 'var(--accent-danger)' }}>
+            <div className={styles.logoutWrapper}>
+              <button onClick={handleLogout} className={`${styles.menuItem} ${styles.logoutBtn}`}>
                 🚪 Logout
               </button>
             </div>
@@ -169,22 +130,6 @@ function ProfileMenu({ resolvedWhoId, names }: { resolvedWhoId: string | null, n
     </div>
   );
 }
-
-const menuItemStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  background: 'none',
-  border: 'none',
-  borderRadius: 8,
-  cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: 500,
-  color: 'var(--text-primary)',
-  textAlign: 'left',
-  display: 'block',
-  fontFamily: 'inherit',
-  transition: 'background 0.15s'
-};
 
 function ModuleSwitcher() {
   const pathname = usePathname();
@@ -199,34 +144,17 @@ function ModuleSwitcher() {
   const activeModule = modules.find(m => m.path === pathname) || modules[0];
 
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    <div className={styles.moduleWrapper}>
       <button 
         onClick={() => setOpen(!open)}
-        className="flex-row items-center gap-2"
-        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        className={`flex-row items-center gap-2 ${styles.moduleBtn}`}
       >
-        <div style={{ 
-          width: 36, height: 36, borderRadius: 10, 
-          background: 'var(--bg-hover)', display: 'flex', 
-          alignItems: 'center', justifyContent: 'center', 
-          overflow: 'hidden', border: '1px solid var(--border-color)' 
-        }}>
-          <img src={activeModule.logo} alt={activeModule.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div className={styles.moduleIcon}>
+          <img src={activeModule.logo} alt={activeModule.name} />
         </div>
-        <div className="flex-col items-start hide-mobile" style={{ marginLeft: 4 }}>
-          <span className="logo-text" style={{ fontWeight: 900, fontSize: 17, letterSpacing: '-0.03em', lineHeight: 1, color: 'var(--text-primary)' }}>Synculariti</span>
-          <span style={{ 
-            fontSize: 9, 
-            fontWeight: 800,
-            padding: '2px 6px', 
-            marginTop: 4, 
-            borderRadius: 6,
-            background: 'var(--bg-secondary)', 
-            border: '1px solid var(--border-color)',
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em'
-          }}>
+        <div className={`flex-col items-start hide-mobile ${styles.moduleTextWrapper}`}>
+          <span className={styles.moduleBrand}>Synculariti</span>
+          <span className={styles.moduleBadge}>
             {activeModule.name}
           </span>
         </div>
@@ -234,25 +162,17 @@ function ModuleSwitcher() {
 
       {open && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 98 }} onClick={() => setOpen(false)} />
-          <div className="glass-card" style={{
-            position: 'absolute', top: 48, left: 0, 
-            borderRadius: 16, padding: 8, minWidth: 220,
-            boxShadow: 'var(--shadow-md)', zIndex: 99
-          }}>
-            <p className="card-subtitle" style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Switch Module</p>
+          <div className={styles.dropdownOverlay} onClick={() => setOpen(false)} />
+          <div className={`glass-card ${styles.moduleDropdown}`}>
+            <p className={styles.moduleSubtitle}>Switch Module</p>
             {modules.map(m => (
               <Link 
                 key={m.name} 
                 href={m.path} 
                 onClick={() => setOpen(false)}
-                className="flex-row items-center gap-3 module-item"
+                className={`flex-row items-center gap-3 ${styles.moduleItem}`}
                 style={{ 
-                  padding: '12px 14px', borderRadius: 12, 
-                  textDecoration: 'none', color: 'var(--text-primary)',
                   background: m.path === pathname ? 'var(--bg-hover)' : 'none',
-                  transition: 'all 0.2s ease',
-                  border: '1px solid transparent'
                 }}
                 onMouseOver={(e) => {
                   if (m.path !== pathname) {
@@ -267,12 +187,12 @@ function ModuleSwitcher() {
                   }
                 }}
               >
-                <div style={{ width: 34, height: 34, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
-                  <img src={m.logo} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div className={styles.moduleItemIcon}>
+                  <img src={m.logo} alt={m.name} />
                 </div>
                 <div className="flex-col">
-                  <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em' }}>{m.name}</span>
-                  <span className="card-subtitle" style={{ fontSize: 10, opacity: 0.8 }}>Synculariti : {m.name}</span>
+                  <span className={styles.moduleItemTitle}>{m.name}</span>
+                  <span className={styles.moduleItemDesc}>Synculariti : {m.name}</span>
                 </div>
               </Link>
             ))}
@@ -290,23 +210,16 @@ export function NavBar() {
     <nav className="navbar">
       <ModuleSwitcher />
 
-      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
-        <Suspense fallback={<div style={{ width: 100, height: 36, background: 'var(--bg-hover)', borderRadius: 12 }} />}>
+      <div className={styles.centerGroup}>
+        <Suspense fallback={<div className={styles.fallbackSelect} />}>
           <SwitcherGroup createdAt={tenant?.created_at} />
         </Suspense>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className={styles.rightGroup}>
         <Link 
           href="/ledger" 
-          className="hide-mobile"
-          style={{ 
-            color: 'var(--text-secondary)',
-            fontSize: 13,
-            fontWeight: 600,
-            padding: '8px 12px',
-            textDecoration: 'none'
-          }}
+          className={`hide-mobile ${styles.ledgerLink}`}
         >
           📊 Ledger
         </Link>

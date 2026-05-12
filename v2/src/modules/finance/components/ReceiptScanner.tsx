@@ -10,6 +10,7 @@ import { fetchWithRetry } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { extractUniversal, parseEkasaError } from '@/lib/ekasa-protocols';
+import styles from './ReceiptScanner.module.css';
 
 interface ReceiptItem {
   name: string;
@@ -223,8 +224,8 @@ export function ReceiptScanner({
   if (step === 'processing') {
     return (
       <BentoCard title={isSaving ? "Finalizing..." : "Processing Document"}>
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <div className="spinner" style={{ marginBottom: 16 }}></div>
+        <div className={styles.processingContainer}>
+          <div className={`spinner ${styles.spinner}`}></div>
           <p>{isSaving ? "Analyzing & Storing your record..." : "Running AI Document Triage & Extraction..."}</p>
         </div>
       </BentoCard>
@@ -234,10 +235,10 @@ export function ReceiptScanner({
   if (isSaving) {
     return (
       <BentoCard title="Saving Expense">
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <div className="spinner" style={{ marginBottom: 16 }}></div>
-          <p style={{ fontWeight: 600 }}>Analyzing & Storing...</p>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>This will only take a moment.</p>
+        <div className={styles.processingContainer}>
+          <div className={`spinner ${styles.spinner}`}></div>
+          <p className={styles.savingText}>Analyzing & Storing...</p>
+          <p className={styles.savingSubtext}>This will only take a moment.</p>
         </div>
       </BentoCard>
     );
@@ -247,26 +248,16 @@ export function ReceiptScanner({
     return (
       <BentoCard title={`Review: ${receipt.store}`}>
         <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>Date: {receipt.date}</p>
+          <p className={styles.reviewDate}>Date: {receipt.date}</p>
           
           <div style={{ marginTop: 12 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Who paid?</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <p className={styles.whoPaidLabel}>Who paid?</p>
+            <div className={styles.whoPaidContainer}>
               {Object.entries(names).map(([id, name]) => (
                 <button
                   key={id}
                   onClick={() => setPayerId(id)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 20,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: '1px solid var(--border-color)',
-                    background: payerId === id ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                    color: payerId === id ? 'var(--accent-primary-text)' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
+                  className={`${styles.payerBtn} ${payerId === id ? styles.payerBtnActive : styles.payerBtnInactive}`}
                 >
                   {name as string}
                 </button>
@@ -275,10 +266,10 @@ export function ReceiptScanner({
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 400, overflowY: 'auto', marginBottom: 20 }}>
+        <div className={styles.itemsContainer}>
           {receipt.items.map((item, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, borderBottom: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div key={i} className={styles.itemRow}>
+              <div className={styles.itemLeft}>
                 <input 
                   type="checkbox" 
                   checked={item.selected} 
@@ -289,7 +280,7 @@ export function ReceiptScanner({
                   }}
                 />
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{item.name}</div>
+                  <div className={styles.itemName}>{item.name}</div>
                   <select 
                     value={item.category} 
                     onChange={(e) => {
@@ -297,20 +288,7 @@ export function ReceiptScanner({
                       next[i].category = e.target.value;
                       setReceipt({ ...receipt, items: next });
                     }}
-                    style={{ 
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                      borderRadius: 20,
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-hover)',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      marginTop: 4,
-                      outline: 'none'
-                    }}
+                    className={styles.itemCategorySelect}
                   >
                     {categories.length > 0 ? (
                       categories.map((c: string) => <option key={c} value={c}>{c}</option>)
@@ -320,33 +298,23 @@ export function ReceiptScanner({
                   </select>
                 </div>
               </div>
-              <div style={{ fontWeight: 600 }}>€{item.amount.toFixed(2)}</div>
+              <div className={styles.itemAmount}>€{item.amount.toFixed(2)}</div>
             </div>
           ))}
         </div>
 
         {/* Global Add Category for Scanner Review */}
         {onAddCategory && (
-          <div style={{ marginBottom: 20, padding: 12, background: 'var(--bg-hover)', borderRadius: 12 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase' }}>Missing a category?</p>
-            <div style={{ display: 'flex', gap: 8 }}>
+          <div className={styles.missingCategoryContainer}>
+            <p className={styles.missingCategoryLabel}>Missing a category?</p>
+            <div className={styles.missingCategoryInputContainer}>
               <input 
                 id="scanner-new-cat"
                 placeholder="New category name..."
-                style={{ 
-                  flex: 1, 
-                  fontSize: 12, 
-                  padding: '6px 12px', 
-                  borderRadius: 8, 
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
+                className={styles.missingCategoryInput}
               />
               <button 
-                className="btn btn-primary"
-                style={{ height: 32, minHeight: 32, fontSize: 12, padding: '0 12px' }}
+                className={`btn btn-primary ${styles.missingCategoryBtn}`}
                 onClick={async () => {
                   const el = document.getElementById('scanner-new-cat') as HTMLInputElement;
                   if (el && el.value.trim()) {
@@ -361,20 +329,20 @@ export function ReceiptScanner({
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontWeight: 600 }}>Total selected:</span>
-          <span style={{ fontSize: 20, fontWeight: 700 }}>
+        <div className={styles.totalContainer}>
+          <span className={styles.totalLabel}>Total selected:</span>
+          <span className={styles.totalAmount}>
             €{receipt.items.filter(i => i.selected).reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div className={styles.actionButtons}>
           <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Confirm & Save'}
           </button>
           <button className="btn btn-secondary" onClick={() => setStep('scan')} disabled={isSaving}>Cancel</button>
         </div>
-        {error && <div style={{ color: 'var(--accent-danger)', marginTop: 16, fontSize: 13 }}>{error}</div>}
+        {error && <div className={styles.errorMessage}>{error}</div>}
       </BentoCard>
     );
   }
@@ -384,17 +352,17 @@ export function ReceiptScanner({
       {error && <div className="status-badge status-danger" style={{ marginBottom: 16, width: '100%', justifyContent: 'center', padding: 12 }}>{error}</div>}
       
       <div className="flex-col gap-4">
-        <div id="qr-reader" style={{ width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border-color)' }}></div>
+        <div id="qr-reader" className={styles.qrContainer}></div>
         
-        <div className="flex-row items-center gap-3">
-          <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
-          <span className="card-subtitle" style={{ fontSize: 10, fontWeight: 800 }}>OR SCAN INVOICE</span>
-          <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+        <div className={styles.dividerContainer}>
+          <div className={styles.dividerLine} />
+          <span className={styles.dividerText}>OR SCAN INVOICE</span>
+          <div className={styles.dividerLine} />
         </div>
 
-        <label className="btn btn-primary flex-center gap-2" style={{ cursor: 'pointer', padding: '16px' }}>
-          <span style={{ fontSize: 20 }}>📷</span>
-          <span style={{ fontWeight: 700 }}>Capture B2B Invoice</span>
+        <label className={`btn btn-primary flex-center gap-2 ${styles.captureLabel}`}>
+          <span className={styles.captureIcon}>📷</span>
+          <span className={styles.captureText}>Capture B2B Invoice</span>
           <input 
             type="file" 
             accept="image/*" 
@@ -404,7 +372,7 @@ export function ReceiptScanner({
           />
         </label>
 
-        <p style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+        <p className={styles.helpText}>
           Point camera at an **eKasa QR** code for instant deterministic sync, <br />
           or **capture a full invoice** for AI-powered multi-stage extraction.
         </p>

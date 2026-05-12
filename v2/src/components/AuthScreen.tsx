@@ -44,7 +44,7 @@ export function AuthScreen({ session }: { session: Session | null }) {
       if (!lookupData || lookupData.length === 0) throw new Error("Invalid access code.");
       
       const tenantId = lookupData[0].target_id;
-      const { error: linkErr } = await supabase.from('app_users').upsert({ id: session.user.id, tenant_id: tenantId });
+      const { error: linkErr } = await supabase.rpc('upsert_app_user_v1', { p_tenant_id: tenantId });
       if (linkErr) throw linkErr;
       
       window.location.reload();

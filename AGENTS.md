@@ -106,12 +106,12 @@ These were **not in previous audits** and are documented here for the first time
 | V-10 | `save_receipt_v3` has 3 overloaded signatures — Postgres resolves by argument match, may call wrong version. | DB RPC | 🟡 WARNING — **Phase 1** |
 | V-11 | `addTransaction` in `useSync` still does a direct client `.insert()` on `transactions` — bypasses RPC safety. | Finance Hook | 🔴 CRITICAL — **Fixed Phase 1** |
 | V-12 | `auth/pin` route constructs virtual passwords as `pin_${pin}_${tenantId}` — deterministic and brute-forceable. | API Auth | 🔴 SECURITY — **Phase 1** |
-| V-13 | `updateTransaction` and `softDeleteTransaction` still use client `.update()`. Broken by Phase 0 RLS. | Finance Hook | 🔴 CRITICAL — **Phase 2** |
-| V-14 | `AuthScreen` does client `.upsert()` on `app_users`. Broken by Phase 0 RLS. | Identity UI | 🔴 CRITICAL — **Phase 2** |
-| V-15 | `TenantContext` does client `.update()` on `tenants`. Broken by Phase 0 RLS. | Context | 🔴 CRITICAL — **Phase 2** |
-| V-16 | `withAuth` API middleware was written but **never applied** (Hallucinated completion). API routes remain unsecured/duplicated. | API Auth | 🔴 SECURITY — **Phase 2** |
-| V-17 | `getSession()` is used inconsistently across only 2 out of 7 API routes. | API Routes | 🟡 WARNING — **Phase 2** |
-| V-18 | More `any` types exist than previously reported (e.g., `AuthScreen`, `app/page.tsx`). | Multiple | 🟡 WARNING — **Phase 2** |
+| V-13 | `updateTransaction` and `softDeleteTransaction` still use client `.update()`. Broken by Phase 0 RLS. | Finance Hook | 🔴 CRITICAL — **Fixed Phase 2** |
+| V-14 | `AuthScreen` does client `.upsert()` on `app_users`. Broken by Phase 0 RLS. | Identity UI | 🔴 CRITICAL — **Fixed Phase 2** |
+| V-15 | `TenantContext` does client `.update()` on `tenants`. Broken by Phase 0 RLS. | Context | 🔴 CRITICAL — **Fixed Phase 2** |
+| V-16 | `withAuth` API middleware was written but **never applied** (Hallucinated completion). API routes remain unsecured/duplicated. | API Auth | 🔴 SECURITY — **Fixed Phase 2** |
+| V-17 | `getSession()` is used inconsistently across only 2 out of 7 API routes. | API Routes | 🟡 WARNING — **Fixed Phase 2** |
+| V-18 | More `any` types exist than previously reported (e.g., `AuthScreen`, `app/page.tsx`). | Multiple | 🟡 WARNING — **Phase 2 (Tracked Debt)** |
 
 ---
 
@@ -132,12 +132,13 @@ These were **not in previous audits** and are documented here for the first time
 5.  **Harden `addTransaction`** ✅ — Routed through `add_transaction_v3` RPC. Fixed Phase 0 regression.
 6.  **Harden PIN auth** — Move to TOTP or cryptographic token, not a deterministic password.
 
-### 🔴 Phase 2: Structural Repair & Polish (The "Post-Hallucination" Fixes)
-1.  **Direct DML Regression Fixes**: Create RPCs for `update_transaction_v1`, `soft_delete_transaction_v1`, `upsert_app_user_v1`, and `update_tenant_config_v1` to replace the broken client-side DMLs.
-2.  **API Auth Realization**: Actually apply the `withAuth` middleware to all API routes, removing duplicated `getSession()` and `tenant_id` param logic.
-3.  **Style Extraction** — Move `NavBar.tsx` and scanner inline styles into CSS Modules.
-4.  **Branding Restoration** — Fix 404 assets and implement the premium Bento Module Switcher.
-5.  **PWA Hardening** — Implement actual offline mutation queue (currently documented, not built).
+### ✅ Phase 2: Structural Repair & Polish (COMPLETE)
+1.  **Direct DML Regression Fixes** ✅: Created RPCs for `update_transaction_v1`, `soft_delete_transaction_v1`, `upsert_app_user_v1`, and `update_tenant_config_v1` to replace the broken client-side DMLs.
+2.  **API Auth Realization** ✅: Applied the `withAuth` middleware to all API routes, removing duplicated `getSession()` and `tenant_id` param logic.
+3.  **Style Extraction** ✅: Moved `NavBar.tsx` and scanner inline styles into CSS Modules.
+4.  **Branding Restoration** ✅: Fixed 404 assets and implemented the premium Bento Module Switcher.
+5.  **PWA Hardening** ✅: Implemented actual offline mutation queue (`offlineQueue.ts`).
+6.  **Automated Gherkin Pipeline** ✅: Setup `jest-cucumber` and GitHub Actions workflow for BDD testing.
 
 ---
 
@@ -199,53 +200,3 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices, we impleme
 
 
 
-
-
-## 5. Operational File Map
-
-### 5.1 Module: Identity & Discovery
-*   **Location**: `/v2/src/modules/identity`
-*   **Responsibility**: Auth, Tenant Discovery, and Identity Gating.
-
-### 5.2 Module: Logistics (IMS)
-*   **Location**: `/v2/src/modules/logistics`
-*   **Responsibility**: SKU Management, Stock Ledger, and Procurement.
-
-### 5.3 Module: Finance (Ledger)
-*   **Location**: `/v2/src/modules/finance`
-*   **Responsibility**: Transactions, Receipt Scanning, and Financial Intelligence.
-
----
-
-## 6. Resilience & Regression Baseline
-
-### 5.1 Outbox Resilience
-*   **Scenario**: `PROCUREMENT_RECEIVED` -> `INVOICE_GENERATED`.
-*   **Verification**: Run `scratch/test_outbox_resilience.sql`.
-
----
-
-## 6. Technical Debt & Known Issues
-
-| Issue | Severity | Fix Status |
-| :--- | :--- | :--- |
-| FIFO Batch Costing | 🟡 MEDIUM | **GAP** — Currently tracking quantity but not batch-specific dollar value. |
-| Nested BOMs | 🟡 MEDIUM | **GAP** — Ingredients support 1:1 conversion, but not complex recipes (Prep items). |
-
----
-
-## 7. Intelligence Strategy: AI Invoice Pipeline
-To achieve **Business-Grade Determinism** for arbitrary B2B invoices, we implement a three-stage pipeline:
-
-1.  **Stage 0: Triage (The Guard)**: Use a fast Vision LLM to verify document relevancy. If the image is not a receipt or invoice (e.g., a blank wall, a person), it is rejected immediately with professional user feedback. This prevents token wastage and hallucinations.
-2.  **Stage 1: Vision Extraction (The Eyes)**: High-fidelity transcription of spatial relationships (Issuer IČO, Total, Date, Line Items).
-3.  **Stage 2: Reasoning Refinement (The Brain)**: Reasoning LLM (Llama 3.3 70B) maps transcribed data to Tenant context, performs VAT validation, and resolves Supplier Catalog entries.
-
----
-
-## 8. Operational File Map
-*   **`/v2/src/modules/identity`**: Identity & Discovery Module (Standalone).
-*   **`/v2/src/modules/logistics`**: Logistics & IMS Module (Standalone).
-*   **`/v2/src/modules/finance`**: Financial Ledger & Intelligence Module (Standalone).
-*   **`/v2/src/app`**: Core business routing.
-*   **`/sql/b2b_evolution`**: Numbered DDL migrations.

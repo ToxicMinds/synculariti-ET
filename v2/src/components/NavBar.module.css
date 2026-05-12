@@ -1,0 +1,260 @@
+.themeToggle {
+  padding: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 16px;
+}
+
+.selectGroup {
+  display: flex;
+  align-items: center;
+}
+
+.monthSelect {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  width: auto;
+}
+
+.monthOption {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.profileWrapper {
+  position: relative;
+}
+
+.avatarBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.dropdownOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+}
+
+.profileDropdown {
+  position: absolute;
+  right: 0;
+  top: 48px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 8px;
+  min-width: 180px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  z-index: 99;
+}
+
+.profileHeader {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.profileRole {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.profileName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.menuItem {
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: left;
+  display: block;
+  font-family: inherit;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+
+.menuItem:hover {
+  background: var(--bg-hover);
+}
+
+.logoutBtn {
+  color: var(--accent-danger);
+}
+
+.logoutWrapper {
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.moduleWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.moduleBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.moduleIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.moduleIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.moduleTextWrapper {
+  margin-left: 4px;
+}
+
+.moduleBrand {
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.moduleBadge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  margin-top: 4px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: inline-block;
+}
+
+.moduleDropdown {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  border-radius: 16px;
+  padding: 8px;
+  min-width: 220px;
+  box-shadow: var(--shadow-md);
+  z-index: 99;
+}
+
+.moduleSubtitle {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.moduleItem {
+  padding: 12px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.moduleItemIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.moduleItemIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.moduleItemTitle {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.moduleItemDesc {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.centerGroup {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.fallbackSelect {
+  width: 100px;
+  height: 36px;
+  background: var(--bg-hover);
+  border-radius: 12px;
+}
+
+.rightGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ledgerLink {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.ledgerLink:hover {
+  color: var(--text-primary);
+}

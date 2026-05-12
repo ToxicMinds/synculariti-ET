@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { Logger } from './logger';
 
 /**
  * Executes a fetch request with exponential backoff retries.
@@ -7,14 +8,14 @@ export async function fetchWithRetry(url: string, options: RequestInit = {}, ret
   try {
     const response = await fetch(url, options);
     if (!response.ok && retries > 0 && response.status >= 500) {
-      console.warn(`Fetch failed (${response.status}), retrying in ${backoff}ms...`);
+      Logger.system('WARN', 'Utils', `Fetch failed (${response.status}), retrying in ${backoff}ms...`, { url });
       await new Promise(res => setTimeout(res, backoff));
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }
     return response;
   } catch (error) {
     if (retries > 0) {
-      console.warn(`Fetch threw error, retrying in ${backoff}ms...`, error);
+      Logger.system('WARN', 'Utils', `Fetch threw error, retrying in ${backoff}ms...`, { url, error });
       await new Promise(res => setTimeout(res, backoff));
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }

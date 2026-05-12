@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import { withAuth } from '@/lib/withAuth';
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req, { tenantId }) => {
   const { spent, budget, daysElapsed, daysInMonth, history } = await req.json();
   
   try {
@@ -42,4 +43,4 @@ export async function POST(req: Request) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
-}
+});

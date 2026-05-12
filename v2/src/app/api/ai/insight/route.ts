@@ -2,23 +2,10 @@ import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
 import { createClient } from '@/lib/supabase-server';
+import { withAuth } from '@/lib/withAuth';
 
-export async function GET() {
+export const GET = withAuth(async (req, { tenantId }) => {
   const supabase = await createClient();
-  
-  // 1. Verify Authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // 2. Resolve Tenant ID (Server-Side Secure)
-  // We call our hardened RPC to get the memoized tenant ID
-  const { data: tenantId, error: hError } = await supabase.rpc('get_my_tenant');
-  
-  if (hError || !tenantId) {
-    return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
-  }
 
   const driver = getNeo4jDriver();
   if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
@@ -135,4 +122,4 @@ export async function GET() {
   } finally {
     await session.close();
   }
-}
+});

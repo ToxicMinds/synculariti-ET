@@ -1,4 +1,5 @@
 import neo4j, { Driver } from 'neo4j-driver';
+import { Logger } from './logger';
 
 let driver: Driver | null = null;
 
@@ -10,7 +11,7 @@ export function getNeo4jDriver() {
   const password = process.env.NEO4J_PASSWORD || '';
 
   if (!uri || !username || !password) {
-    console.warn('Neo4j credentials missing. Graph features will be disabled.');
+    Logger.system('WARN', 'Neo4j', 'Neo4j credentials missing. Graph features will be disabled.');
     return null;
   }
 

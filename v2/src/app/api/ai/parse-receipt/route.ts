@@ -1,21 +1,14 @@
 import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { Groq } from 'groq-sdk';
-import { createClient } from '@/lib/supabase-server';
 import { parseEkasaMetadata } from '@/lib/ekasa-parser';
+import { withAuth } from '@/lib/withAuth';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  
-  // 1. Verify Authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = withAuth(async (req: Request, { tenantId }) => {
 
   try {
     const { ekasaData, categories } = await req.json();
@@ -97,4 +90,4 @@ export async function POST(req: Request) {
     ServerLogger.system('ERROR', 'AI', 'Receipt AI parse error', { error: String(error) });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+});

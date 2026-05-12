@@ -3,6 +3,8 @@ import { Transaction } from '../lib/finance';
 import { normalizeAndLinkMerchant } from '@/lib/neo4j';
 import { Logger } from '@/lib/logger';
 import { useTenantContext } from '@/context/TenantContext';
+import { OfflineQueue, QueuedMutation } from '@/lib/offlineQueue';
+import { useEffect } from 'react';
 
 export interface ReceiptItem {
   name: string;
@@ -28,6 +30,35 @@ export interface ReceiptData {
  */
 export function useSync(tenantId: string | undefined) {
   const { triggerRefresh } = useTenantContext();
+
+  // Auto-flush queue when coming back online
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleOnline = async () => {
+      const q = OfflineQueue.getQueue();
+      if (q.length === 0) return;
+      
+      Logger.system('INFO', 'OfflineQueue', `Flushing ${q.length} queued mutations`, undefined, tenantId);
+      
+      for (const item of q) {
+        try {
+          if (item.type === 'ADD_TRANSACTION') {
+            await addTransaction(item.payload);
+          } else if (item.type === 'SAVE_RECEIPT') {
+            await saveReceipt(item.payload.receipt, item.payload.whoId, item.payload.whoName, item.payload.locationId, item.payload.currency);
+          }
+          OfflineQueue.dequeue(item.id);
+        } catch (e) {
+          OfflineQueue.incrementRetry(item.id);
+          Logger.system('ERROR', 'OfflineQueue', `Failed to flush item ${item.id}`, { error: e });
+        }
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [tenantId]);
   
   /**
    * addTransaction: Routes through add_transaction_v3 RPC (SECURITY DEFINER).
@@ -36,6 +67,12 @@ export function useSync(tenantId: string | undefined) {
    */
   const addTransaction = async (transaction: Partial<Transaction> | Partial<Transaction>[]) => {
     if (!tenantId) return;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      OfflineQueue.enqueue('ADD_TRANSACTION', transaction);
+      triggerRefresh();
+      return;
+    }
 
     const normalize = (t: Partial<Transaction> & { merchant?: string }) => {
       const { merchant, ...rest } = t;
@@ -74,6 +111,12 @@ export function useSync(tenantId: string | undefined) {
 
     const selectedItems = receipt.items.filter(i => i.selected);
     if (selectedItems.length === 0) throw new Error('No items selected');
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      OfflineQueue.enqueue('SAVE_RECEIPT', { receipt, whoId, whoName, locationId, currency });
+      triggerRefresh();
+      return;
+    }
 
     const catCounts: Record<string, number> = {};
     selectedItems.forEach(i => catCounts[i.category] = (catCounts[i.category] || 0) + 1);
@@ -146,21 +189,12 @@ export function useSync(tenantId: string | undefined) {
     throw lastError;
   };
 
-  // NOTE V-13: softDeleteTransaction still does a direct .update() on transactions.
-  // Phase 0 revoked UPDATE from authenticated — this is now broken.
-  // Needs a soft_delete_transaction_v1 RPC in Phase 2.
-  // TEMPORARY: Using service-role-equivalent via the existing RLS policy which
-  // allows UPDATE on is_deleted only via a specific policy (if one exists).
   const softDeleteTransaction = async (id: string) => {
     if (!tenantId) return;
-    const { error } = await supabase
-      .from('transactions')
-      .update({ is_deleted: true })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
+    const { error } = await supabase.rpc('soft_delete_transaction_v1', { p_id: id });
 
     if (error) {
-      Logger.system('ERROR', 'Sync', 'softDeleteTransaction failed — may need RPC wrapper (V-13)', { id, error }, tenantId);
+      Logger.system('ERROR', 'Sync', 'softDeleteTransaction failed', { id, error }, tenantId);
       throw error;
     }
 
@@ -171,12 +205,12 @@ export function useSync(tenantId: string | undefined) {
   const updateTransaction = async (id: string, transaction: Partial<Transaction> & { merchant?: string }) => {
     if (!tenantId) return;
 
-    const { merchant, ...pureTransaction } = transaction;
+    const { merchant, id: _id, created_at, updated_at, tenant_id: _t, ...pureTransaction } = transaction as any;
 
-    const { error } = await supabase
-      .from('transactions')
-      .update({ ...pureTransaction, tenant_id: tenantId })
-      .eq('id', id);
+    const { error } = await supabase.rpc('update_transaction_v1', {
+      p_id: id,
+      p_transaction: pureTransaction
+    });
 
     if (error) throw error;
 

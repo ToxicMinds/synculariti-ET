@@ -130,10 +130,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       categories: updates.categories || tenant.categories
     };
 
-    const { error } = await supabase
-      .from('tenants')
-      .update({ config: newConfig })
-      .eq('id', tenant.tenant_id);
+    const { error } = await supabase.rpc('update_tenant_config_v1', { p_config: newConfig });
 
     if (error) throw error;
     setTenant({ ...tenant, ...updates });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { withAuth } from '@/lib/withAuth';
 
 /**
  * GET /api/export
@@ -9,14 +10,8 @@ import { createClient } from '@/lib/supabase-server';
  * authenticated session via get_my_tenant() — never from URL params.
  * Fixes: table renamed 'expenses' -> 'transactions', removed auth bypass.
  */
-export async function GET(req: Request) {
+export const GET = withAuth(async (req, { tenantId }) => {
   const supabase = await createClient();
-
-  // Verify session — reject unauthenticated callers
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
   const { searchParams } = new URL(req.url);
   const format = searchParams.get('format') || 'csv';
@@ -45,4 +40,4 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({ transactions });
-}
+});

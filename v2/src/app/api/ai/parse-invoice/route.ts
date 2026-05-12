@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
-import { createClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
+import { withAuth } from '@/lib/withAuth';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -11,13 +11,10 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
  * Stage 1: Extraction (High-fidelity spatial transcription)
  * Stage 2: Reasoning (Category mapping & VAT validation)
  */
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req: Request, { tenantId }) => {
   try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { image, tenantId, categories } = await req.json();
+    const { image, categories } = await req.json();
     if (!image) return NextResponse.json({ error: 'No image provided' }, { status: 400 });
 
     // --- STAGE 0: TRIAGE ---
@@ -84,7 +81,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
-    ServerServerLogger.system('ERROR', 'AI', 'Invoice AI parse error', { error: String(err) });
+    ServerLogger.system('ERROR', 'AI', 'Invoice AI parse error', { error: String(err) });
     return NextResponse.json({ error: 'Failed to process invoice' }, { status: 500 });
   }
-}
+});

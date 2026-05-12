@@ -1,15 +1,8 @@
 import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { withAuth } from '@/lib/withAuth';
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  
-  // 1. Verify Authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = withAuth(async (req: Request, { tenantId }) => {
 
   try {
     const { text, categories } = await req.json();
@@ -72,4 +65,4 @@ Only output the JSON object.`
     ServerLogger.system('ERROR', 'AI', 'Statement AI error', { error: String(e) });
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
-}
+});

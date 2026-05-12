@@ -1,5 +1,6 @@
 import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/withAuth';
 
 /**
  * eKasa Regional Proxy (Next.js API Route)
@@ -9,19 +10,10 @@ import { NextResponse } from 'next/server';
  * 
  * Regionality: Slovak Gov API blocks US IPs. We pin this to 'fra1' (Frankfurt).
  */
-import { createClient } from '@/lib/supabase-server';
-
 export const preferredRegion = 'cdg1';
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
-  const supabase = await createClient();
-  
-  // 1. Verify Authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export const POST = withAuth(async (request: Request, { tenantId }) => {
 
   try {
     const { receiptId, okpData } = await request.json();
@@ -70,4 +62,4 @@ export async function POST(request: Request) {
     ServerLogger.system('ERROR', 'eKasa', 'eKasa proxy exception', { error: String(error) });
     return NextResponse.json({ error: 'Proxy failed to reach eKasa', detail: error.message }, { status: 500 });
   }
-}
+});
