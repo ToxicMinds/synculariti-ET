@@ -11,33 +11,28 @@ Any time a schema, RLS policy, RPC function, or trigger needs to change.
 ## Migration File Location
 ```
 /home/nik/synculariti-ET/sql/b2b_evolution/
-├── 00_base_schema.sql       ← Core tables (tenants, app_users, expenses)
-├── 01_locations.sql         ← B2B location primitives
-├── 02_expenses_update.sql   ← Expense table B2B columns (location_id, currency)
-└── 03_code_db_handshake.sql ← get_tenant_bundle RPC
+├── 00_base_schema.sql       ← Legacy (Referential only)
+├── 05_tenant_rename.sql     ← Terminal point for terminology (B2B SaaS)
+└── NN_description.sql       ← Your new migration
 ```
 
-## Naming Convention for New Files
+## Naming Convention
 Format: `NN_description_snake_case.sql`  
-Example: `04_add_supplier_table.sql`
-
-Always increment the number prefix to preserve execution order.
+Example: `06_add_supplier_catalog.sql`
 
 ## Pre-Migration Checklist
-Before writing any SQL:
-- [ ] Does this table need `FORCE ROW LEVEL SECURITY`? (Answer: **YES, always**)
+- [ ] Does this table need `FORCE ROW LEVEL SECURITY`? (**YES**)
 - [ ] Does every policy use `get_my_tenant()` for isolation?
-- [ ] Are you adding a column to `expenses`? Check `save_receipt_v3` signature still matches.
-- [ ] Does this break the `get_tenant_bundle` RPC return shape?
+- [ ] Are you adding a column to `expenses`? Check `save_receipt_v3` signature.
 - [ ] Does the new table need an `activity_log` trigger?
 
 ## Mandatory Table Template
 ```sql
 CREATE TABLE public.your_table (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id  UUID NOT NULL REFERENCES public.app_state(id) ON DELETE CASCADE,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  -- your columns here
+  tenant_id     UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  -- columns...
 );
 
 ALTER TABLE public.your_table ENABLE ROW LEVEL SECURITY;
@@ -47,41 +42,22 @@ CREATE POLICY "Tenant isolation" ON public.your_table
   USING (tenant_id = public.get_my_tenant());
 ```
 
-## RPC Dual-Layer Security Template
-Any RPC that mutates financial data MUST include both checks:
+## Outbox Pattern (Asynchronous Resilience)
+If this table needs to trigger an action in another module (e.g. Finance), use the **Outbox Pattern**:
 ```sql
--- SECURITY CHECK 1: Tenant Mismatch
-IF (p_expense->>'tenant_id')::UUID != v_session_h_id THEN
-  RAISE EXCEPTION 'Security Violation: Tenant Mismatch.';
-END IF;
-
--- SECURITY CHECK 2: Location Ownership (if location_id is involved)
-IF v_loc_id IS NOT NULL THEN
-  IF NOT EXISTS (
-    SELECT 1 FROM public.locations 
-    WHERE id = v_loc_id AND tenant_id = v_session_h_id
-  ) THEN
-    RAISE EXCEPTION 'Security Violation: Location Ownership Mismatch.';
-  END IF;
-END IF;
+INSERT INTO public.outbox_events (tenant_id, event_type, payload)
+VALUES (v_tenant_id, 'PO_RECEIVED', jsonb_build_object('id', v_po_id));
 ```
 
-## Canonical RPCs — Do Not Rename or Drop
-| RPC | Purpose | Status |
-|-----|---------|--------|
-| `get_tenant_bundle` | Platinum Handshake — frontend init | CANONICAL |
-| `save_receipt_v3` | All financial write mutations | CANONICAL |
-| `get_my_tenant()` | Helper — returns `tenant_id` from JWT | CANONICAL |
-| `save_receipt_v2` | Deprecated — tenant era, no location/currency | DEPRECATED |
-
-## How to Apply a Migration
-1. Write the SQL in a new numbered file under `/sql/b2b_evolution/`
-2. Use the Supabase MCP `apply_migration` tool OR paste into Supabase SQL Editor
-3. Run `get_advisors` (security type) after every DDL change to catch missing RLS
-4. Commit the `.sql` file with scope `schema`: `chore(schema): add supplier table`
+## Canonical RPCs
+| RPC | Purpose |
+|-----|---------|
+| `get_tenant_bundle` | Platinum Handshake — frontend init |
+| `save_receipt_v3` | Financial write mutations (Location + Currency) |
+| `get_my_tenant()` | Helper — returns `tenant_id` from JWT |
+| `create_organization` | Bootstrap new B2B tenant |
 
 ## What NOT to Do
-- **Never** `DROP TABLE` without a backup confirmation from the user.
-- **Never** alter `expenses` columns without verifying `save_receipt_v3` still compiles.
-- **Never** remove `FORCE ROW LEVEL SECURITY` — it's a hard architectural rule.
-- **Never** hardcode `tenant_id` values in migrations — use `get_my_tenant()`.
+- ❌ **Never** use `household_id`. It is deprecated. Use `tenant_id`.
+- ❌ **Never** insert directly into `invoices` if the data comes from `Logistics`. Use the Outbox.
+- ❌ **Never** bypass RLS policies.
