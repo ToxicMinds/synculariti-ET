@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 
 export function AIInsights({
   tenantId,

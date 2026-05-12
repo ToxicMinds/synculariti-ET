@@ -1,8 +1,8 @@
 'use client';
 
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 import { Line } from 'react-chartjs-2';
-import { Transaction } from '@/lib/finance';
+import { Transaction } from '../lib/finance';
 import {
   Chart as ChartJS,
   CategoryScale,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 
 interface AggregatedItem {
   name: string;

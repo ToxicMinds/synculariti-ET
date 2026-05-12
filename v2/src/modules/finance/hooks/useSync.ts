@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Transaction } from '@/lib/finance';
+import { Transaction } from '../lib/finance';
 import { normalizeAndLinkMerchant } from '@/lib/neo4j';
 import { Logger } from '@/lib/logger';
 import { useTenantContext } from '@/context/TenantContext';

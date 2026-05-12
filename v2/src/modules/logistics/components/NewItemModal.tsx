@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { InventoryCategory } from '@/types/logistics';
+import { InventoryCategory } from '../types';
 
 export function NewItemModal({ 
   categories, 

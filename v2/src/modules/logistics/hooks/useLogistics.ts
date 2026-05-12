@@ -5,7 +5,7 @@ import {
   InventoryCategory, 
   PurchaseOrder, 
   CurrentInventory 
-} from '@/types/logistics';
+} from '../types';
 import { Logger } from '@/lib/logger';
 
 /**

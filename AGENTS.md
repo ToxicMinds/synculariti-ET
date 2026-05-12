@@ -75,26 +75,42 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | Principle | Status | Implementation Detail |
 | :--- | :--- | :--- |
-| **DRY** | 🟢 **Platinum** | Identity logic centralized in `modules/identity`. Unified validation for staff invitations and tenant joining. No logic duplication in UI. |
-| **ACID** | 🔵 **Hardened** | Cross-module mutations use the **Postgres Outbox Pattern**. `Logistics` updates and `Finance` signals are wrapped in a single Postgres transaction. |
-| **SOLID** | 🟢 **Platinum** | Module-based architecture. Identity logic is physically and logically decoupled from the App Router business logic. |
-| **Security** | 💎 **Hardened** | **Force RLS** on every table. Tenant isolation is enforced at the DB level via `get_my_tenant()`, preventing cross-tenant data leaks. |
-| **ACID (Ledger)** | 💎 **Platinum** | Inventory state is derived, not stored. This eliminates "Stock Drift" between different parts of the system. |
+| **DRY** | 🟢 **Platinum** | Logic centralized in `modules/identity`, `modules/logistics`, and `modules/finance`. No cross-domain logic duplication. |
+| **ACID** | 💎 **Platinum** | **Logistics**: Append-only ledger for stock. **Finance**: Atomic RPCs (`save_receipt_v3`) for multi-table transactions. |
+| **SOLID** | 🟢 **Platinum** | Domain isolation via Physical Decoupling. Hooks are split by responsibility (e.g., Read vs Write in Finance). |
+| **Security** | 💎 **Hardened** | **Force RLS** on every table. Tenant isolation enforced via `get_my_tenant()` at the DB level. |
 
 ---
 
 ## 4. Architecture Standards (The "Platinum" Rules)
 
-### 4.1 Standalone Identity
-*   **Rule**: The App must be wrapped in `IdentityGate`. No business logic should run until `tenant_id` is resolved.
+### 4.1 Modular "Shared-Nothing" Isolation
+*   **Rule**: The App is divided into three core modules: `Identity`, `Logistics`, and `Finance`.
+*   **Encapsulation**: Each module must own its own hooks, components, and domain-specific types.
+*   **Communication**: Modules must not have circular dependencies. Shared UI components reside in `@/components`.
 
-### 4.2 Tenant Separation & RLS
-*   **Standard**: Every table MUST have `FORCE ROW LEVEL SECURITY`.
-*   **Isolation**: All policies must use the memoized `get_my_tenant()` helper.
+### 4.2 Standalone Identity
+*   **Rule**: The App must be wrapped in `IdentityGate`. No business logic should run until `tenant_id` is resolved.
 
 ---
 
-## 5. Resilience & Regression Baseline
+## 5. Operational File Map
+
+### 5.1 Module: Identity & Discovery
+*   **Location**: `/v2/src/modules/identity`
+*   **Responsibility**: Auth, Tenant Discovery, and Identity Gating.
+
+### 5.2 Module: Logistics (IMS)
+*   **Location**: `/v2/src/modules/logistics`
+*   **Responsibility**: SKU Management, Stock Ledger, and Procurement.
+
+### 5.3 Module: Finance (Ledger)
+*   **Location**: `/v2/src/modules/finance`
+*   **Responsibility**: Transactions, Receipt Scanning, and Financial Intelligence.
+
+---
+
+## 6. Resilience & Regression Baseline
 
 ### 5.1 Outbox Resilience
 *   **Scenario**: `PROCUREMENT_RECEIVED` -> `INVOICE_GENERATED`.

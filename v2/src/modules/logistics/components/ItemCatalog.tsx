@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { BentoCard } from './BentoCard';
-import { InventoryItem, InventoryCategory } from '@/types/logistics';
+import { BentoCard } from '@/components/BentoCard';
+import { InventoryItem, InventoryCategory } from '../types';
 
 export function ItemCatalog({ items, categories, onAddItem }: { 
   items: InventoryItem[], 

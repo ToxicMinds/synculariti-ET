@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Transaction } from '@/lib/finance';
+import { Transaction } from '../lib/finance';
 import { useTenantContext } from '@/context/TenantContext';
 
 /**

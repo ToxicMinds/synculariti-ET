@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import { Transaction } from '@/lib/finance';
-import { CategoryPill } from './CategoryPill';
+import { Transaction } from '../lib/finance';
+import { CategoryPill } from '@/components/CategoryPill';
 
 type ViewMode = 'list' | 'calendar';
 

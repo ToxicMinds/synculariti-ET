@@ -1,6 +1,6 @@
 'use client';
 
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 
 import { CATEGORY_ICONS } from '@/lib/constants';
 

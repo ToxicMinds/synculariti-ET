@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 
 export function BudgetHealth({ spent, totalBudget, colSpan = 4 }: { spent: number, totalBudget: number, colSpan?: number }) {
   const [forecast, setForecast] = useState<string | null>(null);

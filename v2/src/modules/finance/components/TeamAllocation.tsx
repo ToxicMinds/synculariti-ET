@@ -1,6 +1,6 @@
 'use client';
 
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 import { Transaction, calcPerUserSpend } from '@/lib/finance';
 
 export function TeamAllocation({ transactions, names, colSpan = 4 }: { transactions: Transaction[], names: Record<string, string>, colSpan?: number }) {

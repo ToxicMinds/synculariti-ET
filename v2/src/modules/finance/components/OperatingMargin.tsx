@@ -1,6 +1,6 @@
 'use client';
 
-import { BentoCard } from './BentoCard';
+import { BentoCard } from '@/components/BentoCard';
 
 export function OperatingMargin({ income, spent, goal }: { income: number, spent: number, goal: number }) {
   const retainedEarnings = income - spent;

@@ -1,12 +1,12 @@
 'use client';
 
 import { useTenant } from '@/hooks/useTenant';
-import { useLogistics } from '@/hooks/useLogistics';
+import { useLogistics } from '@/modules/logistics/hooks/useLogistics';
 import { BentoCard } from '@/components/BentoCard';
 import { AuthScreen } from '@/components/AuthScreen';
 import { Suspense, useState } from 'react';
-import { ItemCatalog } from '@/components/ItemCatalog';
-import { NewItemModal } from '@/components/NewItemModal';
+import { ItemCatalog } from '@/modules/logistics/components/ItemCatalog';
+import { NewItemModal } from '@/modules/logistics/components/NewItemModal';
 
 function LogisticsDashboard() {
   const { session, tenant, loading: hLoading } = useTenant();

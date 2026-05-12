@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { labelStyle, inputStyle } from './formStyles';
 import { Expense } from '@/lib/finance';
-import { CategorySelector } from './CategorySelector';
+import { CategorySelector } from '@/components/CategorySelector';
 
 interface ManualEntryProps {
   prefill?: Partial<Expense> & { merchant?: string };

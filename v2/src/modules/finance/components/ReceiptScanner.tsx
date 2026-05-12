@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { BentoCard } from './BentoCard';
-import { CategorySelector } from './CategorySelector';
-import { CategoryPill } from './CategoryPill';
+import { BentoCard } from '@/components/BentoCard';
+import { CategorySelector } from '@/components/CategorySelector';
+import { CategoryPill } from '@/components/CategoryPill';
 
 import { fetchWithRetry } from '@/lib/utils';
 import { Logger } from '@/lib/logger';

@@ -1,7 +1,7 @@
 'use client';
 
-import { BentoCard } from './BentoCard';
-import { Transaction } from '@/lib/finance';
+import { BentoCard } from '@/components/BentoCard';
+import { Transaction } from '../lib/finance';
 
 export function MonthlyPerformance({ 
   transactions, 
