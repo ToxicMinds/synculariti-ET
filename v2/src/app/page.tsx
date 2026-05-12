@@ -177,6 +177,7 @@ function DashboardContent() {
               dataHash={transactions.length + '_' + totals.spent.toFixed(0)}
               updateState={updateState} 
               tenant={tenant} 
+              isDemo={isDemo}
             />
 
             {/* ROW 5: TRENDS & CONTEXT */}
@@ -196,7 +197,7 @@ function DashboardContent() {
               <div style={{ marginTop: 20 }}><DailyTrend transactions={displayTransactions} /></div>
             </BentoCard>
 
-            <MarketTrends transactions={transactions} selectedMonth={selectedMonth} colSpan={8} />
+            <MarketTrends transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} isDemo={isDemo} />
 
             {/* ROW 6: LIST & BREAKDOWN */}
             <BentoCard colSpan={8} rowSpan={2} title="All Transactions">
@@ -215,7 +216,7 @@ function DashboardContent() {
 
             {/* ROW 7: DEEP ANALYTICS */}
             <BentoCard colSpan={12} title="Top Items (Deep Analytics)">
-              <ItemAnalytics tenantId={tenant.tenant_id} />
+              <ItemAnalytics tenantId={tenant.tenant_id} isDemo={isDemo} />
             </BentoCard>
 
             {displayTransactions.length === 0 && (

@@ -213,9 +213,20 @@ function ModuleSwitcher() {
         }}>
           <img src={activeModule.logo} alt={activeModule.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
-        <div className="flex-col items-start hide-mobile">
-          <span className="logo-text" style={{ fontWeight: 800, fontSize: 16, lineHeight: 1, color: 'var(--text-primary)' }}>Synculariti</span>
-          <span className="status-badge" style={{ fontSize: 9, padding: '1px 5px', marginTop: 2, background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
+        <div className="flex-col items-start hide-mobile" style={{ marginLeft: 4 }}>
+          <span className="logo-text" style={{ fontWeight: 900, fontSize: 17, letterSpacing: '-0.03em', lineHeight: 1, color: 'var(--text-primary)' }}>Synculariti</span>
+          <span style={{ 
+            fontSize: 9, 
+            fontWeight: 800,
+            padding: '2px 6px', 
+            marginTop: 4, 
+            borderRadius: 6,
+            background: 'var(--bg-secondary)', 
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-secondary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em'
+          }}>
             {activeModule.name}
           </span>
         </div>
@@ -235,19 +246,33 @@ function ModuleSwitcher() {
                 key={m.name} 
                 href={m.path} 
                 onClick={() => setOpen(false)}
-                className="flex-row items-center gap-3"
+                className="flex-row items-center gap-3 module-item"
                 style={{ 
-                  padding: '10px 12px', borderRadius: 10, 
+                  padding: '12px 14px', borderRadius: 12, 
                   textDecoration: 'none', color: 'var(--text-primary)',
-                  background: m.path === pathname ? 'var(--bg-hover)' : 'none'
+                  background: m.path === pathname ? 'var(--bg-hover)' : 'none',
+                  transition: 'all 0.2s ease',
+                  border: '1px solid transparent'
+                }}
+                onMouseOver={(e) => {
+                  if (m.path !== pathname) {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (m.path !== pathname) {
+                    e.currentTarget.style.background = 'none';
+                    e.currentTarget.style.borderColor = 'transparent';
+                  }
                 }}
               >
-                <div style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
                   <img src={m.logo} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div className="flex-col">
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>{m.name}</span>
-                  <span className="card-subtitle" style={{ fontSize: 11 }}>Synculariti : {m.name}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em' }}>{m.name}</span>
+                  <span className="card-subtitle" style={{ fontSize: 10, opacity: 0.8 }}>Synculariti : {m.name}</span>
                 </div>
               </Link>
             ))}

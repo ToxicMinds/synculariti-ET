@@ -12,15 +12,26 @@ interface AggregatedItem {
   last_date: string;
 }
 
-export function ItemAnalytics({ tenantId }: { tenantId: string | undefined }) {
+export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string | undefined, isDemo?: boolean }) {
   const [items, setItems] = useState<AggregatedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isDemo);
 
   useEffect(() => {
+    if (isDemo) {
+      // Professional Mock Data for B2B Demo
+      setItems([
+        { name: 'Bulk Organic Coffee Beans', total_amount: 850.40, count: 4, last_store: 'Global Supply Co', last_date: new Date().toISOString() },
+        { name: 'Paper Takeaway Cups (500x)', total_amount: 120.00, count: 2, last_store: 'Eco Packaging', last_date: new Date().toISOString() },
+        { name: 'Oat Milk (Case of 12)', total_amount: 45.60, count: 3, last_store: 'Dairy Free Distro', last_date: new Date().toISOString() }
+      ]);
+      setLoading(false);
+      return;
+    }
+
     if (tenantId) {
       fetchTopItems();
     }
-  }, [tenantId]);
+  }, [tenantId, isDemo]);
 
   async function fetchTopItems() {
     setLoading(true);

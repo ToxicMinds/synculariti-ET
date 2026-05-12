@@ -43,6 +43,25 @@ export async function GET() {
     const facts = merchantResult.records[0]?.get('topMerchants') || [];
     const categories = categoryResult.records[0]?.get('categories') || [];
 
+    // Fallback logic if Groq is missing or fails
+    const generateFallbackInsight = () => {
+      if (categories.length > 0) {
+        const topCat = categories[0];
+        return `💡 Financial Insight: Your highest operating expense is ${topCat.category} at €${Number(topCat.total).toFixed(2)}. ${facts.length > 0 ? `You have high frequency with ${facts[0].merchant}.` : 'Consider auditing this category for optimization.'}`;
+      }
+      return "💡 System Intelligence: Analyzing your spending patterns. Add more transactions to unlock deeper B2B insights.";
+    };
+
+    if (!process.env.GROQ_API_KEY) {
+      console.warn("GROQ_API_KEY missing, using deterministic fallback.");
+      return NextResponse.json({ 
+        success: true, 
+        insight: generateFallbackInsight(),
+        facts,
+        categories
+      });
+    }
+
     // Build context for Groq
     const merchantSummary = facts
       .map((f: any) => {
@@ -56,44 +75,62 @@ export async function GET() {
       .map((c: any) => `${c.category}: €${Number(c.total).toFixed(2)}`)
       .join('; ');
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "system",
-            content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
-Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
-          },
-          {
-            role: "user",
-            content: `Category breakdown: ${categorySummary || 'No data'}.
-Top merchants: ${merchantSummary || 'No data'}.`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 200
-      })
-    });
+    try {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            {
+              role: "system",
+              content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
+  Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
+            },
+            {
+              role: "user",
+              content: `Category breakdown: ${categorySummary || 'No data'}.
+  Top merchants: ${merchantSummary || 'No data'}.`
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 200
+        })
+      });
 
-    const aiData = await groqRes.json();
-    const insightText = aiData.choices?.[0]?.message?.content || "Your spending patterns are being analyzed.";
+      if (!groqRes.ok) throw new Error("Groq API error");
 
-    return NextResponse.json({ 
-      success: true, 
-      insight: insightText,
-      facts,
-      categories
-    });
+      const aiData = await groqRes.json();
+      const insightText = aiData.choices?.[0]?.message?.content || generateFallbackInsight();
+
+      return NextResponse.json({ 
+        success: true, 
+        insight: insightText,
+        facts,
+        categories
+      });
+    } catch (apiErr) {
+      console.error("Groq Fetch Error, using fallback:", apiErr);
+      return NextResponse.json({ 
+        success: true, 
+        insight: generateFallbackInsight(),
+        facts,
+        categories
+      });
+    }
 
   } catch (e: any) {
-    console.error("AI Insight Error:", e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error("AI Insight Core Error:", e);
+    // Even if Neo4j fails, we try a soft fallback if possible, or a clean error
+    return NextResponse.json({ 
+      success: true, 
+      insight: "💡 Intelligence Hub: Syncing your financial graph. Insights will appear shortly.",
+      facts: [],
+      categories: []
+    });
   } finally {
     await session.close();
   }

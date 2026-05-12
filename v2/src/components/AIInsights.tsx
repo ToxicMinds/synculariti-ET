@@ -8,17 +8,19 @@ export function AIInsights({
   transactionCount,
   dataHash,
   updateState,
-  tenant
+  tenant,
+  isDemo = false
 }: {
   tenantId: string | undefined;
   transactionCount?: number;
   dataHash?: string;
   updateState?: (s: any) => Promise<void>;
   tenant?: any;
+  isDemo?: boolean;
 }) {
   const [insight, setInsight] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<'cache' | 'live' | 'error'>('live');
+  const [loading, setLoading] = useState(!isDemo);
+  const [source, setSource] = useState<'cache' | 'live' | 'error' | 'demo'>('live');
 
   // Track the last hash we fetched for — prevents re-fetching on unrelated re-renders
   const lastFetchedHash = useRef<string | null>(null);
@@ -28,6 +30,13 @@ export function AIInsights({
   const cacheHash = tenantId ? (dataHash || `${tenantId}_${transactionCount ?? 0}`) : null;
 
   useEffect(() => {
+    if (isDemo) {
+      setInsight('📊 Trend Detected: Bulk produce costs (Coffee Beans) have decreased by 5.2% over the last 30 days. Recommend increasing inventory buffer while prices are low.');
+      setSource('demo');
+      setLoading(false);
+      return;
+    }
+
     if (!tenantId || !tenant || !cacheHash) return;
 
     // 1. Serve from Supabase-backed cache if valid AND < 24h old
