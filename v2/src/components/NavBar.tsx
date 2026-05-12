@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useTenant } from '@/hooks/useTenant';
+import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { Suspense, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 

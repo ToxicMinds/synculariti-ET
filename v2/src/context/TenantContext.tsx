@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { AppState } from '@/hooks/useTenant';
+import { AppState } from '@/modules/identity/hooks/useTenant';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 interface TenantContextType {

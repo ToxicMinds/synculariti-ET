@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { useTenant } from '@/hooks/useTenant';
+import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { ChartOfAccounts } from '@/components/ChartOfAccounts';
 import { InvoiceManager } from '@/components/InvoiceManager';
 import { AuthScreen } from '@/components/AuthScreen';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTenant } from '@/hooks/useTenant';
+import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { BentoCard } from '@/components/BentoCard';
 import Link from 'next/link';
 

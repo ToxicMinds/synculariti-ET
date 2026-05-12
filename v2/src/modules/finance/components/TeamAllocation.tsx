@@ -1,7 +1,7 @@
 'use client';
 
 import { BentoCard } from '@/components/BentoCard';
-import { Transaction, calcPerUserSpend } from '@/lib/finance';
+import { Transaction, calcPerUserSpend } from '../lib/finance';
 
 export function TeamAllocation({ transactions, names, colSpan = 4 }: { transactions: Transaction[], names: Record<string, string>, colSpan?: number }) {
   // FIXED: Use the proper hybrid resolver that handles BOTH who_id AND legacy who-name

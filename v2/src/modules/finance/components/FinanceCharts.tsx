@@ -13,7 +13,7 @@ import {
   LineElement,
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { Transaction, calcCategoryTotals } from '@/lib/finance';
+import { Transaction, calcCategoryTotals } from '../lib/finance';
 
 ChartJS.register(
   ArcElement,

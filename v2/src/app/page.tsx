@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { BentoCard } from '@/components/BentoCard';
-import { useTenant } from '@/hooks/useTenant';
+import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { useTransactions } from '@/modules/finance/hooks/useTransactions';
 import { useSync, ReceiptData } from '@/modules/finance/hooks/useSync';
 import { calcTotals } from '@/modules/finance/lib/finance';

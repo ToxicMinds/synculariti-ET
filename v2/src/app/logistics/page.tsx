@@ -1,6 +1,6 @@
 'use client';
 
-import { useTenant } from '@/hooks/useTenant';
+import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { useLogistics } from '@/modules/logistics/hooks/useLogistics';
 import { BentoCard } from '@/components/BentoCard';
 import { AuthScreen } from '@/components/AuthScreen';

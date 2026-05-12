@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
-import { createServerClient } from '@/lib/supabase-server';
+import { createClient } from '@/lib/supabase-server';
 import { Logger } from '@/lib/logger';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -13,7 +13,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerClient();
+    const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
