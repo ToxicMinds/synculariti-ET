@@ -128,10 +128,11 @@ This document is the definitive guide for AI assistants and developers. It conso
 ---
 
 ## 7. Intelligence Strategy: AI Invoice Pipeline
-To achieve **Business-Grade Determinism** for arbitrary B2B invoices, we implement a dual-stage pipeline:
+To achieve **Business-Grade Determinism** for arbitrary B2B invoices, we implement a three-stage pipeline:
 
-1.  **Stage 1: Vision Extraction (The Eyes)**: Use a Vision LLM (e.g., Llama 3.2 Vision) to perform high-fidelity transcription of the invoice image. Focus: Spatial relationship of Total, Date, Issuer IČO/DIČ, and Line Items.
-2.  **Stage 2: Reasoning Refinement (The Brain)**: Feed the transcription + Tenant Context into a Reasoning LLM (Llama 3.3 70B). Focus: Category mapping, VAT validation, and Supplier Catalog resolution.
+1.  **Stage 0: Triage (The Guard)**: Use a fast Vision LLM to verify document relevancy. If the image is not a receipt or invoice (e.g., a blank wall, a person), it is rejected immediately with professional user feedback. This prevents token wastage and hallucinations.
+2.  **Stage 1: Vision Extraction (The Eyes)**: High-fidelity transcription of spatial relationships (Issuer IČO, Total, Date, Line Items).
+3.  **Stage 2: Reasoning Refinement (The Brain)**: Reasoning LLM (Llama 3.3 70B) maps transcribed data to Tenant context, performs VAT validation, and resolves Supplier Catalog entries.
 
 ---
 
