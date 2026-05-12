@@ -54,10 +54,11 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | Principle | Status | Implementation Detail |
 | :--- | :--- | :--- |
-| **DRY** | 🟢 **Platinum** | Identity logic centralized in `modules/identity`. Unified validation for staff and joining. |
-| **ACID** | 🔵 **Hardened** | Cross-module mutations use the **Postgres Outbox Pattern** to ensure consistency. |
-| **SOLID** | 🟢 **Platinum** | Hook-based architecture. Identity logic is decoupled from the main App Router. |
-| **ACID (Ledger)** | 💎 **Platinum** | Inventory state is derived, not stored. This prevents "Stock Drift." |
+| **DRY** | 🟢 **Platinum** | Identity logic centralized in `modules/identity`. Unified validation for staff invitations and tenant joining. No logic duplication in UI. |
+| **ACID** | 🔵 **Hardened** | Cross-module mutations use the **Postgres Outbox Pattern**. `Logistics` updates and `Finance` signals are wrapped in a single Postgres transaction. |
+| **SOLID** | 🟢 **Platinum** | Module-based architecture. Identity logic is physically and logically decoupled from the App Router business logic. |
+| **Security** | 💎 **Hardened** | **Force RLS** on every table. Tenant isolation is enforced at the DB level via `get_my_tenant()`, preventing cross-tenant data leaks. |
+| **ACID (Ledger)** | 💎 **Platinum** | Inventory state is derived, not stored. This eliminates "Stock Drift" between different parts of the system. |
 
 ---
 
