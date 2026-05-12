@@ -4,7 +4,7 @@ import { getNeo4jDriver } from '@/lib/neo4j';
 import { createClient } from '@/lib/supabase-server';
 import { withAuth } from '@/lib/withAuth';
 
-export const GET = withAuth(async (req, { tenantId }) => {
+export const GET = withAuth(async (req, { tenantId, user }) => {
   const supabase = await createClient();
 
   const driver = getNeo4jDriver();

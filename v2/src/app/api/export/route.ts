@@ -10,7 +10,7 @@ import { withAuth } from '@/lib/withAuth';
  * authenticated session via get_my_tenant() — never from URL params.
  * Fixes: table renamed 'expenses' -> 'transactions', removed auth bypass.
  */
-export const GET = withAuth(async (req, { tenantId }) => {
+export const GET = withAuth(async (req, { tenantId, user }) => {
   const supabase = await createClient();
 
   const { searchParams } = new URL(req.url);

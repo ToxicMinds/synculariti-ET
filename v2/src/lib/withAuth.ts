@@ -4,7 +4,7 @@ import { ServerLogger } from '@/lib/logger-server';
 
 type RouteHandler = (
   req: Request,
-  context: { tenantId: string }
+  context: { tenantId: string; user: any }
 ) => Promise<NextResponse>;
 
 /**
@@ -51,7 +51,7 @@ export function withAuth(handler: RouteHandler) {
         return NextResponse.json({ error: 'Tenant not found' }, { status: 403 });
       }
 
-      return await handler(req, { tenantId });
+      return await handler(req, { tenantId, user: session.user });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       await ServerLogger.system('ERROR', 'API', 'Unhandled error in withAuth wrapper', { error: msg });

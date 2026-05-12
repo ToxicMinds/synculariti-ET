@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
 import { withAuth } from '@/lib/withAuth';
 
-export const POST = withAuth(async (req, { tenantId }) => {
+export const POST = withAuth(async (req, { tenantId, user }) => {
   const { spent, budget, daysElapsed, daysInMonth, history } = await req.json();
   
   try {

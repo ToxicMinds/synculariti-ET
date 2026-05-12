@@ -11,7 +11,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
  * Stage 1: Extraction (High-fidelity spatial transcription)
  * Stage 2: Reasoning (Category mapping & VAT validation)
  */
-export const POST = withAuth(async (req: Request, { tenantId }) => {
+export const POST = withAuth(async (req: Request, { tenantId, user }) => {
   try {
 
     const { image, categories } = await req.json();
@@ -72,7 +72,7 @@ export const POST = withAuth(async (req: Request, { tenantId }) => {
 
     const result = JSON.parse(parseResponse.choices[0]?.message?.content || '{}');
 
-    Logger.user(tenantId, 'INVOICE_PARSED', `AI parsed invoice from ${result.store || 'Unknown'}`, session.user.email || 'User');
+    await ServerLogger.user(tenantId, 'INVOICE_PARSED', `AI parsed invoice from ${result.store || 'Unknown'}`, user.email || 'User');
 
     return NextResponse.json({ 
       success: true, 

@@ -2,7 +2,7 @@ import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
 
-export const POST = withAuth(async (req: Request, { tenantId }) => {
+export const POST = withAuth(async (req: Request, { tenantId, user }) => {
 
   try {
     const { text, categories } = await req.json();

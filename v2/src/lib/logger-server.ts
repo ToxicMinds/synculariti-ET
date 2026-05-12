@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'PERF';
-export type LogComponent = 'API' | 'Neo4j' | 'Scanner' | 'Auth' | 'Sync' | 'AI' | 'Finance' | 'Logistics' | 'eKasa';
+export type LogComponent = 'API' | 'Neo4j' | 'Scanner' | 'Auth' | 'Sync' | 'AI' | 'Finance' | 'Logistics' | 'eKasa' | 'OfflineQueue' | 'Utils';
 
 /**
  * ServerLogger: Writes telemetry from Next.js API routes (server-side).
@@ -50,6 +50,30 @@ export class ServerLogger {
       });
     } catch {
       // Intentional: never let telemetry failure crash an API route
+    }
+  }
+
+  /**
+   * Log a user activity event from an API route.
+   */
+  static async user(
+    tenantId: string,
+    action: string,
+    description: string,
+    actorName: string,
+    metadata: Record<string, unknown> = {}
+  ): Promise<void> {
+    try {
+      const supabase = this.getClient();
+      await supabase.from('activity_log').insert({
+        tenant_id: tenantId,
+        action,
+        description,
+        actor_name: actorName,
+        metadata: { ...metadata, timestamp: new Date().toISOString() },
+      });
+    } catch {
+      // Never let activity logging failure crash an API route
     }
   }
 }

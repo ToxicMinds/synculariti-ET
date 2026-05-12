@@ -8,7 +8,7 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-export const POST = withAuth(async (req: Request, { tenantId }) => {
+export const POST = withAuth(async (req: Request, { tenantId, user }) => {
 
   try {
     const { ekasaData, categories } = await req.json();
@@ -59,14 +59,13 @@ export const POST = withAuth(async (req: Request, { tenantId }) => {
       : metadata.store;
 
     // Log for auditing (The "Black Site" Standard)
-    const { Logger } = await import('@/lib/logger');
-    Logger.system('INFO', 'AI', 'Merchant Extraction Detail', {
+    await ServerLogger.system('INFO', 'AI', 'Merchant Extraction Detail', {
       dic: metadata.dic,
       rawStore: metadata.store,
       inferredStore: aiParsed.inferredStore,
       finalStore,
       itemCount: metadata.items.length
-    });
+    }, tenantId);
 
     // 3. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
     const mergedItems = metadata.items.map((orig: any, idx: number) => ({

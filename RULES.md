@@ -83,6 +83,7 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 - **Logger, not console**: NEVER use `console.log`, `console.warn`, or `console.error` in production code. Use `Logger.system()` for technical events and `Logger.user()` for business events.
 - **User Activity**: EVERY mutation MUST call `Logger.user(tenantId, action, description, actorName)`.
 - **Visibility**: If an action doesn't appear in the Activity Log, it didn't happen.
+- **API Telemetry**: API routes MUST use `ServerLogger.system()` or `ServerLogger.user()`. Never import the client-side `Logger` in `/api/*` routes as it depends on browser globals and will crash the production build.
 
 ### Error Handling
 - **ErrorBoundary Required**: Every page-level component MUST be wrapped in an `ErrorBoundary`. React render crashes are a telemetry blackspot without them.

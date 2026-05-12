@@ -13,7 +13,7 @@ import { withAuth } from '@/lib/withAuth';
 export const preferredRegion = 'cdg1';
 export const dynamic = 'force-dynamic';
 
-export const POST = withAuth(async (request: Request, { tenantId }) => {
+export const POST = withAuth(async (request: Request, { tenantId, user }) => {
 
   try {
     const { receiptId, okpData } = await request.json();
