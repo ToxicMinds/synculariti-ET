@@ -63,6 +63,69 @@ export function ReceiptScanner({
     }
   }, [step]);
 
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setStep('processing');
+    setLoading(true);
+    setError('');
+
+    try {
+      // 1. Convert to Base64 for Groq Vision
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const base64 = await base64Promise;
+
+      // 2. Call our new AI Invoice Parser (Stage 0-2)
+      const response = await fetch('/api/ai/parse-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: base64, 
+          categories 
+        })
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        if (result.triage === 'REJECTED') {
+          throw new Error(`Invalid Document: ${result.message}`);
+        }
+        throw new Error(result.error || 'Failed to parse invoice');
+      }
+
+      const parsed = result.data;
+      setReceipt({
+        store: parsed.store || 'Unknown Store',
+        date: parsed.date || new Date().toISOString().split('T')[0],
+        total: parsed.total || 0,
+        items: (parsed.items || []).map((it: any) => ({
+          ...it,
+          selected: true
+        })),
+        ico: parsed.ico,
+        receiptNumber: parsed.receiptNumber,
+        transactedAt: parsed.transactedAt,
+        vatDetail: parsed.vatDetail
+      });
+
+      setStep('review');
+    } catch (e: any) {
+      setError(e.message);
+      setStep('scan');
+      Logger.system('ERROR', 'Scanner', 'AI Invoice scan failure', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onScanSuccess(decodedText: string) {
     setStep('processing');
     setLoading(true);
@@ -159,10 +222,10 @@ export function ReceiptScanner({
 
   if (step === 'processing') {
     return (
-      <BentoCard title={isSaving ? "Finalizing..." : "Processing Receipt"}>
+      <BentoCard title={isSaving ? "Finalizing..." : "Processing Document"}>
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <div className="spinner" style={{ marginBottom: 16 }}></div>
-          <p>{isSaving ? "Analyzing & Storing your receipt..." : "Fetching eKasa details and running AI categorization..."}</p>
+          <p>{isSaving ? "Analyzing & Storing your record..." : "Running AI Document Triage & Extraction..."}</p>
         </div>
       </BentoCard>
     );
@@ -317,12 +380,35 @@ export function ReceiptScanner({
   }
 
   return (
-    <BentoCard title="Scan Receipt (Slovak eKasa)">
-      {error && <div style={{ color: 'var(--accent-danger)', marginBottom: 16 }}>{error}</div>}
-      <div id="qr-reader" style={{ width: '100%', borderRadius: 8, overflow: 'hidden' }}></div>
-      <p style={{ marginTop: 16, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center' }}>
-        Point your camera at the QR code on any Slovak fiscal receipt.
-      </p>
+    <BentoCard title="Business Intelligence Scanner">
+      {error && <div className="status-badge status-danger" style={{ marginBottom: 16, width: '100%', justifyContent: 'center', padding: 12 }}>{error}</div>}
+      
+      <div className="flex-col gap-4">
+        <div id="qr-reader" style={{ width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border-color)' }}></div>
+        
+        <div className="flex-row items-center gap-3">
+          <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+          <span className="card-subtitle" style={{ fontSize: 10, fontWeight: 800 }}>OR SCAN INVOICE</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border-color)' }} />
+        </div>
+
+        <label className="btn btn-primary flex-center gap-2" style={{ cursor: 'pointer', padding: '16px' }}>
+          <span style={{ fontSize: 20 }}>📷</span>
+          <span style={{ fontWeight: 700 }}>Capture B2B Invoice</span>
+          <input 
+            type="file" 
+            accept="image/*" 
+            capture="environment" 
+            onChange={onFileChange}
+            style={{ display: 'none' }}
+          />
+        </label>
+
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+          Point camera at an **eKasa QR** code for instant deterministic sync, <br />
+          or **capture a full invoice** for AI-powered multi-stage extraction.
+        </p>
+      </div>
     </BentoCard>
   );
 }
