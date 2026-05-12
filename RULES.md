@@ -76,15 +76,21 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 - **Atomic Only**: Any mutation touching the ledger (Transactions or Inventory) MUST be atomic.
 - **Logistics Rule**: Marking a PO as RECEIVED **MUST** simultaneously insert into `inventory_ledger`. Failure to do so is a SEVERITY-1 bug.
 - **Canonical RPC**: Use `save_receipt_v3` for ALL financial writes. Manual client-side `.insert()` on `transactions` is restricted to dev-only.
-- **Unified Ledger**: Prefer shared ledger primitives from `@/lib` to prevent logic drift.
+- **B2B Atomic Pattern**: Use the `outbox_events` table for cross-domain signals (e.g., Procurement -> Finance).
 
 ### Telemetry & Audit Trail
 - **User Activity**: EVERY mutation MUST call `Logger.user(tenantId, action, description, actorName)`.
 - **Visibility**: If an action (e.g. stock receipt) doesn't appear in the Activity Log, it didn't happen.
 
-### Security & Database
+### Security & API Governance
 - **No Direct DML**: Avoid client-side `.insert()`, `.update()`, or `.delete()` on core tables. Use RPCs to ensure business logic and RLS are enforced as a single unit.
+- **Middleware-First**: API routes should use a centralized auth wrapper to prevent boilerplate duplication and ensure session integrity.
 - **Naked Tables**: Never grant `INSERT/UPDATE/DELETE` permissions to `anon` or `authenticated` roles on ledger tables.
+
+### Design System & UX
+- **Zero Inline Styling**: Avoid ad-hoc `style={{...}}` in components. Use CSS Modules or `globals.css` tokens.
+- **Component Patterns**: Centralize layout patterns (Loading states, Modals) to ensure UI consistency.
+- **Branding Assets**: All module logos must be served from `@/public/brand/` and checked for 404 status before deployment.
 
 ### TypeScript
 - **TypeScript only.** No `.js` files in `src/`. No `require()`.

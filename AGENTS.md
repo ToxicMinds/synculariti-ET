@@ -75,17 +75,28 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | Principle | Status | Implementation Detail |
 | :--- | :--- | :--- |
-| **DRY** | 🔴 **Violation** | Duplicated Ledger logic between Finance and Logistics. Inline styling remains prevalent. |
-| **ACID** | 🔴 **Violation** | `receivePO` in Logistics fails to update inventory ledger (Atomicity failure). Client-side inserts bypass RPC safety. |
-| **SOLID** | 🟡 **Warning** | `useSync` is a "God Hook" with too many responsibilities. Modules are decoupled but logic is leaked. |
-| **Security** | 🔴 **BREACH** | SQL Audit confirms direct `INSERT/UPDATE/DELETE` access for `anon` and `authenticated` roles on core tables. |
-| **Observability**| 🟡 **Warning** | Logistics actions miss `Logger.user` calls. Business audit trail is incomplete. |
+| **DRY** | 🔴 **Violation** | Duplicated Ledger logic. API Auth boilerplate copy-pasted. Inline styles > 300 lines in single components. |
+| **ACID** | 🔴 **Violation** | `receivePO` fails to update ledger. `outbox_events` is unused (Zero cross-domain signal resilience). |
+| **SOLID** | 🟡 **Warning** | `useSync` and `NavBar` are God Objects. Identity is a "tight-coupling" bottleneck. |
+| **Security** | 🔴 **BREACH** | SQL Audit: `anon` users have direct DML on core ledger tables. |
+| **Observability**| 🟡 **Warning** | Missing `Logger.user` in Logistics. Broken module logos (404s). |
 
-## 4. Current Technical Debt (The "Wall of Shame")
-1.  **The "Ghost" PO Problem**: Receiving a PO in Logistics does not increase physical stock.
-2.  **Naked Tables**: RLS exists but permissions are too broad, allowing bypass of atomic RPCs.
-3.  **Ledger Schism**: Separate logic for financial vs. physical ledgers creates maintenance overhead.
-4.  **Inline Styling**: Massive use of ad-hoc styles instead of design tokens in `globals.css`.
+## 4. Priority Remediation Path (The "Platinum" Roadmap)
+
+### 🔴 Phase 0: Integrity & Security (The Must-Fix)
+1.  **Hardened RLS**: Revoke direct DML for `anon/authenticated` and enforce RPC-only writes.
+2.  **Atomic Logistics**: Fix the "Ghost PO" by making PO receipt and Ledger update atomic in a single RPC.
+3.  **Outbox Activation**: Implement the event-driven bridge for Logistics -> Finance signals.
+
+### 🟡 Phase 1: Architectural Purity (The Cleanup)
+1.  **API Middleware**: Centralize API auth/logging to remove copy-paste boilerplate.
+2.  **Ledger Unification**: Abstract Finance/Physical ledger logic into a single `@/lib/ledger` primitive.
+3.  **Hook Decomposition**: Break down `useSync` into smaller, responsibility-focused hooks.
+
+### 🟢 Phase 2: Visual & UX Excellence (The Polish)
+1.  **Style Extraction**: Move `NavBar` and scanner inline styles into CSS Modules or Design Tokens.
+2.  **Branding Restoration**: Fix 404 assets and implement the premium Bento Module Switcher.
+3.  **PWA Hardening**: Align Manifest and icons with the B2B SaaS identity.
 
 ---
 
