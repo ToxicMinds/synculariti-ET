@@ -104,8 +104,14 @@ These were **not in previous audits** and are documented here for the first time
 | V-08 | 32 `: any` TypeScript usages violate strict type contracts. | Multiple | 🟡 WARNING — **Phase 1** |
 | V-09 | Zero `ErrorBoundary` components — React render crashes are invisible. | App-wide | 🔴 VIOLATION — **Phase 1** |
 | V-10 | `save_receipt_v3` has 3 overloaded signatures — Postgres resolves by argument match, may call wrong version. | DB RPC | 🟡 WARNING — **Phase 1** |
-| V-11 | `addTransaction` in `useSync` still does a direct client `.insert()` on `transactions` — bypasses RPC safety. | Finance Hook | 🟡 WARNING — **Phase 1** |
+| V-11 | `addTransaction` in `useSync` still does a direct client `.insert()` on `transactions` — bypasses RPC safety. | Finance Hook | 🔴 CRITICAL — **Fixed Phase 1** |
 | V-12 | `auth/pin` route constructs virtual passwords as `pin_${pin}_${tenantId}` — deterministic and brute-forceable. | API Auth | 🔴 SECURITY — **Phase 1** |
+| V-13 | `updateTransaction` and `softDeleteTransaction` still use client `.update()`. Broken by Phase 0 RLS. | Finance Hook | 🔴 CRITICAL — **Phase 2** |
+| V-14 | `AuthScreen` does client `.upsert()` on `app_users`. Broken by Phase 0 RLS. | Identity UI | 🔴 CRITICAL — **Phase 2** |
+| V-15 | `TenantContext` does client `.update()` on `tenants`. Broken by Phase 0 RLS. | Context | 🔴 CRITICAL — **Phase 2** |
+| V-16 | `withAuth` API middleware was written but **never applied** (Hallucinated completion). API routes remain unsecured/duplicated. | API Auth | 🔴 SECURITY — **Phase 2** |
+| V-17 | `getSession()` is used inconsistently across only 2 out of 7 API routes. | API Routes | 🟡 WARNING — **Phase 2** |
+| V-18 | More `any` types exist than previously reported (e.g., `AuthScreen`, `app/page.tsx`). | Multiple | 🟡 WARNING — **Phase 2** |
 
 ---
 
@@ -118,18 +124,20 @@ These were **not in previous audits** and are documented here for the first time
 4.  **Export Route** ✅ — Auth guard added, stale table reference fixed, tenant isolation enforced via session.
 5.  **Debug Routes** ✅ — Fixed stale `expenses` table reference in 2 debug routes.
 
-### 🟡 Phase 1: Architectural Purity (Next)
-1.  **Replace `console.log` with `Logger`** — 13 locations across modules and API routes.
-2.  **Eliminate `: any` types** — 32 usages; prioritise `ReceiptScanner.tsx` and `useIdentity.ts`.
-3.  **Add ErrorBoundary** — Wrap root and each module page to surface render crashes.
-4.  **API Middleware** — Centralize auth/logging boilerplate into a shared `withAuth()` wrapper.
-5.  **Harden `addTransaction`** — Route through `save_receipt_v3` or a new `add_transaction_v3` RPC.
+### 🟡 Phase 1: Architectural Purity (In Progress)
+1.  **Replace `console.log` with `Logger`** ✅ — ServerLogger created for API routes; modules updated.
+2.  **Eliminate `: any` types** 🟡 — Critical fixes applied in `AuthScreen` and `useLogistics`. Debt remains.
+3.  **Add ErrorBoundary** ✅ — `ErrorBoundary` created and wrapped at Root Layout and App level.
+4.  **API Middleware** 🔴 — `withAuth()` was created but **hallucinated** as applied. It remains unimplemented on routes.
+5.  **Harden `addTransaction`** ✅ — Routed through `add_transaction_v3` RPC. Fixed Phase 0 regression.
 6.  **Harden PIN auth** — Move to TOTP or cryptographic token, not a deterministic password.
 
-### 🟢 Phase 2: Visual & UX Excellence (Polish)
-1.  **Style Extraction** — Move `NavBar.tsx` and scanner inline styles into CSS Modules.
-2.  **Branding Restoration** — Fix 404 assets and implement the premium Bento Module Switcher.
-3.  **PWA Hardening** — Implement actual offline mutation queue (currently documented, not built).
+### 🔴 Phase 2: Structural Repair & Polish (The "Post-Hallucination" Fixes)
+1.  **Direct DML Regression Fixes**: Create RPCs for `update_transaction_v1`, `soft_delete_transaction_v1`, `upsert_app_user_v1`, and `update_tenant_config_v1` to replace the broken client-side DMLs.
+2.  **API Auth Realization**: Actually apply the `withAuth` middleware to all API routes, removing duplicated `getSession()` and `tenant_id` param logic.
+3.  **Style Extraction** — Move `NavBar.tsx` and scanner inline styles into CSS Modules.
+4.  **Branding Restoration** — Fix 404 assets and implement the premium Bento Module Switcher.
+5.  **PWA Hardening** — Implement actual offline mutation queue (currently documented, not built).
 
 ---
 

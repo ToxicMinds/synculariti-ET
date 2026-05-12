@@ -46,23 +46,27 @@ export const viewport: Viewport = {
 };
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-
 import { IdentityGateWrapper } from "@/modules/identity/IdentityGateWrapper";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <TenantProvider>
-          <IdentityGateWrapper>
-            <NavBar />
-            <div className="app-container">
-              {children}
-            </div>
-            <MobileBottomNav />
-            <PWAInstallPrompt />
-          </IdentityGateWrapper>
-        </TenantProvider>
+        <ErrorBoundary module="App">
+          <TenantProvider>
+            <IdentityGateWrapper>
+              <NavBar />
+              <div className="app-container">
+                <ErrorBoundary module="Finance">
+                  {children}
+                </ErrorBoundary>
+              </div>
+              <MobileBottomNav />
+              <PWAInstallPrompt />
+            </IdentityGateWrapper>
+          </TenantProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

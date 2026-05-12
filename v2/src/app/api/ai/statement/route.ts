@@ -1,3 +1,4 @@
+import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 
@@ -68,7 +69,7 @@ Only output the JSON object.`
     });
 
   } catch (e: any) {
-    console.error("Statement AI Error:", e);
+    ServerLogger.system('ERROR', 'AI', 'Statement AI error', { error: String(e) });
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

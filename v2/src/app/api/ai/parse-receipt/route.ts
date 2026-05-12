@@ -1,3 +1,4 @@
+import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { Groq } from 'groq-sdk';
 import { createClient } from '@/lib/supabase-server';
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error('Receipt AI Error:', error);
+    ServerLogger.system('ERROR', 'AI', 'Receipt AI parse error', { error: String(error) });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

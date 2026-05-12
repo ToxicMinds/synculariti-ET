@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BentoCard } from './BentoCard';
+import type { Session } from '@supabase/supabase-js';
 
-export function AuthScreen({ session }: { session: any }) {
+export function AuthScreen({ session }: { session: Session | null }) {
   const [mode, setMode] = useState<'join' | 'create'>('join');
   const [handle, setHandle] = useState('');
   const [orgName, setOrgName] = useState('');

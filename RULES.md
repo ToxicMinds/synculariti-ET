@@ -90,11 +90,14 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 - **Fire-and-Forget Safety**: Neo4j `.catch()` calls are acceptable but MUST log to `Logger.system`.
 
 ### Security & API Governance
-- **No Direct DML**: Avoid client-side `.insert()`, `.update()`, or `.delete()` on core tables. Use RPCs.
+- **No Direct DML**: The database explicitly denies `INSERT/UPDATE/DELETE` on core tables (`transactions`, `tenants`, `app_users`) to `authenticated` clients. Client-side `.insert()`, `.update()`, or `.upsert()` WILL FAIL. Always use RPCs (e.g. `add_transaction_v3`).
 - **Session-Based tenant_id**: `tenant_id` is NEVER passed as a URL param or client payload. Always derived server-side from session via RLS `get_my_tenant()`.
 - **No Stale Table References**: The core financial table is `transactions` (not `expenses`). The rename was applied in migration `05_tenant_rename.sql`. Any reference to `'expenses'` in app code is a bug.
-- **Auth Guard on All Routes**: Every API route that reads or writes tenant data MUST call `createClient()` and verify the session. No exceptions.
+- **Auth Guard on All Routes**: Every API route that reads or writes tenant data MUST verify the session. Use the `withAuth` middleware. Do not rely on copy-pasted `getSession()` logic.
 - **Naked Tables**: Never grant `INSERT/UPDATE/DELETE` to `anon` or `authenticated` on ledger tables.
+
+### Development Rigor (Anti-Hallucination)
+- **Verify Implementation**: Writing a middleware or utility file does NOT mean it is implemented. You must verify that the utility is actively imported and used by the target files before marking a task complete (e.g. `withAuth` was written but not applied).
 
 ### Design System & UX
 - **Zero Inline Styling**: Avoid ad-hoc `style={{...}}` in components. Use CSS Modules or `globals.css` tokens.

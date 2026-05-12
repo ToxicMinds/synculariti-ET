@@ -1,3 +1,4 @@
+import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 
 /**
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error('eKasa Gov API Error:', response.status, errText);
+      ServerLogger.system('ERROR', 'eKasa', 'eKasa Gov API error', { status: response.status });
       return NextResponse.json({ 
         error: 'Slovak Gov API returned an error', 
         status: response.status,
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error('eKasa Proxy Exception:', error);
+    ServerLogger.system('ERROR', 'eKasa', 'eKasa proxy exception', { error: String(error) });
     return NextResponse.json({ error: 'Proxy failed to reach eKasa', detail: error.message }, { status: 500 });
   }
 }

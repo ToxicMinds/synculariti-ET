@@ -1,3 +1,4 @@
+import { ServerLogger } from '@/lib/logger-server';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     if (authErr) {
       // If virtual account doesn't exist, we could auto-provision it here, 
       // but for now, we'll assume they are seeded or handled via a migration.
-      console.error('Virtual Login Failed:', authErr);
+      ServerLogger.system('ERROR', 'Auth', 'Virtual login failed for PIN auth', { error: String(authErr) });
       return NextResponse.json({ error: 'System Error: Virtual Account not initialized.' }, { status: 500 });
     }
 

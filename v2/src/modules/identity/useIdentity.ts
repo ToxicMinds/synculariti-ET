@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
+
+import type { Session } from '@supabase/supabase-js';
 
 export interface AvailableTenant {
   tenant_id: string;
@@ -10,7 +13,7 @@ export interface AvailableTenant {
   user_role: string;
 }
 
-export function useIdentity(session: any) {
+export function useIdentity(session: Session | null) {
   const [tenants, setTenants] = useState<AvailableTenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,9 +27,10 @@ export function useIdentity(session: any) {
       if (error) throw error;
       setTenants(data || []);
       return data || [];
-    } catch (e: any) {
-      console.error('Identity Discovery Error:', e);
-      setError(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Logger.system('ERROR', 'Auth', 'Tenant discovery failed', { error: msg });
+      setError(msg);
       return [];
     } finally {
       setLoading(false);

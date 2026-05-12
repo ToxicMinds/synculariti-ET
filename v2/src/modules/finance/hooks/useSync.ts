@@ -29,46 +29,44 @@ export interface ReceiptData {
 export function useSync(tenantId: string | undefined) {
   const { triggerRefresh } = useTenantContext();
   
+  /**
+   * addTransaction: Routes through add_transaction_v3 RPC (SECURITY DEFINER).
+   * Fixes Phase 0 regression — authenticated users lost INSERT on transactions.
+   * The RPC enforces tenant isolation server-side before writing.
+   */
   const addTransaction = async (transaction: Partial<Transaction> | Partial<Transaction>[]) => {
     if (!tenantId) return;
 
     const normalize = (t: Partial<Transaction> & { merchant?: string }) => {
-      const { merchant, id, ...pureTransaction } = t;
-      return {
-        id: id || crypto.randomUUID(),
-        ...pureTransaction,
-        tenant_id: tenantId,
-      };
+      const { merchant, ...rest } = t;
+      return { ...rest, id: rest.id || crypto.randomUUID(), tenant_id: tenantId };
     };
 
-    const payload = Array.isArray(transaction)
-      ? transaction.map(t => normalize(t))
-      : normalize(transaction);
+    const items = Array.isArray(transaction)
+      ? transaction.map(normalize)
+      : [normalize(transaction)];
 
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert(payload)
-      .select();
-      
-    if (error) {
-      Logger.system('ERROR', 'Sync', 'Failed to add manual transaction', error, tenantId);
-      throw error;
-    }
+    const savedIds: string[] = [];
 
-    // Success activity & Signal
-    const count = Array.isArray(payload) ? payload.length : 1;
-    Logger.user(tenantId, 'TRANSACTION_ADDED', `Added ${count} manual transaction(s)`, 'Tenant Member');
-    triggerRefresh();
-
-    // Fire-and-forget Neo4j sync
-    if (data) {
-      for (const saved of data) {
-        const merchantName = (transaction as any).merchant || saved.description || 'Unknown Merchant';
-        normalizeAndLinkMerchant(merchantName, saved.id, Number(saved.amount)).catch(
-          err => Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed for manual transaction', { error: err, transactionId: saved.id }, tenantId)
-        );
+    for (const item of items) {
+      const { data: newId, error } = await supabase.rpc('add_transaction_v3', {
+        p_transaction: item
+      });
+      if (error) {
+        Logger.system('ERROR', 'Sync', 'add_transaction_v3 RPC failed', error, tenantId);
+        throw error;
       }
+      savedIds.push(newId);
+
+      // Fire-and-forget Neo4j sync
+      const merchantName = (item as any).merchant || item.description || 'Unknown Merchant';
+      normalizeAndLinkMerchant(merchantName, newId, Number(item.amount)).catch(
+        err => Logger.system('ERROR', 'Neo4j', 'Neo4j sync failed for manual transaction', { error: err, transactionId: newId }, tenantId)
+      );
     }
+
+    Logger.user(tenantId, 'TRANSACTION_ADDED', `Added ${savedIds.length} manual transaction(s)`, 'Tenant Member');
+    triggerRefresh();
   };
 
   const saveReceipt = async (receipt: ReceiptData, whoId: string, whoName: string, locationId?: string, currency: string = 'EUR') => {
@@ -148,6 +146,11 @@ export function useSync(tenantId: string | undefined) {
     throw lastError;
   };
 
+  // NOTE V-13: softDeleteTransaction still does a direct .update() on transactions.
+  // Phase 0 revoked UPDATE from authenticated — this is now broken.
+  // Needs a soft_delete_transaction_v1 RPC in Phase 2.
+  // TEMPORARY: Using service-role-equivalent via the existing RLS policy which
+  // allows UPDATE on is_deleted only via a specific policy (if one exists).
   const softDeleteTransaction = async (id: string) => {
     if (!tenantId) return;
     const { error } = await supabase
@@ -156,7 +159,10 @@ export function useSync(tenantId: string | undefined) {
       .eq('id', id)
       .eq('tenant_id', tenantId);
 
-    if (error) throw error;
+    if (error) {
+      Logger.system('ERROR', 'Sync', 'softDeleteTransaction failed — may need RPC wrapper (V-13)', { id, error }, tenantId);
+      throw error;
+    }
 
     Logger.user(tenantId, 'TRANSACTION_DELETED', `Removed a transaction record`, 'Tenant Member');
     triggerRefresh();

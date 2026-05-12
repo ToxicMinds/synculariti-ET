@@ -58,7 +58,7 @@ export function ReceiptScanner({
       scanner.render(onScanSuccess, onScanFailure);
 
       return () => {
-        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+        scanner.clear().catch(error => Logger.system('ERROR', 'Scanner', 'Failed to clear QR scanner instance', { error }));
       };
     }
   }, [step]);
@@ -179,7 +179,7 @@ export function ReceiptScanner({
       });
       
       if (!parsed.date) {
-        console.warn("Date missing from eKasa response, falling back to today.");
+        Logger.system('WARN', 'Scanner', 'Date missing from eKasa response — falling back to today', {});
       }
 
       setStep('review');

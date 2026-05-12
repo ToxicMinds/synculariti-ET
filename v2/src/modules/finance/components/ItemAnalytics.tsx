@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BentoCard } from '@/components/BentoCard';
+import { Logger } from '@/lib/logger';
 
 interface AggregatedItem {
   name: string;
@@ -83,8 +84,8 @@ export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string |
         .slice(0, 5);
 
       setItems(sorted);
-    } catch (e) {
-      console.error("Failed to fetch analytics:", e);
+    } catch (e: unknown) {
+      Logger.system('ERROR', 'Finance', 'Failed to fetch item analytics', { error: e instanceof Error ? e.message : String(e) });
     } finally {
       setLoading(false);
     }

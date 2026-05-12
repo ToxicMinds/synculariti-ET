@@ -1,3 +1,4 @@
+import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
 import { createClient } from '@/lib/supabase-server';
@@ -53,7 +54,7 @@ export async function GET() {
     };
 
     if (!process.env.GROQ_API_KEY) {
-      console.warn("GROQ_API_KEY missing, using deterministic fallback.");
+      ServerLogger.system('WARN', 'AI', 'GROQ_API_KEY missing 2014 using deterministic fallback', {});
       return NextResponse.json({ 
         success: true, 
         insight: generateFallbackInsight(),
@@ -113,7 +114,7 @@ export async function GET() {
         categories
       });
     } catch (apiErr) {
-      console.error("Groq Fetch Error, using fallback:", apiErr);
+      ServerLogger.system('ERROR', 'AI', 'Groq API error 2014 using fallback', { error: apiErr });
       return NextResponse.json({ 
         success: true, 
         insight: generateFallbackInsight(),
@@ -123,7 +124,7 @@ export async function GET() {
     }
 
   } catch (e: any) {
-    console.error("AI Insight Core Error:", e);
+    ServerLogger.system('ERROR', 'AI', 'AI Insight core error', { error: String(e) });
     // Even if Neo4j fails, we try a soft fallback if possible, or a clean error
     return NextResponse.json({ 
       success: true, 

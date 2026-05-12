@@ -8,6 +8,17 @@ import {
 } from '../types';
 import { Logger } from '@/lib/logger';
 
+/** Shape expected by the create_inventory_item_v1 RPC */
+export interface InventoryItemInput {
+  name: string;
+  sku: string;
+  type: 'RAW' | 'PREP' | 'SERVICE';
+  purchasing_uom: string;
+  inventory_uom: string;
+  conversion_factor: number;
+  category_id?: string;
+}
+
 /**
  * useLogistics Hook
  * RESPONSIBILITY: Read/Write state for Inventory and Procurement modules.
@@ -99,7 +110,7 @@ export function useLogistics(tenantId: string | undefined) {
    * addItem: Creates a new inventory SKU via the canonical RPC.
    * Bypasses direct table insert — enforces tenant isolation at DB level.
    */
-  const addItem = async (itemData: any) => {
+  const addItem = async (itemData: InventoryItemInput) => {
     if (!tenantId) return { success: false, error: 'No tenant context' };
     try {
       const { data, error } = await supabase.rpc('create_inventory_item_v1', {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { createClient } from '@/lib/supabase-server';
-import { Logger } from '@/lib/logger';
+import { ServerLogger } from '@/lib/logger-server';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (err: any) {
-    console.error('AI Parse Error:', err);
+    ServerServerLogger.system('ERROR', 'AI', 'Invoice AI parse error', { error: String(err) });
     return NextResponse.json({ error: 'Failed to process invoice' }, { status: 500 });
   }
 }
