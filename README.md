@@ -2,7 +2,7 @@
 
 A minimalist, high-performance financial management platform designed for multi-user households.
 
-🚀 **Live App**: [https://expense-tracker-v2-ten.vercel.app/](https://expense-tracker-v2-ten.vercel.app/)
+🚀 **Live App**: [https://synculariti-et.vercel.app/](https://synculariti-et.vercel.app/)
 
 ---
 
