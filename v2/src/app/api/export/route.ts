@@ -1,43 +1,48 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase-server';
 
-// Server-side Supabase (uses service role to access data for export)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
+/**
+ * GET /api/export
+ * Exports tenant transactions as CSV.
+ *
+ * SECURITY: Session-authenticated. tenant_id is derived from the
+ * authenticated session via get_my_tenant() — never from URL params.
+ * Fixes: table renamed 'expenses' -> 'transactions', removed auth bypass.
+ */
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const tenantId = searchParams.get('tenant_id');
-  const format = searchParams.get('format') || 'csv';
+  const supabase = await createClient();
 
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenant_id' }, { status: 400 });
+  // Verify session — reject unauthenticated callers
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: expenses, error } = await supabase
-    .from('expenses')
-    .select('date, description, category, amount, who, who_id')
-    .eq('tenant_id', tenantId)
+  const { searchParams } = new URL(req.url);
+  const format = searchParams.get('format') || 'csv';
+
+  // tenant_id is resolved server-side from the session, never from URL params
+  const { data: transactions, error } = await supabase
+    .from('transactions')
+    .select('date, description, category, amount, who, currency, transaction_type')
     .eq('is_deleted', false)
     .order('date', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (format === 'csv') {
-    const header = 'Date,Description,Category,Amount,Person\n';
-    const rows = (expenses || []).map(e =>
-      `${e.date},"${(e.description || '').replace(/"/g, '""')}",${e.category},${e.amount},${e.who || e.who_id || ''}`
+    const header = 'Date,Description,Category,Amount,Currency,Type,Person\n';
+    const rows = (transactions || []).map(e =>
+      `${e.date},"${(e.description || '').replace(/"/g, '""')}",${e.category},${e.amount},${e.currency},${e.transaction_type},${e.who || ''}`
     ).join('\n');
 
     return new NextResponse(header + rows, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="ET-Expenses-${new Date().toISOString().slice(0, 10)}.csv"`
+        'Content-Disposition': `attachment; filename="Synculariti-Export-${new Date().toISOString().slice(0, 10)}.csv"`
       }
     });
   }
 
-  return NextResponse.json({ expenses });
+  return NextResponse.json({ transactions });
 }

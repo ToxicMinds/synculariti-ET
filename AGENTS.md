@@ -73,44 +73,125 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ## 3. Principles Audit (The Scorecard)
 
-| Principle | Status | Implementation Detail |
+*Last updated: 2026-05-12 — Post Phase 0 execution.*
+
+| Principle | Status | Detail |
 | :--- | :--- | :--- |
-| **DRY** | 🔴 **Violation** | Duplicated Ledger logic. API Auth boilerplate copy-pasted. Inline styles > 300 lines in single components. |
-| **ACID** | 🔴 **Violation** | `receivePO` fails to update ledger. `outbox_events` is unused (Zero cross-domain signal resilience). |
-| **SOLID** | 🟡 **Warning** | `useSync` and `NavBar` are God Objects. Identity is a "tight-coupling" bottleneck. |
-| **Security** | 🔴 **BREACH** | SQL Audit: `anon` users have direct DML on core ledger tables. |
-| **Observability**| 🟡 **Warning** | Missing `Logger.user` in Logistics. Broken module logos (404s). |
-
-## 4. Priority Remediation Path (The "Platinum" Roadmap)
-
-### 🔴 Phase 0: Integrity & Security (The Must-Fix)
-1.  **Hardened RLS**: Revoke direct DML for `anon/authenticated` and enforce RPC-only writes.
-2.  **Atomic Logistics**: Fix the "Ghost PO" by making PO receipt and Ledger update atomic in a single RPC.
-3.  **Outbox Activation**: Implement the event-driven bridge for Logistics -> Finance signals.
-
-### 🟡 Phase 1: Architectural Purity (The Cleanup)
-1.  **API Middleware**: Centralize API auth/logging to remove copy-paste boilerplate.
-2.  **Ledger Unification**: Abstract Finance/Physical ledger logic into a single `@/lib/ledger` primitive.
-3.  **Hook Decomposition**: Break down `useSync` into smaller, responsibility-focused hooks.
-
-### 🟢 Phase 2: Visual & UX Excellence (The Polish)
-1.  **Style Extraction**: Move `NavBar` and scanner inline styles into CSS Modules or Design Tokens.
-2.  **Branding Restoration**: Fix 404 assets and implement the premium Bento Module Switcher.
-3.  **PWA Hardening**: Align Manifest and icons with the B2B SaaS identity.
+| **ACID** | 🟡 **Partial** | Phase 0 fixed the Ghost PO and wired the outbox bridge. `save_receipt_v3` has 3 overloaded signatures (ambiguity risk). Manual `addTransaction` still does a direct insert on `transactions`. |
+| **Security** | 🟡 **Hardened** | Phase 0 revoked direct DML from `anon`/`authenticated` on all ledger tables. Export route patched (auth + table name). Residual: `auth/pin` uses service role (legitimate but undocumented). |
+| **DRY** | 🔴 **Violation** | 13 `console.log` calls bypass the Logger. API auth boilerplate copied across 5 routes. Duplicate trigger names existed (now cleaned). Two debug routes queried the stale `expenses` table name. |
+| **Type Safety** | 🔴 **Violation** | 32 `: any` usages across modules. Heaviest offenders: `ReceiptScanner.tsx` (7), `StatementScanner.tsx` (4), `useIdentity.ts` (3). Breaks strict TypeScript contracts. |
+| **SOLID** | 🟡 **Warning** | `useSync` mixes read, write, and Neo4j sync in one hook. `NavBar.tsx` is a 324-line God Component with 3 embedded sub-components. Identity module is a bottleneck — every module depends on it. |
+| **Observability** | 🟡 **Warning** | `Logger.user` now added to Logistics mutations. But `useIdentity.ts` still uses `console.error`. No ErrorBoundary exists anywhere in the app — unhandled React errors are invisible to the audit trail. |
+| **Error Handling** | 🔴 **Violation** | Zero `ErrorBoundary` components. Unhandled promise rejections in Neo4j fire-and-forget calls. `ReceiptScanner` silently ignores scan failures in `onScanFailure`. |
+| **Resilience** | 🟡 **Partial** | `saveReceipt` has 3-attempt exponential backoff. `addTransaction` has none. PWA offline queue is documented but not implemented. |
 
 ---
 
-## 4. Architecture Standards (The "Platinum" Rules)
+## 4. Newly Surfaced Violations (Phase 0 Deep Scan)
 
-### 4.1 Modular "Shared-Nothing" Isolation
+These were **not in previous audits** and are documented here for the first time:
+
+| ID | Violation | File | Severity |
+| :--- | :--- | :--- | :--- |
+| V-01 | `receive_purchase_order_v1` referenced `pli.quantity` — column doesn't exist. Silent crash on every PO receipt. | DB RPC | 🔴 CRITICAL — **Fixed Phase 0.2** |
+| V-02 | Outbox trigger functions existed but were never attached to tables. Bridge was dead. | DB Triggers | 🔴 CRITICAL — **Fixed Phase 0.3** |
+| V-03 | Duplicate triggers (`trg_consume_procurement` + `trg_signal_procurement_finance`) would fire twice, creating duplicate invoices. | DB Triggers | 🔴 CRITICAL — **Fixed Phase 0.3b** |
+| V-04 | `export/route.ts` queried `FROM 'expenses'` (renamed table). All CSV exports returned errors. | API Route | 🔴 CRITICAL — **Fixed Phase 0.4** |
+| V-05 | `export/route.ts` had no auth guard — any caller could exfiltrate any tenant's data via URL param. | API Route | 🔴 SECURITY — **Fixed Phase 0.4** |
+| V-06 | `debug/sync-neo4j` and `debug/backfill-neo4j` still referenced `FROM 'expenses'`. | API Debug | 🟡 WARNING — **Fixed Phase 0.4** |
+| V-07 | 13 `console.log/warn/error` calls bypass `Logger` — telemetry blackspot. | Multiple | 🟡 WARNING — **Phase 1** |
+| V-08 | 32 `: any` TypeScript usages violate strict type contracts. | Multiple | 🟡 WARNING — **Phase 1** |
+| V-09 | Zero `ErrorBoundary` components — React render crashes are invisible. | App-wide | 🔴 VIOLATION — **Phase 1** |
+| V-10 | `save_receipt_v3` has 3 overloaded signatures — Postgres resolves by argument match, may call wrong version. | DB RPC | 🟡 WARNING — **Phase 1** |
+| V-11 | `addTransaction` in `useSync` still does a direct client `.insert()` on `transactions` — bypasses RPC safety. | Finance Hook | 🟡 WARNING — **Phase 1** |
+| V-12 | `auth/pin` route constructs virtual passwords as `pin_${pin}_${tenantId}` — deterministic and brute-forceable. | API Auth | 🔴 SECURITY — **Phase 1** |
+
+---
+
+## 5. Priority Remediation Path (The "Platinum" Roadmap)
+
+### ✅ Phase 0: Integrity & Security (COMPLETE)
+1.  **Hardened RLS** ✅ — Revoked direct DML from `anon`/`authenticated` on all ledger tables.
+2.  **Atomic Logistics** ✅ — Fixed Ghost PO. `receive_purchase_order_v1` now atomically: updates PO, writes ledger, emits outbox, logs activity.
+3.  **Outbox Activation** ✅ — Wired `trg_signal_procurement_to_finance` and `trg_consume_procurement_signal`. Bridge is live.
+4.  **Export Route** ✅ — Auth guard added, stale table reference fixed, tenant isolation enforced via session.
+5.  **Debug Routes** ✅ — Fixed stale `expenses` table reference in 2 debug routes.
+
+### 🟡 Phase 1: Architectural Purity (Next)
+1.  **Replace `console.log` with `Logger`** — 13 locations across modules and API routes.
+2.  **Eliminate `: any` types** — 32 usages; prioritise `ReceiptScanner.tsx` and `useIdentity.ts`.
+3.  **Add ErrorBoundary** — Wrap root and each module page to surface render crashes.
+4.  **API Middleware** — Centralize auth/logging boilerplate into a shared `withAuth()` wrapper.
+5.  **Harden `addTransaction`** — Route through `save_receipt_v3` or a new `add_transaction_v3` RPC.
+6.  **Harden PIN auth** — Move to TOTP or cryptographic token, not a deterministic password.
+
+### 🟢 Phase 2: Visual & UX Excellence (Polish)
+1.  **Style Extraction** — Move `NavBar.tsx` and scanner inline styles into CSS Modules.
+2.  **Branding Restoration** — Fix 404 assets and implement the premium Bento Module Switcher.
+3.  **PWA Hardening** — Implement actual offline mutation queue (currently documented, not built).
+
+---
+
+## 6. Architecture Standards (The "Platinum" Rules)
+
+### 6.1 Modular "Shared-Nothing" Isolation
 *   **Rule**: The App is divided into three core modules: `Identity`, `Logistics`, and `Finance`.
 *   **Encapsulation**: Each module must own its own hooks, components, and domain-specific types.
 *   **Communication**: Modules must not have circular dependencies. Shared UI components reside in `@/components`.
 
-### 4.2 Standalone Identity
+### 6.2 Standalone Identity
 *   **Rule**: The App must be wrapped in `IdentityGate`. No business logic should run until `tenant_id` is resolved.
 
 ---
+
+## 7. Operational File Map
+
+### 7.1 Module: Identity & Discovery
+*   **Location**: `/v2/src/modules/identity`
+*   **Responsibility**: Auth, Tenant Discovery, and Identity Gating.
+
+### 7.2 Module: Logistics (IMS)
+*   **Location**: `/v2/src/modules/logistics`
+*   **Responsibility**: SKU Management, Stock Ledger, and Procurement.
+
+### 7.3 Module: Finance (Ledger)
+*   **Location**: `/v2/src/modules/finance`
+*   **Responsibility**: Transactions, Receipt Scanning, and Financial Intelligence.
+
+---
+
+## 8. Resilience & Regression Baseline
+
+### 8.1 Outbox Resilience
+*   **Scenario**: `PROCUREMENT_RECEIVED` → `INVOICE_GENERATED`.
+*   **Verification**: Run `scratch/test_outbox_resilience.sql`.
+*   **Status**: ✅ Live as of Phase 0.
+
+---
+
+## 9. Technical Debt & Known Issues
+
+| Issue | Severity | Fix Status |
+| :--- | :--- | :--- |
+| FIFO Batch Costing | 🟡 MEDIUM | **GAP** — Tracking quantity but not batch-specific dollar value. |
+| Nested BOMs | 🟡 MEDIUM | **GAP** — Ingredients support 1:1 conversion, not complex recipes. |
+| `save_receipt_v3` Overloads | 🟡 MEDIUM | **Phase 1** — 3 signatures; consolidate to 1 canonical form. |
+| PIN Auth Security | 🔴 HIGH | **Phase 1** — Deterministic password construction is brute-forceable. |
+| Zero ErrorBoundaries | 🔴 HIGH | **Phase 1** — React render crashes are invisible to operators. |
+
+---
+
+## 10. Intelligence Strategy: AI Invoice Pipeline
+To achieve **Business-Grade Determinism** for arbitrary B2B invoices, we implement a three-stage pipeline:
+
+1.  **Stage 0: Triage (The Guard)**: Vision LLM verifies document relevancy. Non-financial images are rejected immediately.
+2.  **Stage 1: Vision Extraction (The Eyes)**: High-fidelity transcription of spatial relationships (Issuer IČO, Total, Date, Line Items).
+3.  **Stage 2: Reasoning Refinement (The Brain)**: Llama 3.3 70B maps transcribed data to Tenant context, performs VAT validation, resolves Supplier Catalog entries.
+
+
+
+
 
 ## 5. Operational File Map
 

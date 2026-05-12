@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   try {
     // Fetch all non-deleted expenses for this sync run
     const { data: expenses, error } = await supabase
-      .from('expenses')
+      .from('transactions')
       .select('*')
       .eq('is_deleted', false);
 

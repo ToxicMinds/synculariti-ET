@@ -67,36 +67,54 @@ export function useLogistics(tenantId: string | undefined) {
   };
 
   // Mutations
+
+  /**
+   * receivePO: Atomic 3-step operation via RPC.
+   * 1. Marks PO as RECEIVED
+   * 2. Inserts inventory_ledger rows for each line item (with conversion_factor)
+   * 3. Emits PROCUREMENT_RECEIVED to outbox_events (triggers Finance invoice creation)
+   * All three steps are atomic — if any fails, all roll back.
+   */
   const receivePO = async (poId: string) => {
+    if (!tenantId) return { success: false, error: 'No tenant context' };
     try {
-      const { error } = await supabase
-        .from('purchase_orders')
-        .update({ status: 'RECEIVED' })
-        .eq('id', poId);
+      const { data, error } = await supabase.rpc('receive_purchase_order_v1', {
+        p_po_id: poId
+      });
 
       if (error) throw error;
-      
-      Logger.system('INFO', 'Logistics', 'PO received successfully', { poId });
-      return { success: true };
+
+      Logger.system('INFO', 'Logistics', 'PO received atomically via RPC', { poId, result: data });
+      Logger.user(tenantId, 'PO_RECEIVED', `Purchase Order received — stock updated`, 'Logistics Manager');
+
+      await fetchData();
+      return { success: true, data };
     } catch (err: any) {
-      Logger.system('ERROR', 'Logistics', 'Failed to receive PO', { poId, error: err });
+      Logger.system('ERROR', 'Logistics', 'receivePO RPC failed', { poId, error: err });
       return { success: false, error: err.message };
     }
   };
 
+  /**
+   * addItem: Creates a new inventory SKU via the canonical RPC.
+   * Bypasses direct table insert — enforces tenant isolation at DB level.
+   */
   const addItem = async (itemData: any) => {
+    if (!tenantId) return { success: false, error: 'No tenant context' };
     try {
-      const { error } = await supabase
-        .from('inventory_items')
-        .insert([{ ...itemData, tenant_id: tenantId }]);
+      const { data, error } = await supabase.rpc('create_inventory_item_v1', {
+        p_item: { ...itemData, tenant_id: tenantId }
+      });
 
       if (error) throw error;
-      
-      Logger.system('INFO', 'Logistics', 'Item added successfully', { name: itemData.name });
+
+      Logger.system('INFO', 'Logistics', 'Item created via RPC', { name: itemData.name });
+      Logger.user(tenantId, 'ITEM_CREATED', `New SKU added: ${itemData.name}`, 'Logistics Manager');
+
       await fetchData();
-      return { success: true };
+      return { success: true, data };
     } catch (err: any) {
-      Logger.system('ERROR', 'Logistics', 'Failed to add item', { error: err });
+      Logger.system('ERROR', 'Logistics', 'addItem RPC failed', { error: err });
       return { success: false, error: err.message };
     }
   };

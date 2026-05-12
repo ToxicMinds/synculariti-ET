@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
   try {
     let query = supabase
-      .from('expenses')
+      .from('transactions')
       .select('id, tenant_id, description, amount, date, category')
       .eq('is_deleted', false);
 

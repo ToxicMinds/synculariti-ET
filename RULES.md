@@ -74,18 +74,27 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 
 ### Financial & Physical Ledger Mutations
 - **Atomic Only**: Any mutation touching the ledger (Transactions or Inventory) MUST be atomic.
-- **Logistics Rule**: Marking a PO as RECEIVED **MUST** simultaneously insert into `inventory_ledger`. Failure to do so is a SEVERITY-1 bug.
-- **Canonical RPC**: Use `save_receipt_v3` for ALL financial writes. Manual client-side `.insert()` on `transactions` is restricted to dev-only.
-- **B2B Atomic Pattern**: Use the `outbox_events` table for cross-domain signals (e.g., Procurement -> Finance).
+- **Logistics Rule**: `receive_purchase_order_v1` RPC is the canonical way to receive a PO. It atomically: marks RECEIVED, updates `inventory_ledger`, emits `PROCUREMENT_RECEIVED` to outbox, and logs to `activity_log`.
+- **Canonical RPC**: Use `save_receipt_v3` for ALL financial writes. Manual client-side `.insert()` on `transactions` is forbidden outside development.
+- **B2B Atomic Pattern**: Cross-domain signals (Logistics → Finance) MUST flow through `outbox_events`. Never call Finance logic directly from Logistics.
+- **No Orphaned Functions**: Any trigger function MUST have a corresponding attached trigger. Verify with `information_schema.triggers` after every migration.
 
 ### Telemetry & Audit Trail
+- **Logger, not console**: NEVER use `console.log`, `console.warn`, or `console.error` in production code. Use `Logger.system()` for technical events and `Logger.user()` for business events.
 - **User Activity**: EVERY mutation MUST call `Logger.user(tenantId, action, description, actorName)`.
-- **Visibility**: If an action (e.g. stock receipt) doesn't appear in the Activity Log, it didn't happen.
+- **Visibility**: If an action doesn't appear in the Activity Log, it didn't happen.
+
+### Error Handling
+- **ErrorBoundary Required**: Every page-level component MUST be wrapped in an `ErrorBoundary`. React render crashes are a telemetry blackspot without them.
+- **No Silent Failures**: Never swallow errors silently (e.g., empty `catch` blocks or `onScanFailure` that does nothing). Log with `Logger.system('ERROR', ...)`.
+- **Fire-and-Forget Safety**: Neo4j `.catch()` calls are acceptable but MUST log to `Logger.system`.
 
 ### Security & API Governance
-- **No Direct DML**: Avoid client-side `.insert()`, `.update()`, or `.delete()` on core tables. Use RPCs to ensure business logic and RLS are enforced as a single unit.
-- **Middleware-First**: API routes should use a centralized auth wrapper to prevent boilerplate duplication and ensure session integrity.
-- **Naked Tables**: Never grant `INSERT/UPDATE/DELETE` permissions to `anon` or `authenticated` roles on ledger tables.
+- **No Direct DML**: Avoid client-side `.insert()`, `.update()`, or `.delete()` on core tables. Use RPCs.
+- **Session-Based tenant_id**: `tenant_id` is NEVER passed as a URL param or client payload. Always derived server-side from session via RLS `get_my_tenant()`.
+- **No Stale Table References**: The core financial table is `transactions` (not `expenses`). The rename was applied in migration `05_tenant_rename.sql`. Any reference to `'expenses'` in app code is a bug.
+- **Auth Guard on All Routes**: Every API route that reads or writes tenant data MUST call `createClient()` and verify the session. No exceptions.
+- **Naked Tables**: Never grant `INSERT/UPDATE/DELETE` to `anon` or `authenticated` on ledger tables.
 
 ### Design System & UX
 - **Zero Inline Styling**: Avoid ad-hoc `style={{...}}` in components. Use CSS Modules or `globals.css` tokens.
@@ -94,9 +103,9 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 
 ### TypeScript
 - **TypeScript only.** No `.js` files in `src/`. No `require()`.
-- All functions must have **explicit return types**. No implicit `any`.
+- **No `: any`**: The 32 current usages are tracked debt. No new `any` types without a `// REASON:` comment.
+- All functions must have **explicit return types**.
 - Use `async/await`. No raw `.then()/.catch()` chains.
-- Use `as any` only as a last resort, always with a `// REASON:` comment.
 
 ---
 
@@ -138,7 +147,11 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 | Import a hook from `@/hooks` | Import from `@/modules/[domain]/hooks` |
 | Import a component from `@/components` if it's domain-specific | Move it to `@/modules/[domain]/components` |
 | Create circular dependencies between modules | Move shared logic to `@/lib` or `@/components` |
-| `supabase.from('expenses').insert(...)` in app code | Use `save_receipt_v3` RPC |
+| `supabase.from('expenses').insert(...)` | The table is `transactions`. Use `save_receipt_v3` RPC |
+| `supabase.from('purchase_orders').update({ status: 'RECEIVED' })` | Use `receive_purchase_order_v1` RPC — it's atomic |
+| `console.log / console.error` | Use `Logger.system()` or `Logger.user()` |
+| Pass `tenant_id` in a URL param | Derive it from session via RLS — never trust the client |
+| Create a trigger function without attaching it | Always pair `CREATE FUNCTION` with `CREATE TRIGGER` |
 | Call Groq without injecting the category list | Always pass `tenant.categories` to the prompt |
 | Deploy without `npm run build` passing | Build must be clean before any push to `main` |
 | Alter an applied SQL migration file | Add a new numbered migration file |
