@@ -127,8 +127,17 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ---
 
-## 7. Operational File Map
+## 7. Intelligence Strategy: AI Invoice Pipeline
+To achieve **Business-Grade Determinism** for arbitrary B2B invoices, we implement a dual-stage pipeline:
+
+1.  **Stage 1: Vision Extraction (The Eyes)**: Use a Vision LLM (e.g., Llama 3.2 Vision) to perform high-fidelity transcription of the invoice image. Focus: Spatial relationship of Total, Date, Issuer IČO/DIČ, and Line Items.
+2.  **Stage 2: Reasoning Refinement (The Brain)**: Feed the transcription + Tenant Context into a Reasoning LLM (Llama 3.3 70B). Focus: Category mapping, VAT validation, and Supplier Catalog resolution.
+
+---
+
+## 8. Operational File Map
 *   **`/v2/src/modules/identity`**: Identity & Discovery Module (Standalone).
+*   **`/v2/src/modules/logistics`**: Logistics & IMS Module (Standalone).
+*   **`/v2/src/modules/finance`**: Financial Ledger & Intelligence Module (Standalone).
 *   **`/v2/src/app`**: Core business routing.
-*   **`/v2/src/hooks`**: `useLogistics` (IMS), `useSync` (Finance).
 *   **`/sql/b2b_evolution`**: Numbered DDL migrations.
