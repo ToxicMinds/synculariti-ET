@@ -2,8 +2,6 @@
 
 This document is the definitive guide for AI assistants and developers. It consolidates architecture, design principles, and operational rules for the **Synculariti-ET** platform—the B2B SaaS evolution of the ET Expense engine.
 
-> For the full developer rulebook (stack, commands, conventions, what NOT to do), see **`RULES.md`**.
-
 ---
 
 ## 1. Project Overview
@@ -11,7 +9,6 @@ This document is the definitive guide for AI assistants and developers. It conso
 *   **Mission**: Business-Grade Determinism. Moving from household tracking to multi-location restaurant and SMB financial management.
 *   **Core Stack**: Next.js 16.2 (App Router), TypeScript 5, Supabase (Postgres 17), Neo4j 6 (Graph), Groq AI (Llama 3.3 70B).
 *   **Architecture**: "Shared-Nothing" Multi-Tenant Isolation.
-*   **Identity**: Standalone **Discovery & Selection** module.
 
 ---
 
@@ -41,7 +38,31 @@ This document is the definitive guide for AI assistants and developers. It conso
     *   **WHEN** the Bridge Trigger executes
     *   **THEN** a new 'PENDING' Invoice should appear in Finance matching the PO total and currency.
 
-### 2.4 Module: Observability (Black Site)
+### 2.4 Module: Supplier Management
+*   **Purpose**: Vendor tracking and pricing history.
+*   **Logic**: Linked to POs and Invoices. Tracks IČO/DIČ for tax compliance.
+*   **Gherkin Scenario**:
+    *   **GIVEN** an invoice is saved with IČO "12345678"
+    *   **WHEN** I view the Supplier Catalog
+    *   **THEN** I should see a profile for that vendor with their total billing history.
+
+### 2.5 Module: Intelligence Hub
+*   **Purpose**: Predictive analytics and relationship mapping.
+*   **Stack**: Groq (Llama 3.3) for forecasting + Neo4j for merchant graph resolution.
+*   **Gherkin Scenario**:
+    *   **GIVEN** 3 months of coffee purchases from 3 different vendors
+    *   **WHEN** I run the Price Trend insight
+    *   **THEN** the AI should identify the lowest-cost vendor and forecast next month's requirement.
+
+### 2.6 Module: PWA Mobility
+*   **Purpose**: High-performance mobile experience.
+*   **Features**: Manifest v3, biometric-ready UI, and orientation-locked bento layouts.
+*   **Gherkin Scenario**:
+    *   **GIVEN** a user is in a basement with flaky signal
+    *   **WHEN** they scan a receipt
+    *   **THEN** the mutation should be queued locally and retried automatically until the outbox clears.
+
+### 2.7 Module: Observability (Black Site)
 *   **Purpose**: High-fidelity technical and business telemetry.
 *   **Gherkin Scenario**:
     *   **GIVEN** an expense of €50 is added to the system
@@ -66,7 +87,6 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ### 4.1 Standalone Identity
 *   **Rule**: The App must be wrapped in `IdentityGate`. No business logic should run until `tenant_id` is resolved.
-*   **JWT Capability**: Module is designed to accept `tenant_id` scopes from the Global Login JWT.
 
 ### 4.2 Tenant Separation & RLS
 *   **Standard**: Every table MUST have `FORCE ROW LEVEL SECURITY`.

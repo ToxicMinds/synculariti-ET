@@ -14,9 +14,9 @@ import { StatementScanner } from '@/components/StatementScanner';
 import { ItemAnalytics } from '@/components/ItemAnalytics';
 import { SpendingBreakdown, DailyTrend } from '@/components/FinanceCharts';
 import { AIInsights } from '@/components/AIInsights';
-import { WealthBuilder } from '@/components/WealthBuilder';
+import { OperatingMargin } from '@/components/WealthBuilder';
 import { BudgetHealth } from '@/components/BudgetHealth';
-import { FamilySpends } from '@/components/FamilySpends';
+import { TeamAllocation } from '@/components/FamilySpends';
 import { CommandCenter } from '@/components/CommandCenter';
 import { MarketTrends } from '@/components/MarketTrends';
 import { ManualEntryModal } from '@/components/ManualEntryModal';
@@ -74,8 +74,16 @@ function DashboardContent() {
 
   if (!tenant) return <AuthScreen session={session} />;
 
-  // Filter transactions for current month components
-  const displayTransactions = transactions.filter(t => t.date?.startsWith(selectedMonth));
+  // Platinum Demo Mode: Show ghost data if no real transactions exist
+  const isDemo = transactions.length === 0;
+  const demoTransactions = isDemo ? [
+    { id: 'd1', amount: 450.00, category: 'Food Costs', who: 'System', date: selectedMonth + '-01', note: 'Demo: Bulk Produce' },
+    { id: 'd2', amount: 1200.00, category: 'Labor & Wages', who: 'System', date: selectedMonth + '-05', note: 'Demo: Payroll' },
+    { id: 'd3', amount: 200.00, category: 'Utilities', who: 'System', date: selectedMonth + '-10', note: 'Demo: Electricity' }
+  ] : [];
+
+  const activeTransactions = isDemo ? demoTransactions : transactions;
+  const displayTransactions = activeTransactions.filter(t => t.date?.startsWith(selectedMonth));
   const totals = calcTotals(displayTransactions);
   const totalIncome = Object.values(tenant.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const totalBudget = Object.values(tenant.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
@@ -141,19 +149,28 @@ function DashboardContent() {
         ) : (
           <>
             {/* ROW 1: ACTION & PERFORMANCE */}
-            <MonthlyPerformance transactions={transactions} selectedMonth={selectedMonth} colSpan={8} />
+            {isDemo && (
+              <div style={{ gridColumn: 'span 12', padding: '12px 24px', borderRadius: 16, background: 'var(--bg-hover)', border: '1px solid var(--border-color)', marginBottom: -16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 18 }}>💡</span>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>Demo Mode Active:</strong> We've populated some sample operating data for {selectedMonth} to show you what's possible. 
+                  Scan your first invoice to replace this.
+                </p>
+              </div>
+            )}
+            <MonthlyPerformance transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
             <CommandCenter
               onScan={() => setShowScanner(true)}
               onManual={(prefill) => setManualEntry({ ...prefill, who_id: selectedUser })}
               onStatement={() => setShowStatement(true)}
             />
 
-            {/* ROW 2: FAMILY & BUDGET */}
-            <FamilySpends transactions={displayTransactions} names={tenant.names} colSpan={6} />
+            {/* ROW 2: TEAM & BUDGET */}
+            <TeamAllocation transactions={displayTransactions} names={tenant.names} colSpan={6} />
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} colSpan={6} />
 
             {/* ROW 3: STATUS & INTELLIGENCE */}
-            <WealthBuilder income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
+            <OperatingMargin income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
             <AIInsights 
               tenantId={tenant.tenant_id} 
               transactionCount={transactions.length} 

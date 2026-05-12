@@ -3,7 +3,7 @@
 import { BentoCard } from './BentoCard';
 import { Transaction, calcPerUserSpend } from '@/lib/finance';
 
-export function FamilySpends({ transactions, names, colSpan = 4 }: { transactions: Transaction[], names: Record<string, string>, colSpan?: number }) {
+export function TeamAllocation({ transactions, names, colSpan = 4 }: { transactions: Transaction[], names: Record<string, string>, colSpan?: number }) {
   // FIXED: Use the proper hybrid resolver that handles BOTH who_id AND legacy who-name
   const userSpends = calcPerUserSpend(transactions, names);
 
@@ -14,12 +14,12 @@ export function FamilySpends({ transactions, names, colSpan = 4 }: { transaction
   })).sort((a, b) => b.amount - a.amount);
 
   const maxSpend = sortedUsers[0]?.amount || 1;
-  // Champion = lowest spender (most budget-conscious, not counting zero-data users)
+  // Lead = lowest spender (most efficient resource usage)
   const activeUsers = sortedUsers.filter(u => u.amount > 0);
-  const champion = activeUsers.length > 1 ? activeUsers[activeUsers.length - 1] : null;
+  const efficiencyLead = activeUsers.length > 1 ? activeUsers[activeUsers.length - 1] : null;
 
   return (
-    <BentoCard title="Family Spends" colSpan={colSpan}>
+    <BentoCard title="Team Allocation" colSpan={colSpan}>
       <div className="flex-col gap-4">
         {sortedUsers.map((user) => (
           <div key={user.id} className="flex-row items-center gap-3">
@@ -46,14 +46,14 @@ export function FamilySpends({ transactions, names, colSpan = 4 }: { transaction
           </div>
         ))}
 
-        {champion && (
+        {efficiencyLead && (
           <div className="status-badge status-success" style={{ marginTop: 4, padding: '10px 14px', fontSize: 12 }}>
-            🏆 {champion.name} is the Budget Champion this month!
+            ⚡ {efficiencyLead.name} is the Efficiency Lead this month!
           </div>
         )}
 
         {activeUsers.length === 0 && (
-          <p className="card-subtitle">No spending data attributed to members yet.</p>
+          <p className="card-subtitle">No resource allocation data found.</p>
         )}
       </div>
     </BentoCard>

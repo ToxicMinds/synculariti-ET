@@ -1,22 +1,22 @@
 {
   "name": "Synculariti",
   "short_name": "Synculariti",
-  "description": "Premium household expense tracking",
+  "description": "Enterprise B2B SaaS Financial Primitive",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#020617",
   "theme_color": "#020617",
-  "categories": ["finance", "productivity"],
+  "categories": ["finance", "business", "logistics"],
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/brand/identity.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/brand/identity.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
