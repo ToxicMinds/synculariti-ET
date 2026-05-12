@@ -35,92 +35,53 @@ npm run start    # Start production server locally
 
 ```
 synculariti-ET/
-├── AGENTS.md              ← AI agent rules (read this first)
+├── AGENTS.md              ← AI agent rules & principles audit
 ├── RULES.md               ← This file — developer rulebook
 ├── vercel.json            ← eKasa proxy rewrite rules
 ├── sql/
 │   └── b2b_evolution/     ← Ordered SQL migrations (00_ → 03_)
-│       ├── 00_base_schema.sql
-│       ├── 01_locations.sql
-│       ├── 02_expenses_update.sql
-│       └── 03_code_db_handshake.sql
 └── v2/                    ← Next.js application root
     └── src/
         ├── app/           ← Next.js App Router pages + API routes
-        │   ├── api/
-        │   │   ├── ai/         ← AI insights endpoint
-        │   │   ├── auth/       ← Auth helpers
-        │   │   ├── ekasa/      ← eKasa receipt lookup
-        │   │   ├── ekasa-proxy/← Slovak FinSprva proxy
-        │   │   ├── enablebanking/ ← Bank sync (Enable Banking API)
-        │   │   ├── export/     ← Data export endpoints
-        │   │   ├── groq/       ← Groq AI categorization
-        │   │   └── health/     ← Health check
-        │   ├── settings/   ← Settings page
-        │   ├── layout.tsx  ← Root layout (PWA metadata, fonts)
-        │   └── page.tsx    ← Main dashboard
-        ├── components/    ← Reusable UI components (Bento cards, scanner, charts)
+        ├── components/    ← SHARED UI components (Bento cards, generic inputs)
+        ├── modules/       ← DOMAIN ISOLATION (Core Business Logic)
+        │   ├── identity/  ← Auth, Tenant Discovery, Identity Gate
+        │   ├── logistics/ ← SKU Catalog, Append-only Ledger, Procurement
+        │   └── finance/   ← Ledger, AI Insights, Invoicing, Scanning
         ├── context/
         │   └── TenantContext.tsx    ← Global app state provider
-        ├── hooks/
-        │   ├── useTenant.ts       ← Type definitions for app state
-        │   ├── useTransactions.ts ← READ-ONLY: fetches expenses
-        │   └── useSync.ts         ← WRITE-ONLY: financial mutations
-        └── lib/
-            ├── constants.ts       ← DEFAULT_CATEGORIES, CATEGORY_ICONS (source of truth)
-            ├── ekasa-protocols.ts ← QR extraction (baseline + OKP protocol)
-            ├── finance.ts         ← Pure financial calculation functions
-            ├── finance.test.ts    ← Jest tests for finance.ts
-            ├── logger.ts          ← Logger class (system telemetry + user activity)
-            ├── neo4j.ts           ← Merchant graph operations
-            ├── rules.ts           ← Business rule validations
-            ├── supabase.ts        ← Client-side Supabase client
-            ├── supabase-server.ts ← Server-side Supabase client (SSR)
-            └── utils.ts           ← General utilities
+        └── lib/           ← SHARED utilities (logger, supabase, types)
 ```
 
 ---
 
 ## Coding Conventions
 
+### Modular "Shared-Nothing" Isolation
+- **Rule**: Every business domain MUST live in its own `modules/` subdirectory.
+- **Encapsulation**: Hooks, components, and domain-specific types must stay inside the module.
+- **Communication**: Modules must never have circular dependencies. If logic is shared, it moves to `@/lib` or `@/components`.
+
+### Hooks — Domain Separation
+- **Finance**: `useTransactions` (Read) and `useSync` (Write) live in `modules/finance/hooks/`.
+- **Logistics**: `useLogistics` lives in `modules/logistics/hooks/`.
+- **Identity**: `useTenant` lives in `modules/identity/hooks/`.
+
+### Intelligence Strategy: AI Invoice Pipeline
+To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
+1. **Stage 1 (Vision)**: Use Vision LLM for spatial transcription (Total, Date, IČO, Items).
+2. **Stage 2 (Reasoning)**: Use Reasoning LLM (Llama 3.3) for category mapping and VAT validation.
+
+### Financial Mutations
+- All expense writes go through the `save_receipt_v3` Supabase RPC. No exceptions.
+- Every mutation MUST: call `Logger.user(...)`, call `triggerRefresh()`, fire Neo4j sync.
+- All network/DB writes MUST have 3-stage exponential backoff (1s → 2s → 4s).
+
 ### TypeScript
 - **TypeScript only.** No `.js` files in `src/`. No `require()`.
 - All functions must have **explicit return types**. No implicit `any`.
 - Use `async/await`. No raw `.then()/.catch()` chains.
 - Use `as any` only as a last resort, always with a `// REASON:` comment.
-
-### Hooks — Hard Separation
-- `useTransactions` — **read-only**. Never put write logic here.
-- `useSync` — **write-only**. Never put fetch/query logic here.
-- Never mix these concerns in the same component or hook.
-
-### Categories — Single Source of Truth
-- Categories live in `v2/src/lib/constants.ts` (`DEFAULT_CATEGORIES`, `CATEGORY_ICONS`).
-- At runtime, the live list comes from `tenant.categories` via `TenantContext`.
-- **NEVER** hardcode a category string in a component. Always read from context.
-- Groq MUST receive `tenant.categories` in every prompt — never let it invent categories.
-
-### Financial Mutations
-- All expense writes go through the `save_receipt_v3` Supabase RPC. No exceptions.
-- `save_receipt_v2` is **deprecated** — it lacks location ownership checks and currency fields.
-- Every mutation MUST: call `Logger.user(...)`, call `triggerRefresh()`, fire Neo4j sync.
-- All network/DB writes MUST have 3-stage exponential backoff (1s → 2s → 4s).
-
-### Logging
-- **Technical errors** → `Logger.system('ERROR', component, message, metadata, tenantId)`
-- **User-visible events** → `Logger.user(tenantId, action, description, actorName)`
-- **NEVER** surface raw Supabase/PostgreSQL error messages to the user UI.
-- Log component names: `'API' | 'Neo4j' | 'Scanner' | 'Auth' | 'Sync' | 'AI'`
-
-### Supabase Clients
-- **Client-side** (React components, hooks): `import { supabase } from '@/lib/supabase'`
-- **Server-side** (API routes, middleware): `import { createServerClient } from '@/lib/supabase-server'`
-- Never use `supabase-js` directly in API routes — must use `@supabase/ssr` for session mirroring.
-
-### Styling
-- Vanilla CSS only. No Tailwind, no CSS-in-JS.
-- Global design tokens in `v2/src/app/globals.css`.
-- Component-scoped styles via CSS Modules (`*.module.css`) where needed.
 
 ---
 
@@ -155,26 +116,14 @@ synculariti-ET/
 
 ---
 
-## eKasa Protocol Rules
-
-- Dual-protocol extraction: try baseline Online ID (`O-[32 hex chars]`) first, fall back to OKP raw data.
-- eKasa requests proxy through `vercel.json` rewrite → EU-Central to bypass Slovak government IP blocks.
-- Error codes are mapped to human-readable messages in `ekasa-protocols.ts`. Never show raw HTTP status to user.
-
----
-
 ## What NOT to Do
 
 | ❌ Don't | ✅ Do Instead |
 |---------|-------------|
+| Import a hook from `@/hooks` | Import from `@/modules/[domain]/hooks` |
+| Import a component from `@/components` if it's domain-specific | Move it to `@/modules/[domain]/components` |
+| Create circular dependencies between modules | Move shared logic to `@/lib` or `@/components` |
 | `supabase.from('expenses').insert(...)` in app code | Use `save_receipt_v3` RPC |
-| Call `save_receipt_v2` | Use `save_receipt_v3` |
-| Hardcode categories like `'Groceries'` in components | Read from `tenant.categories` |
-| Put `GROQ_API_KEY` in a `NEXT_PUBLIC_*` variable | Use server-side env var in API routes |
-| Show raw DB errors to the user | Map to a friendly message |
-| Mix read/write logic in one hook | Keep `useTransactions` and `useSync` separate |
-| Add a new table without RLS | Always add `FORCE ROW LEVEL SECURITY` |
-| Pass `tenant_id` in a URL param | Let the DB resolve it from `auth.uid()` |
 | Call Groq without injecting the category list | Always pass `tenant.categories` to the prompt |
 | Deploy without `npm run build` passing | Build must be clean before any push to `main` |
 | Alter an applied SQL migration file | Add a new numbered migration file |
@@ -188,41 +137,17 @@ synculariti-ET/
 
 #### 1. Supabase MCP (already configured)
 **Why**: Direct DB introspection, RPC execution, RLS verification, log access — all without leaving the IDE.  
-**Token Strategy**: Never ask for "all tables" or "all data". Always scope:
-```
-# ✅ Efficient
-"Check if save_receipt_v3 exists"
-"Show me RLS policies on the expenses table"
-"Get the last 10 error logs from the api service"
-
-# ❌ Wasteful
-"Show me all the data in the expenses table"
-"List every function in the database"
-```
+**Token Strategy**: Never ask for "all tables" or "all data". Always scope.
 
 #### 2. GitHub MCP
 **Why**: PR creation, branch management, and code review without context-switching to browser.  
 **Install**: `npx @modelcontextprotocol/server-github`  
-**Token Strategy**: Use for targeted operations — create PR, check CI status, list open issues. Never "read the whole repo".
 
 #### 3. Vercel MCP
 **Why**: Trigger deploys, check build logs, promote previews to production — directly from the agent.  
 **Install**: `npx @modelcontextprotocol/server-vercel` (requires Vercel token)  
-**Token Strategy**: Use for deploy status and log tailing only. Don't ask it to inspect env vars.
-
-### Tier 2 — Situational
-
-#### 4. Playwright / Browser MCP
-**Why**: End-to-end testing of the PWA scanner flow — verifying QR scan → receipt parse → save works.  
-**When**: Only when testing UI flows, not for every task.  
-**Token Strategy**: Write targeted test scripts. Never use for general browsing.
-
-#### 5. Neo4j MCP
-**Why**: Query the merchant graph (`MATCH (m:Merchant)-[:SOLD]->...`) when debugging sync failures.  
-**When**: Only when `normalizeAndLinkMerchant` issues arise or graph analysis is needed.
 
 ### Universal Token Efficiency Rules
 - Ask MCPs for **specific facts**, not open-ended exploration.
-- Always provide context (table name, function name, error message) so the MCP doesn't have to search.
 - Chain MCP calls: get schema → get logs → propose fix. Don't re-fetch what you already know.
 - For Supabase: prefer `execute_sql` for pinpoint queries over `list_tables` for exploration.
