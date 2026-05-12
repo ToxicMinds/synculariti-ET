@@ -75,10 +75,17 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | Principle | Status | Implementation Detail |
 | :--- | :--- | :--- |
-| **DRY** | 🟢 **Platinum** | Logic centralized in `modules/identity`, `modules/logistics`, and `modules/finance`. No cross-domain logic duplication. |
-| **ACID** | 💎 **Platinum** | **Logistics**: Append-only ledger for stock. **Finance**: Atomic RPCs (`save_receipt_v3`) for multi-table transactions. |
-| **SOLID** | 🟢 **Platinum** | Domain isolation via Physical Decoupling. Hooks are split by responsibility (e.g., Read vs Write in Finance). |
-| **Security** | 💎 **Hardened** | **Force RLS** on every table. Tenant isolation enforced via `get_my_tenant()` at the DB level. |
+| **DRY** | 🔴 **Violation** | Duplicated Ledger logic between Finance and Logistics. Inline styling remains prevalent. |
+| **ACID** | 🔴 **Violation** | `receivePO` in Logistics fails to update inventory ledger (Atomicity failure). Client-side inserts bypass RPC safety. |
+| **SOLID** | 🟡 **Warning** | `useSync` is a "God Hook" with too many responsibilities. Modules are decoupled but logic is leaked. |
+| **Security** | 🔴 **BREACH** | SQL Audit confirms direct `INSERT/UPDATE/DELETE` access for `anon` and `authenticated` roles on core tables. |
+| **Observability**| 🟡 **Warning** | Logistics actions miss `Logger.user` calls. Business audit trail is incomplete. |
+
+## 4. Current Technical Debt (The "Wall of Shame")
+1.  **The "Ghost" PO Problem**: Receiving a PO in Logistics does not increase physical stock.
+2.  **Naked Tables**: RLS exists but permissions are too broad, allowing bypass of atomic RPCs.
+3.  **Ledger Schism**: Separate logic for financial vs. physical ledgers creates maintenance overhead.
+4.  **Inline Styling**: Massive use of ad-hoc styles instead of design tokens in `globals.css`.
 
 ---
 

@@ -72,10 +72,19 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 1. **Stage 1 (Vision)**: Use Vision LLM for spatial transcription (Total, Date, IČO, Items).
 2. **Stage 2 (Reasoning)**: Use Reasoning LLM (Llama 3.3) for category mapping and VAT validation.
 
-### Financial Mutations
-- All expense writes go through the `save_receipt_v3` Supabase RPC. No exceptions.
-- Every mutation MUST: call `Logger.user(...)`, call `triggerRefresh()`, fire Neo4j sync.
-- All network/DB writes MUST have 3-stage exponential backoff (1s → 2s → 4s).
+### Financial & Physical Ledger Mutations
+- **Atomic Only**: Any mutation touching the ledger (Transactions or Inventory) MUST be atomic.
+- **Logistics Rule**: Marking a PO as RECEIVED **MUST** simultaneously insert into `inventory_ledger`. Failure to do so is a SEVERITY-1 bug.
+- **Canonical RPC**: Use `save_receipt_v3` for ALL financial writes. Manual client-side `.insert()` on `transactions` is restricted to dev-only.
+- **Unified Ledger**: Prefer shared ledger primitives from `@/lib` to prevent logic drift.
+
+### Telemetry & Audit Trail
+- **User Activity**: EVERY mutation MUST call `Logger.user(tenantId, action, description, actorName)`.
+- **Visibility**: If an action (e.g. stock receipt) doesn't appear in the Activity Log, it didn't happen.
+
+### Security & Database
+- **No Direct DML**: Avoid client-side `.insert()`, `.update()`, or `.delete()` on core tables. Use RPCs to ensure business logic and RLS are enforced as a single unit.
+- **Naked Tables**: Never grant `INSERT/UPDATE/DELETE` permissions to `anon` or `authenticated` roles on ledger tables.
 
 ### TypeScript
 - **TypeScript only.** No `.js` files in `src/`. No `require()`.
