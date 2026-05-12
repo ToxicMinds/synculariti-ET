@@ -47,17 +47,21 @@ export const viewport: Viewport = {
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
+import { IdentityGateWrapper } from "@/modules/identity/IdentityGateWrapper";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
         <TenantProvider>
-          <NavBar />
-          <div className="app-container">
-            {children}
-          </div>
-          <MobileBottomNav />
-          <PWAInstallPrompt />
+          <IdentityGateWrapper>
+            <NavBar />
+            <div className="app-container">
+              {children}
+            </div>
+            <MobileBottomNav />
+            <PWAInstallPrompt />
+          </IdentityGateWrapper>
         </TenantProvider>
       </body>
     </html>
