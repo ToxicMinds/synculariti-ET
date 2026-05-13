@@ -1,5 +1,6 @@
 import neo4j, { Driver, Session, ManagedTransaction } from 'neo4j-driver';
 import { Logger } from './logger';
+import { Transaction } from '@/modules/finance/lib/finance';
 
 let driver: Driver | null = null;
 
@@ -73,7 +74,7 @@ export async function normalizeAndLinkMerchant(rawName: string, expenseId: strin
  * Bulk merges transactions into Neo4j using Cypher 5 compliant syntax.
  * Extracts the exact loop used by sync and backfill routes.
  */
-export async function neo4jBulkMerge(expenses: any[], sessionNeo: Session) {
+export async function neo4jBulkMerge(expenses: Transaction[], sessionNeo: Session) {
   let syncCount = 0;
   await sessionNeo.executeWrite(async (tx: ManagedTransaction) => {
     if (!expenses) return;
@@ -105,4 +106,13 @@ export async function neo4jBulkMerge(expenses: any[], sessionNeo: Session) {
     }
   });
   return syncCount;
+}
+
+/**
+ * Atomically removes a transaction from the graph.
+ */
+export async function neo4jDeleteTransaction(id: string, sessionNeo: Session) {
+  await sessionNeo.executeWrite(tx => 
+    tx.run(`MATCH (t:Transaction {id: $id}) DETACH DELETE t RETURN count(t)`, { id })
+  );
 }

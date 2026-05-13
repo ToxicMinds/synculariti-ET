@@ -23,7 +23,7 @@ export interface ReceiptData {
   vatDetail?: Record<string, unknown> | null;
 }
 
-export function useTransactionSync(tenantId: string | undefined, callbacks?: { onTransactionAdded?: (transactions: Partial<Transaction>[], savedIds: string[]) => void, onReceiptSaved?: (receipt: ReceiptData, transactionId: string, totalAmount: number) => void, onTransactionUpdated?: (id: string, transaction: Partial<Transaction> & { merchant?: string }) => void }) {
+export function useTransactionSync(tenantId: string | undefined) {
   const { triggerRefresh } = useTenantContext();
 
   const addTransaction = async (transaction: Partial<Transaction> | Partial<Transaction>[]) => {
@@ -48,10 +48,6 @@ export function useTransactionSync(tenantId: string | undefined, callbacks?: { o
     if (error) {
       Logger.system('ERROR', 'Sync', 'add_transactions_bulk_v1 RPC failed', { error }, tenantId);
       throw error;
-    }
-
-    if (callbacks?.onTransactionAdded && Array.isArray(savedIds)) {
-      callbacks.onTransactionAdded(items, savedIds);
     }
 
     Logger.user(tenantId, 'TRANSACTION_ADDED', `Added ${items.length} manual transaction(s)`, 'Tenant Member');
@@ -125,10 +121,6 @@ export function useTransactionSync(tenantId: string | undefined, callbacks?: { o
         Logger.user(tenantId, 'TRANSACTION_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
         triggerRefresh();
 
-        if (callbacks?.onReceiptSaved) {
-          callbacks.onReceiptSaved(receipt, transactionId, totalAmount);
-        }
-
         return data;
       } catch (err: unknown) {
         lastError = err;
@@ -173,10 +165,6 @@ export function useTransactionSync(tenantId: string | undefined, callbacks?: { o
 
     Logger.user(tenantId, 'TRANSACTION_UPDATED', `Updated details for ${transaction.description || 'a transaction'}`, 'Tenant Member');
     triggerRefresh();
-
-    if (callbacks?.onTransactionUpdated) {
-      callbacks.onTransactionUpdated(id, transaction);
-    }
   };
 
   return { 

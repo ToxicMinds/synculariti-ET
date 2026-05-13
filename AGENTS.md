@@ -115,6 +115,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 | V-29 | `AuthScreen` + `IdentityAuth` DRY violation (75% identical). | Identity | 🟡 DRY | ✅ FIXED (Phase 6) |
 | V-30 | PIN Auth brute-force vulnerability. | API Route | 🔴 SECURITY | ✅ FIXED (Phase 8) |
 | V-32 | OfflineQueue Multi-Tab Race. | OfflineQueue | 🔴 CRITICAL | ✅ FIXED (Phase 10) |
+| V-33 | Dual-Write ACID violation (Supabase/Neo4j). | Sync Hook | 🔴 CRITICAL | ✅ FIXED (Phase 11) |
 
 ---
 
@@ -185,6 +186,12 @@ This document is the definitive guide for AI assistants and developers. It conso
 184: 1.  **Multi-Tab Locking** ✅ — `navigator.locks` implemented for mutual exclusion.
 185: 2.  **Retry Exhaustion** ✅ — `MAX_RETRY = 5` with permanent eviction and logging.
 186: 3.  **Observability** ✅ — High-fidelity success/failure logging in the flush cycle.
+
+### ✅ Phase 11: Graph Sync Outbox (C-05) (COMPLETE)
+1.  **Atomic Queueing** ✅ — `graph_sync_queue` implemented inside Postgres RPC transactions.
+2.  **Exactly-Once Delivery** ✅ — Asynchronous consumer with retry capping and dead-letter logic.
+3.  **Type Safety** ✅ — Removed `: any` from `neo4jBulkMerge`.
+4.  **Harden Deletion** ✅ — Atomic graph detachment for deleted transactions.
 
 ---
 

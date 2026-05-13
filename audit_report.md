@@ -484,6 +484,8 @@ for (const item of pending) {
 
 **Why this works:** The Outbox pattern guarantees exactly-once semantics. The Supabase commit and the graph_sync_queue insert happen in the same DB transaction (within the RPC). A separate consumer processes the queue asynchronously with retries and dead-letter after max attempts. This replaces the fragile synchronous dual-write where the Neo4j call could fail after the Supabase commit, with no way to recover.
 
+**Status: ✅ FIXED** (Verified with atomic RPC enqueuing and idempotent consumer).
+
 ---
 
 ### C-06: Enable Banking Mass Assignment + Open Redirect (Security)
