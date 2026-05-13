@@ -703,6 +703,8 @@ export const useTenantContext = useTenantData;
 
 **Why this works:** Components that only need the session (e.g., `login/page.tsx`) can use `useAuth()` without subscribing to tenant state changes. Components that only write (e.g., `useCategories.ts` calling `updateState`) can use `useTenantMutations()` without re-rendering on tenant data changes. This is proper CQRS at the hook level.
 
+**Status: ✅ FIXED** (Refactored into Auth, Data, and Mutation sub-providers).
+
 ---
 
 ## 🟠 SECTION 2: HIGH SEVERITY VIOLATIONS

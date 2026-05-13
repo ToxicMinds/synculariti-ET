@@ -168,7 +168,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ### ✅ Phase 7: Deep Architecture Polish (COMPLETE)
 1.  **God-Hook Refactor (`useSync`)** ✅ — Split into specialized hooks for queue management, transaction mutations, and Neo4j sync to resolve SRP violation.
-2.  **God-Context Refactor (`TenantContext`)** ✅ — Extract category/budget mutations into a separate hook from core state provider.
+2.  **God-Context Refactor (`TenantContext`)** ✅ — Extract category/budget mutations into a separate hook from core state provider. (Phase 7 / C-07)
 3.  **AI DRY Violations** ✅ — Extract prompt category mapping logic from `parse-invoice`, `parse-receipt`, and `statement` routes into `@/lib/ai-categories.ts`.
 4.  **Neo4j Cypher DRY** ✅ — Extract shared `neo4jBulkMerge()` utility to unify `sync-neo4j` and `backfill-neo4j` loops.
 
