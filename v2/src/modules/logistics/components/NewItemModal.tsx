@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { InventoryCategory } from '../types';
+import { InventoryItemInput } from '../hooks/useLogistics';
 
 export function NewItemModal({ 
   categories, 
@@ -9,14 +10,14 @@ export function NewItemModal({
   onClose 
 }: { 
   categories: InventoryCategory[], 
-  onSave: (item: any) => Promise<any>,
+  onSave: (item: InventoryItemInput) => Promise<{ success: boolean; data?: unknown; error?: string }>,
   onClose: () => void 
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<InventoryItemInput>({
     name: '',
     sku: '',
     category_id: categories[0]?.id || '',
-    type: 'RAW' as 'RAW' | 'PREP' | 'SERVICE',
+    type: 'RAW',
     purchasing_uom: '',
     inventory_uom: '',
     conversion_factor: 1,
@@ -71,7 +72,7 @@ export function NewItemModal({
                 className="btn btn-secondary" 
                 style={{ width: '100%' }}
                 value={formData.type}
-                onChange={e => setFormData({...formData, type: e.target.value as any})}
+                onChange={e => setFormData({...formData, type: e.target.value as 'RAW' | 'PREP' | 'SERVICE'})}
               >
                 <option value="RAW">RAW MATERIAL</option>
                 <option value="PREP">PREPARED</option>

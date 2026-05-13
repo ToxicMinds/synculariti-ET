@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import { Logger } from './logger';
 
 /**
@@ -13,19 +12,12 @@ export async function fetchWithRetry(url: string, options: RequestInit = {}, ret
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }
     return response;
-  } catch (error) {
+  } catch (error: unknown) {
     if (retries > 0) {
-      Logger.system('WARN', 'Utils', `Fetch threw error, retrying in ${backoff}ms...`, { url, error });
+      Logger.system('WARN', 'Utils', `Fetch threw error, retrying in ${backoff}ms...`, { url, error: error instanceof Error ? error.message : String(error) });
       await new Promise(res => setTimeout(res, backoff));
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }
     throw error;
   }
-}
-
-/**
- * Logs technical metrics (like eKasa performance) to Supabase.
- */
-export async function systemLog(action: string, errorData: any, tenantId?: string) {
-  // Redundant - use Logger.system from @/lib/logger instead.
 }

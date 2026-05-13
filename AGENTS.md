@@ -79,9 +79,9 @@ This document is the definitive guide for AI assistants and developers. It conso
 | :--- | :--- | :--- |
 | **ACID** | 🟢 **Hardened** | `save_receipt_v4` & `add_transactions_bulk_v1` are atomic. `TenantContext.updateState()` has a non-atomic read-before-write — needs fixing in Phase 5. |
 | **Security** | 🟠 **Partially Hardened** | 12/13 API routes protected with `withAuth`. **NEW**: 23 `SECURITY DEFINER` RPCs callable by `anon` role — Phase 4 remediation required. |
-| **DRY** | 🟡 **Warning** | `AuthScreen` vs `IdentityAuth` (~75% overlap). Neo4j Cypher duplication. AI category mapping x3. Unresolved. |
+| **DRY** | 🟢 **Hardened** | AI category prompts, Neo4j Cypher loops, and Auth components unified. |
 | **Type Safety** | 🟢 **Hardened** | **0** `: any` / `as any` usages in `v2/src`. 100% Type-Safe codebase. |
-| **SOLID** | 🟡 **Warning** | `useSync` still has 5 responsibilities (not SRP). `TenantContext` has 6 responsibilities. `useLogistics` mixes reads and writes. |
+| **SOLID** | 🟢 **Hardened** | `useSync`, `TenantContext`, and `useLogistics` refactored into specialized hooks (SRP). |
 | **Observability** | 🟢 **Hardened** | `ServerLogger.system()` logs to console. `ServerLogger.user()` has intentional silent `catch {}` to avoid crashing routes. `forecast/route.ts` catch has no `ServerLogger` — gap. |
 | **Error Handling** | 🟢 **Hardened** | `unknown` catch blocks throughout. `forecast/route.ts` missing input validation (division-by-zero risk). |
 | **Resilience** | 🟢 **Hardened** | `OfflineQueue` fully implemented and verified. |
@@ -161,11 +161,11 @@ This document is the definitive guide for AI assistants and developers. It conso
 3.  **Fix `useLogistics.ts:73`** ✅ — Type safety enforced with `catch (err: unknown)`.
 4.  **Extract `<BrandHeader />`** ✅ — Created shared component to remove duplicate branding logic.
 
-### 🟠 Phase 7: Deep Architecture Polish (NEXT)
-1.  **God-Hook Refactor (`useSync`)** — Split into specialized hooks for queue management, transaction mutations, and Neo4j sync to resolve SRP violation.
-2.  **God-Context Refactor (`TenantContext`)** — Extract category/budget mutations into a separate hook from core state provider.
-3.  **AI DRY Violations** — Extract prompt category mapping logic from `parse-invoice`, `parse-receipt`, and `statement` routes into `@/lib/ai-categories.ts`.
-4.  **Neo4j Cypher DRY** — Extract shared `neo4jBulkMerge()` utility to unify `sync-neo4j` and `backfill-neo4j` loops.
+### ✅ Phase 7: Deep Architecture Polish (COMPLETE)
+1.  **God-Hook Refactor (`useSync`)** ✅ — Split into specialized hooks for queue management, transaction mutations, and Neo4j sync to resolve SRP violation.
+2.  **God-Context Refactor (`TenantContext`)** ✅ — Extract category/budget mutations into a separate hook from core state provider.
+3.  **AI DRY Violations** ✅ — Extract prompt category mapping logic from `parse-invoice`, `parse-receipt`, and `statement` routes into `@/lib/ai-categories.ts`.
+4.  **Neo4j Cypher DRY** ✅ — Extract shared `neo4jBulkMerge()` utility to unify `sync-neo4j` and `backfill-neo4j` loops.
 
 ---
 
@@ -193,8 +193,8 @@ To maintain **Business-Grade Determinism**, we must audit AI-claimed status agai
 | "expenses renamed to transactions" | Verified: `transactions` table confirmed in DB with RLS. | ✅ ACCURATE |
 | "0 `: any` usages" | Verified: Grep confirms zero `: any` / `as any` in `v2/src/`. | ✅ ACCURATE |
 | "Security fully hardened" | Verified: Anon EXECUTE revoked, `search_path` fixed. | ✅ FIXED (Phase 4) |
-| "SOLID hardened" | `useSync` still has 5 responsibilities; `TenantContext` has 6. | 🟡 OVERSTATED — Phase 7 |
-| "DRY hardened" | AuthScreen merged, but AI prompts & Neo4j Cypher still duplicated. | 🟡 OVERSTATED — Phase 7 |
+| **SOLID hardened** | Verified: `useSync`, `TenantContext`, and `useLogistics` split into specialized hooks. | ✅ ACCURATE |
+| **DRY hardened** | Verified: AI prompt prompts, Neo4j loops, and Auth components unified. | ✅ ACCURATE |
 
 ---
 

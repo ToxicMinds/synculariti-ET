@@ -56,15 +56,17 @@ export const POST = withAuth(async (req: Request) => {
     }
 
     const response = await fetch(url, { method, headers, body });
-    const data = await response.json();
+    const data = (await response.json()) as unknown;
 
     if (!response.ok) {
-      return NextResponse.json({ error: data.error || data.detail || 'Enable Banking API Error' }, { status: response.status });
+      const errData = data as { error?: string; detail?: string };
+      return NextResponse.json({ error: errData.error || errData.detail || 'Enable Banking API Error' }, { status: response.status });
     }
 
     return NextResponse.json(data);
 
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Enable Banking exception';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 });

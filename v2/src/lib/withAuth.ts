@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
+import { User } from '@supabase/supabase-js';
 
 type RouteHandler = (
   req: Request,
-  context: { tenantId: string; user: any }
+  context: { tenantId: string; user: User }
 ) => Promise<NextResponse>;
 
 /**

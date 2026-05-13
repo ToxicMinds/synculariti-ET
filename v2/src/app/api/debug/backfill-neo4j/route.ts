@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getNeo4jDriver } from '@/lib/neo4j';
+import { getNeo4jDriver, neo4jBulkMerge } from '@/lib/neo4j';
 import { withAuth } from '@/lib/withAuth';
 
 /**
@@ -41,34 +41,8 @@ export const GET = withAuth(async (req: Request) => {
     let skippedCount = 0;
 
     try {
-      await sessionNeo.executeWrite(async (tx) => {
-        for (const exp of expenses) {
-          if (!exp.tenant_id) { skippedCount++; continue; }
-
-          const rawName = (exp.description || 'Unknown Merchant').trim();
-
-          // Query 1: MERGE Transaction node + stamp tenant_id (Cypher 5: ends with RETURN)
-          await tx.run(
-            `MERGE (t:Transaction {id: $id})
-             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.tenant_id = $tenant_id
-             ON MATCH SET  t.tenant_id = $tenant_id, t.amount = $amount, t.date = $date, t.category = $category
-             RETURN t.id AS id`,
-            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, tenant_id: exp.tenant_id }
-          );
-
-          // Query 2: MERGE Merchant + link to Transaction
-          await tx.run(
-            `MERGE (m:Merchant {name: $rawName})
-             WITH m
-             MATCH (t:Transaction {id: $id})
-             MERGE (m)-[:PROCESSED]->(t)
-             RETURN m.name AS merchant`,
-            { rawName, id: exp.id }
-          );
-
-          updatedCount++;
-        }
-      });
+      skippedCount = expenses ? expenses.filter(e => !e.tenant_id).length : 0;
+      updatedCount = await neo4jBulkMerge(expenses, sessionNeo);
     } finally {
       await sessionNeo.close();
     }
@@ -89,7 +63,7 @@ export const GET = withAuth(async (req: Request) => {
     }
 
     const stats = verifyResult.records[0];
-    const toNum = (v: any) => (v && typeof v === 'object' && 'low' in v ? v.low : v);
+    const toNum = (v: unknown) => (v && typeof v === 'object' && 'low' in v ? (v as { low: number }).low : Number(v));
 
     return NextResponse.json({
       success: true,
@@ -103,7 +77,8 @@ export const GET = withAuth(async (req: Request) => {
       isolation_proof: 'Each tenant_id maps to exactly one tenant. All graph queries filter by this ID — cross-tenant leakage is structurally impossible.'
     });
 
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Neo4j backfill exception';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 });

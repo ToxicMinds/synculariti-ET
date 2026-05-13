@@ -12,7 +12,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  TooltipItem
 } from 'chart.js';
 
 ChartJS.register(
@@ -26,7 +27,7 @@ ChartJS.register(
   Filler
 );
 
-export function MarketTrends({ transactions, selectedMonth, colSpan = 8, isDemo = false }: { transactions: Transaction[], selectedMonth: string, colSpan?: number, isDemo?: boolean }) {
+export function MarketTrends({ transactions, selectedMonth, colSpan = 8 }: { transactions: Transaction[], selectedMonth: string, colSpan?: number, isDemo?: boolean }) {
   // Logic: Group transactions by month for the last 6 months
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const [y, m] = selectedMonth.split('-');
@@ -67,7 +68,7 @@ export function MarketTrends({ transactions, selectedMonth, colSpan = 8, isDemo 
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (context: any) => `€${context.parsed.y.toFixed(2)}`
+          label: (context: TooltipItem<'line'>) => `€${(context.parsed.y || 0).toFixed(2)}`
         }
       }
     },

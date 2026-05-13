@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { ChartOfAccounts } from '@/components/ChartOfAccounts';
 import { InvoiceManager } from '@/components/InvoiceManager';
-import { AuthScreen } from '@/components/AuthScreen';
+import { OrgAccessForm } from '@/components/OrgAccessForm';
 
 function LedgerContent() {
   const { session, tenant, loading } = useTenant();
@@ -16,7 +16,7 @@ function LedgerContent() {
     </div>
   );
 
-  if (!tenant) return <AuthScreen session={session} />;
+  if (!tenant) return <OrgAccessForm session={session} />;
 
   return (
     <main>

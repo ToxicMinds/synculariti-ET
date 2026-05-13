@@ -1,12 +1,21 @@
 import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
-import { createClient } from '@/lib/supabase-server';
 import { withAuth } from '@/lib/withAuth';
 
-export const GET = withAuth(async (req, { tenantId, user }) => {
-  const supabase = await createClient();
+interface Neo4jMerchantFact {
+  merchant: string;
+  visits: number | { low: number };
+  total: number;
+}
 
+interface Neo4jCategoryFact {
+  category: string;
+  count: number | { low: number };
+  total: number;
+}
+
+export const GET = withAuth(async (req, { tenantId }) => {
   const driver = getNeo4jDriver();
   if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
 
@@ -28,8 +37,8 @@ export const GET = withAuth(async (req, { tenantId, user }) => {
       RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
     `, { tenantId });
 
-    const facts = merchantResult.records[0]?.get('topMerchants') || [];
-    const categories = categoryResult.records[0]?.get('categories') || [];
+    const facts = (merchantResult.records[0]?.get('topMerchants') || []) as Neo4jMerchantFact[];
+    const categories = (categoryResult.records[0]?.get('categories') || []) as Neo4jCategoryFact[];
 
     // Fallback logic if Groq is missing or fails
     const generateFallbackInsight = () => {
@@ -52,15 +61,15 @@ export const GET = withAuth(async (req, { tenantId, user }) => {
 
     // Build context for Groq
     const merchantSummary = facts
-      .map((f: any) => {
-        const visits = typeof f.visits === 'object' && f.visits !== null ? f.visits.low : f.visits;
+      .map((f: Neo4jMerchantFact) => {
+        const visits = typeof f.visits === 'object' && f.visits !== null ? (f.visits as { low: number }).low : f.visits;
         return `${f.merchant}: ${visits} visits, €${Number(f.total).toFixed(2)}`;
       })
       .join('; ');
 
     const categorySummary = categories
       .slice(0, 6)
-      .map((c: any) => `${c.category}: €${Number(c.total).toFixed(2)}`)
+      .map((c: Neo4jCategoryFact) => `${c.category}: €${Number(c.total).toFixed(2)}`)
       .join('; ');
 
     try {
@@ -100,8 +109,8 @@ export const GET = withAuth(async (req, { tenantId, user }) => {
         facts,
         categories
       });
-    } catch (apiErr) {
-      ServerLogger.system('ERROR', 'AI', 'Groq API error 2014 using fallback', { error: apiErr });
+    } catch (apiErr: unknown) {
+      ServerLogger.system('ERROR', 'AI', 'Groq API error 2014 using fallback', { error: apiErr instanceof Error ? apiErr.message : String(apiErr) });
       return NextResponse.json({ 
         success: true, 
         insight: generateFallbackInsight(),
@@ -110,8 +119,8 @@ export const GET = withAuth(async (req, { tenantId, user }) => {
       });
     }
 
-  } catch (e: any) {
-    ServerLogger.system('ERROR', 'AI', 'AI Insight core error', { error: String(e) });
+  } catch (e: unknown) {
+    ServerLogger.system('ERROR', 'AI', 'AI Insight core error', { error: e instanceof Error ? e.message : String(e) });
     // Even if Neo4j fails, we try a soft fallback if possible, or a clean error
     return NextResponse.json({ 
       success: true, 

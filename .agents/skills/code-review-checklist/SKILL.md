@@ -17,14 +17,16 @@ Read the changed files. Work through each section below. Report pass/fail per it
 
 ## 1. Security (Hard Failures — Block Merge)
 - [ ] No `tenant_id` passed as a URL param or query string (must be server-resolved)
-- [ ] No raw `supabase.from('expenses').insert()` without `tenant_id` — use `save_receipt_v3` RPC
+- [ ] No raw `supabase.from('expenses').insert()` without `tenant_id` — use `save_receipt_v4` RPC
 - [ ] No new table without `FORCE ROW LEVEL SECURITY` + policy using `get_my_tenant()`
 - [ ] No secrets, `.env` values, or API keys in source code
 - [ ] `@supabase/ssr` used for all server-side auth — no plain `supabase-js` in API routes
 - [ ] JWT is never decoded or inspected client-side for access decisions
+- [ ] No new `SECURITY DEFINER` function without `REVOKE EXECUTE ON FUNCTION ... FROM anon` in the same migration
+- [ ] No new DB function without `SET search_path = public` in the function header
 
 ## 2. Financial Integrity (Hard Failures — Block Merge)
-- [ ] All financial mutations go through `save_receipt_v3`, not `v2` or raw inserts
+- [ ] All financial mutations go through `save_receipt_v4`, not `v3`, `v2` or raw inserts
 - [ ] Currency field is ISO-4217 (3-char string). No bare numbers, no `"€"` symbols
 - [ ] Amount is `>= 0`. No negative amounts without explicit `Adjustment` category
 - [ ] `location_id` is passed when the expense belongs to a business location

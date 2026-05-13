@@ -26,7 +26,7 @@ export function useIdentity(session: Session | null) {
       const { data, error } = await supabase.rpc('get_my_available_tenants');
       if (error) throw error;
       setTenants(data || []);
-      return data || [];
+      return (data as AvailableTenant[]) || [];
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       Logger.system('ERROR', 'Auth', 'Tenant discovery failed', { error: msg });
@@ -46,8 +46,8 @@ export function useIdentity(session: Session | null) {
       
       // Force a full reload to re-initialize the App with the new tenant_id context
       window.location.reload();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Switch failed');
       setLoading(false);
     }
   };

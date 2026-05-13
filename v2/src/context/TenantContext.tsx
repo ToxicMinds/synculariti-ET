@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { AppState } from '@/modules/identity/hooks/useTenant';
+import { AppState, Location } from '@/modules/identity/hooks/useTenant';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 interface TenantContextType {
@@ -16,7 +16,6 @@ interface TenantContextType {
   triggerRefresh: () => void;
   fetchTenantState: () => Promise<void>;
   updateState: (updates: Partial<AppState>) => Promise<void>;
-  addCategory: (name: string) => Promise<void>;
 }
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
@@ -71,7 +70,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       if (!bundle || !bundle.tenant) return;
 
-      const { tenant: h, user: u, locations: l } = bundle;
+      const { tenant: h, locations: l } = bundle;
 
       setTenant({
         tenant_id: h.id,
@@ -84,14 +83,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         goals: h.config?.goals || { monthly_savings: 500 },
         ai_insight: h.config?.ai_insight,
         categories: h.categories || DEFAULT_CATEGORIES,
-        locations: l || [],
+        locations: (l as Location[]) || [],
         created_at: h.created_at
       });
-
-      // Identity Resolution: Use the bundled user profile if available
-      if (u) {
-        // You can now store the full user profile in state if needed
-      }
 
       const email = activeSession.user?.email;
       if (email && h.config?.emails) {
@@ -100,8 +94,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         );
         if (foundId) setResolvedWhoId(foundId);
       }
-    } catch (e) {
-      Logger.system('ERROR', 'Auth', 'Failed to fetch tenant bundle', { error: e });
+    } catch (e: unknown) {
+      Logger.system('ERROR', 'Auth', 'Failed to fetch tenant bundle', { error: e instanceof Error ? e.message : String(e) });
     } finally {
       setLoading(false);
     }
@@ -110,51 +104,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const updateState = async (updates: Partial<AppState>) => {
     if (!tenant?.tenant_id) return;
     
-    // Get latest config from DB to avoid race conditions
-    const { data: stateData } = await supabase
-      .from('tenants')
-      .select('config')
-      .eq('id', tenant.tenant_id)
-      .single();
-
-    const currentConfig = stateData?.config || {};
-
-    const newConfig = {
-      ...currentConfig,
-      names: updates.names || tenant.names,
-      income: updates.income || tenant.income,
-      budgets: updates.budgets || tenant.budgets,
-      memory: updates.memory || tenant.memory,
-      goals: updates.goals || tenant.goals,
-      ai_insight: updates.ai_insight || tenant.ai_insight,
-      categories: updates.categories || tenant.categories
-    };
-
-    const { error } = await supabase.rpc('update_tenant_config_v1', { p_config: newConfig });
+    // V-27: Atomic Patching
+    // The RPC already uses `config = config || p_config`, so we just send the updates.
+    const { error } = await supabase.rpc('update_tenant_config_v1', { p_config: updates });
 
     if (error) throw error;
-    setTenant({ ...tenant, ...updates });
+    
+    // Update local state by merging
+    setTenant(prev => prev ? ({ ...prev, ...updates }) : null);
   };
 
-  const addCategory = async (name: string) => {
-    if (!tenant) return;
-    const cleanName = name.trim();
-    if (!cleanName) return;
-    
-    const existingBudgets = tenant.budgets || {};
-    const existingCategories = tenant.categories || [];
-    
-    // Skip if already exists
-    if (existingCategories.includes(cleanName)) return;
-    
-    const newBudgets = { ...existingBudgets, [cleanName]: existingBudgets[cleanName] || 0 };
-    const newCategories = [...existingCategories, cleanName];
-    
-    await updateState({ 
-      budgets: newBudgets,
-      categories: newCategories
-    });
-  };
 
   return (
     <TenantContext.Provider value={{ 
@@ -165,8 +124,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       syncToken,
       triggerRefresh,
       fetchTenantState, 
-      updateState,
-      addCategory
+      updateState
     }}>
       {children}
     </TenantContext.Provider>

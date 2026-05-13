@@ -68,7 +68,7 @@ export function useTransactions(tenantId: string | undefined, selectedMonth?: st
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setTransactions(data);
+      setTransactions(data as Transaction[]);
     }
     setLoading(false);
   };

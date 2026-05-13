@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { getNeo4jDriver } from '@/lib/neo4j';
+import { getNeo4jDriver, neo4jBulkMerge } from '@/lib/neo4j';
 import { withAuth } from '@/lib/withAuth';
 
 /**
@@ -33,32 +33,7 @@ export const GET = withAuth(async (req: Request) => {
     let syncCount = 0;
 
     try {
-      await sessionNeo.executeWrite(async (tx) => {
-        for (const exp of expenses) {
-          const rawName = (exp.description || 'Unknown Merchant').trim();
-
-          // Query 1: MERGE/update Transaction node with tenant_id
-          await tx.run(
-            `MERGE (t:Transaction {id: $id})
-             ON CREATE SET t.amount = $amount, t.date = $date, t.category = $category, t.tenant_id = $tenant_id
-             ON MATCH SET  t.tenant_id = $tenant_id, t.amount = $amount, t.date = $date, t.category = $category
-             RETURN t.id AS id`,
-            { id: exp.id, amount: Number(exp.amount), date: exp.date, category: exp.category, tenant_id: exp.tenant_id }
-          );
-
-          // Query 2: MERGE Merchant + link to Transaction
-          await tx.run(
-            `MERGE (m:Merchant {name: $rawName})
-             WITH m
-             MATCH (t:Transaction {id: $id})
-             MERGE (m)-[:PROCESSED]->(t)
-             RETURN m.name AS merchant`,
-            { rawName, id: exp.id }
-          );
-
-          syncCount++;
-        }
-      });
+      syncCount = await neo4jBulkMerge(expenses, sessionNeo);
     } finally {
       await sessionNeo.close();
     }
@@ -69,7 +44,8 @@ export const GET = withAuth(async (req: Request) => {
       tip: 'Run in Neo4j Aura: MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction) RETURN m.name, count(t) ORDER BY count(t) DESC'
     });
 
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Neo4j sync exception';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 });

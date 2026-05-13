@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { ServerLogger } from '@/lib/logger-server';
 import { withAuth } from '@/lib/withAuth';
+import { getCategoryPrompt } from '@/lib/ai-categories';
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -60,7 +61,7 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
                 "currency": "EUR",
                 "vatDetail": {}
               }
-              Map each item to one of these categories: ${categories.join(', ')}.` 
+              ${getCategoryPrompt(categories as string[])}` 
             },
             { type: 'image_url', image_url: { url: image } }
           ]
@@ -80,8 +81,8 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
       data: result 
     });
 
-  } catch (err: any) {
-    ServerLogger.system('ERROR', 'AI', 'Invoice AI parse error', { error: String(err) });
+  } catch (err: unknown) {
+    ServerLogger.system('ERROR', 'AI', 'Invoice AI parse error', { error: err instanceof Error ? err.message : String(err) });
     return NextResponse.json({ error: 'Failed to process invoice' }, { status: 500 });
   }
 });

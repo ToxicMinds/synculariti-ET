@@ -13,6 +13,16 @@ interface AggregatedItem {
   last_date: string;
 }
 
+interface RawReceiptItem {
+  name: string | null;
+  amount: number | string | null;
+  transaction_id: string;
+  transactions: {
+    description: string | null;
+    date: string | null;
+  } | null | any; // Supabase nested select returns single object or array depending on relation
+}
+
 export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string | undefined, isDemo?: boolean }) {
   const [items, setItems] = useState<AggregatedItem[]>([]);
   const [loading, setLoading] = useState(!isDemo);
@@ -52,10 +62,13 @@ export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string |
 
       if (error) throw error;
 
-      const aggregated = (data || []).reduce((acc: Record<string, AggregatedItem>, curr: any) => {
+      const rawData = (data || []) as unknown as RawReceiptItem[];
+
+      const aggregated = rawData.reduce((acc: Record<string, AggregatedItem>, curr: RawReceiptItem) => {
         const rawName = curr.name || 'Unknown Item';
         const nameKey = rawName.trim().toUpperCase();
-        const parent = curr.transactions;
+        // Supabase nested join can return object or array depending on query
+        const parent = Array.isArray(curr.transactions) ? curr.transactions[0] : curr.transactions;
         
         if (!acc[nameKey]) {
           acc[nameKey] = { 
@@ -67,13 +80,13 @@ export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string |
           };
         }
 
-        acc[nameKey].total_amount += Number(curr.amount);
+        acc[nameKey].total_amount += Number(curr.amount || 0);
         acc[nameKey].count += 1;
 
         // Track latest context
         if (parent?.date && (!acc[nameKey].last_date || parent.date > acc[nameKey].last_date)) {
           acc[nameKey].last_date = parent.date;
-          acc[nameKey].last_store = parent.description;
+          acc[nameKey].last_store = parent.description || 'Unknown';
         }
 
         return acc;

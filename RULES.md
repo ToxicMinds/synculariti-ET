@@ -39,7 +39,7 @@ synculariti-ET/
 ├── RULES.md               ← This file — developer rulebook
 ├── vercel.json            ← eKasa proxy rewrite rules
 ├── sql/
-│   └── b2b_evolution/     ← Ordered SQL migrations (00_ → 13_)
+│   └── b2b_evolution/     ← Ordered SQL migrations (00_ → 15_)
 └── v2/                    ← Next.js application root
     └── src/
         ├── app/           ← Next.js App Router pages + API routes
@@ -63,9 +63,10 @@ synculariti-ET/
 - **Communication**: Modules must never have circular dependencies. If logic is shared, it moves to `@/lib` or `@/components`.
 
 ### Hooks — Domain Separation
-- **Finance**: `useTransactions` (Read) and `useSync` (Write) live in `modules/finance/hooks/`.
-- **Logistics**: `useLogistics` lives in `modules/logistics/hooks/`.
+- **Finance**: `useTransactions` (Read) and `useSync` (Write Facade) / `useTransactionSync` (Write Core) live in `modules/finance/hooks/`.
+- **Logistics**: `useInventory` (Read) and `useLogisticsSync` (Write) live in `modules/logistics/hooks/`.
 - **Identity**: `useTenant` lives in `modules/identity/hooks/`.
+- **Categories**: `useCategories` lives in `modules/finance/hooks/`.
 
 ### Intelligence Strategy: AI Invoice Pipeline
 To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
@@ -73,11 +74,11 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 2. **Stage 2 (Reasoning)**: Use Reasoning LLM (Llama 3.3) for category mapping and VAT validation.
 
 ### Financial & Physical Ledger Mutations
-- **Atomic Only**: Any mutation touching the ledger (Transactions or Inventory) MUST be atomic.
-- **Logistics Rule**: `receive_purchase_order_v1` RPC is the canonical way to receive a PO. It atomically: marks RECEIVED, updates `inventory_ledger`, emits `PROCUREMENT_RECEIVED` to outbox, and logs to `activity_log`.
-- **Canonical RPC**: Use `save_receipt_v3` for ALL financial writes. Manual client-side `.insert()` on `transactions` is forbidden outside development.
-- **B2B Atomic Pattern**: Cross-domain signals (Logistics → Finance) MUST flow through `outbox_events`. Never call Finance logic directly from Logistics.
-- **No Orphaned Functions**: Any trigger function MUST have a corresponding attached trigger. Verify with `information_schema.triggers` after every migration.
+*   **Atomic Only**: Any mutation touching the ledger (Transactions or Inventory) MUST be atomic.
+*   **Logistics Rule**: `receive_purchase_order_v1` RPC is the canonical way to receive a PO. It atomically: marks RECEIVED, updates `inventory_ledger`, emits `PROCUREMENT_RECEIVED` to outbox, and logs to `activity_log`.
+*   **Canonical RPC**: Use `save_receipt_v4` for ALL financial writes. Manual client-side `.insert()` on `transactions` is forbidden outside development. (`v3` is deprecated — zero app references.)
+*   **B2B Atomic Pattern**: Cross-domain signals (Logistics → Finance) MUST flow through `outbox_events`. Never call Finance logic directly from Logistics.
+*   **No Orphaned Functions**: Any trigger function MUST have a corresponding attached trigger. Verify with `information_schema.triggers` after every migration.
 
 ### Telemetry & Audit Trail
 - **Logger, not console**: NEVER use `console.log`, `console.warn`, or `console.error` in production code. Use `Logger.system()` for technical events and `Logger.user()` for business events.
@@ -91,7 +92,7 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 - **Fire-and-Forget Safety**: Neo4j `.catch()` calls are acceptable but MUST log to `Logger.system`.
 
 ### Security & API Governance
-- **No Direct DML**: The database explicitly denies `INSERT/UPDATE/DELETE` on core tables (`transactions`, `tenants`, `app_users`) to `authenticated` clients. Client-side `.insert()`, `.update()`, or `.upsert()` WILL FAIL. Always use RPCs (e.g. `add_transaction_v3`).
+- **No Direct DML**: The database explicitly denies `INSERT/UPDATE/DELETE` on core tables (`transactions`, `tenants`, `app_users`) to `authenticated` clients. Client-side `.insert()`, `.update()`, or `.upsert()` WILL FAIL. Always use RPCs (e.g. `add_transactions_bulk_v1`).
 - **Session-Based tenant_id**: `tenant_id` is NEVER passed as a URL param or client payload. Always derived server-side from session via RLS `get_my_tenant()`.
 - **No Stale Table References**: The core financial table is `transactions` (not `expenses`). The rename was applied in migration `04_finance_schema.sql`. Any reference to `'expenses'` in app code is a bug.
 - **Auth Guard on All Routes**: Every API route that reads or writes tenant data MUST verify the session. Use the `withAuth` middleware. Do not rely on copy-pasted `getSession()` logic.
@@ -107,7 +108,7 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 
 ### TypeScript
 - **TypeScript only.** No `.js` files in `src/`. No `require()`.
-- **No `: any`**: The **62** current usages are tracked debt. No new `any` types without a `// REASON:` comment.
+- **No `: any`**: Current count is **0**. This is a hard ceiling — no new `any` types without a `// REASON:` comment explaining why it cannot be avoided.
 - All functions must have **explicit return types**.
 - Use `async/await`. No raw `.then()/.catch()` chains.
 
@@ -120,16 +121,19 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 3. **Server-Side Auth**: All API routes use `createServerClient` from `@supabase/ssr`. No client Supabase instances in API routes.
 4. **Secrets**: `GROQ_API_KEY`, `NEO4J_*` credentials are server-side env vars only. Never in `NEXT_PUBLIC_*`.
 5. **Dual-Layer Check**: Any RPC touching expenses must check both Tenant Mismatch AND Location Ownership.
+6. **Anon EXECUTE Ban**: No `SECURITY DEFINER` function accessible to the DB may be callable by the `anon` role unless it is explicitly a public authentication flow (e.g. `verify_tenant_access`). After every new RPC migration, run: `REVOKE EXECUTE ON FUNCTION public.<name> FROM anon;`
+7. **search_path Hardening**: Every new DB function MUST include `SET search_path = public` to prevent search path injection. This is a migration checklist item.
 
 ---
 
 ## Database Rules
 
-- **Canonical RPC for all writes**: `save_receipt_v3` — includes dual-layer security, location_id, ISO-4217 currency.
+- **Canonical RPC for all writes**: `save_receipt_v4` — includes dual-layer security, eKasa metadata, location_id, ISO-4217 currency. (`v3` is deprecated.)
 - **Initialization RPC**: `get_tenant_bundle` — returns `{ tenant, locations, user, server_time }` in one round-trip.
 - **New table checklist**: `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + policy using `get_my_tenant()`.
-- SQL migrations are numbered files in `/sql/b2b_evolution/`. Never alter applied migrations — add a new file instead.
-- After any DDL change: run Supabase security advisors to catch missing RLS.
+- **New function checklist**: Include `SET search_path = public` + `REVOKE EXECUTE ON FUNCTION ... FROM anon` in the same migration.
+- SQL migrations are numbered files in `/sql/b2b_evolution/`. The current highest is `15_identity_rpcs.sql`. Never alter applied migrations — add a new file instead.
+- After any DDL change: run Supabase security advisors (`get_advisors`) to catch missing RLS and anon-callable functions.
 
 ---
 
@@ -151,7 +155,7 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 | Import a hook from `@/hooks` | Import from `@/modules/[domain]/hooks` |
 | Import a component from `@/components` if it's domain-specific | Move it to `@/modules/[domain]/components` |
 | Create circular dependencies between modules | Move shared logic to `@/lib` or `@/components` |
-| `supabase.from('expenses').insert(...)` | The table is `transactions`. Use `save_receipt_v3` RPC |
+| `supabase.from('expenses').insert(...)` | The table is `transactions`. Use `save_receipt_v4` RPC |
 | `supabase.from('purchase_orders').update({ status: 'RECEIVED' })` | Use `receive_purchase_order_v1` RPC — it's atomic |
 | `console.log / console.error` | Use `Logger.system()` or `Logger.user()` |
 | Pass `tenant_id` in a URL param | Derive it from session via RLS — never trust the client |
@@ -160,6 +164,8 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 | Deploy without `npm run build` passing | Build must be clean before any push to `main` |
 | Alter an applied SQL migration file | Add a new numbered migration file |
 | Commit `.env.local` | It's in `.gitignore` — keep it there |
+| Create a new `SECURITY DEFINER` function without revoking anon EXECUTE | Always add `REVOKE EXECUTE ON FUNCTION ... FROM anon` in the same migration |
+| Create a new DB function without `SET search_path = public` | Add it to the function header — prevents search path injection |
 
 ---
 

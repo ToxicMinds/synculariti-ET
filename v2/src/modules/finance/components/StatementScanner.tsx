@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-interface ParsedTransaction {
+export interface ParsedTransaction {
   date: string;
   description: string;
   amount: number;
@@ -14,7 +14,7 @@ interface StatementScannerProps {
   names: Record<string, string>;
   categories: string[];
   selectedUser: string;
-  onSave: (transactions: any[], whoId: string, whoName: string) => Promise<void>;
+  onSave: (transactions: ParsedTransaction[], whoId: string, whoName: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -41,9 +41,9 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
       
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to parse statement');
       
-      setTransactions(data.transactions.map((t: any) => ({ ...t, selected: true })));
-    } catch (err: any) {
-      setError(err.message);
+      setTransactions(data.transactions.map((t: ParsedTransaction) => ({ ...t, selected: true })));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while uploading.');
     } finally {
       setLoading(false);
     }
@@ -63,8 +63,8 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
     try {
       await onSave(selectedTx, whoId, names[whoId]);
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred while saving.');
       setLoading(false);
     }
   };
@@ -139,7 +139,7 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
                   style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
                 >
                   {Object.entries(names).map(([id, name]) => (
-                    <option key={id} value={id}>{name as string}</option>
+                    <option key={id} value={id}>{name}</option>
                   ))}
                 </select>
               </div>

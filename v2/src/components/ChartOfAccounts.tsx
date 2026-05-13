@@ -29,8 +29,8 @@ export function ChartOfAccounts({ tenantId }: { tenantId: string }) {
       
       if (error) throw error;
       setAccounts(data || []);
-    } catch (e) {
-      Logger.system('ERROR', 'Finance', 'Failed to fetch CoA', e, tenantId);
+    } catch (e: unknown) {
+      Logger.system('ERROR', 'Finance', 'Failed to fetch CoA', { error: e }, tenantId);
     } finally {
       setLoading(false);
     }

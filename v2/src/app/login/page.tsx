@@ -30,8 +30,9 @@ export default function LoginPage() {
         if (error) throw error;
         router.push('/');
       }
-    } catch (error: any) {
-      setMessage({ text: error.message || 'Authentication failed', type: 'error' });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Authentication failed';
+      setMessage({ text: msg, type: 'error' });
     } finally {
       setLoading(false);
     }

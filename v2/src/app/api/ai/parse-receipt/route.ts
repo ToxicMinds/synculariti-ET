@@ -3,12 +3,18 @@ import { NextResponse } from 'next/server';
 import { Groq } from 'groq-sdk';
 import { parseEkasaMetadata } from '@/lib/ekasa-parser';
 import { withAuth } from '@/lib/withAuth';
+import { getCategoryPrompt } from '@/lib/ai-categories';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-export const POST = withAuth(async (req: Request, { tenantId, user }) => {
+interface EkasaItem {
+  originalName: string;
+  amount: number;
+}
+
+export const POST = withAuth(async (req: Request, { tenantId }) => {
 
   try {
     const { ekasaData, categories } = await req.json();
@@ -27,7 +33,7 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
       I will provide a list of items from a receipt.
       ${needsStoreInference ? 'IDENTIFY THE SPECIFIC STORE BRAND from these items. Look for store-brand products or item names to "fingerprint" the retailer (e.g., "Dr.Max" instead of just "Pharmacy", "Lidl" instead of "Groceries").' : ''}
       Normalize item names (e.g., "Kup. sunka 100g" -> "Šunka").
-      Assign a CATEGORY from this list: ${categories?.join(', ') || 'Groceries, Dining Out, Transport, Other'}.
+      ${getCategoryPrompt(categories as string[])}
       
       RETURN JSON:
       {
@@ -38,7 +44,7 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
       }
     `;
 
-    const userPrompt = `Analyze these items: ${metadata.items.map((i: any) => i.originalName).join(', ')}`;
+    const userPrompt = `Analyze these items: ${metadata.items.map((i: EkasaItem) => i.originalName).join(', ')}`;
 
     const completion = await groq.chat.completions.create({
       messages: [
@@ -68,7 +74,7 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
     }, tenantId);
 
     // 3. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
-    const mergedItems = metadata.items.map((orig: any, idx: number) => ({
+    const mergedItems = metadata.items.map((orig: EkasaItem, idx: number) => ({
       name: aiItems[idx]?.name || orig.originalName,
       amount: orig.amount,
       category: aiItems[idx]?.category || 'Others'
@@ -85,8 +91,8 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
       vatDetail: metadata.vatDetail
     });
 
-  } catch (error: any) {
-    ServerLogger.system('ERROR', 'AI', 'Receipt AI parse error', { error: String(error) });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    ServerLogger.system('ERROR', 'AI', 'Receipt AI parse error', { error: error instanceof Error ? error.message : String(error) });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Receipt processing failed' }, { status: 500 });
   }
 });

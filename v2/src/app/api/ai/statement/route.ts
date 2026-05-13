@@ -1,12 +1,12 @@
 import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
+import { getCategoryPrompt } from '@/lib/ai-categories';
 
-export const POST = withAuth(async (req: Request, { tenantId, user }) => {
+export const POST = withAuth(async (req: Request) => {
 
   try {
     const { text, categories } = await req.json();
-    const categoryList = categories?.join(', ') || 'Groceries, Dining Out, Transport, Other';
 
     if (!text || text.length < 10) {
       return NextResponse.json({ error: 'Statement text too short or empty' }, { status: 400 });
@@ -19,7 +19,7 @@ export const POST = withAuth(async (req: Request, { tenantId, user }) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama-3.1-70b-versatile",
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
@@ -32,8 +32,9 @@ Format each item exactly like this:
   "date": "YYYY-MM-DD",
   "description": "Store or Merchant Name",
   "amount": 12.34,
-  "category": "One of: ${categoryList}"
+  "category": "..."
 }
+${getCategoryPrompt(categories as string[])}
 Only output the JSON object.`
           },
           {
@@ -61,8 +62,8 @@ Only output the JSON object.`
       transactions: parsed.transactions || []
     });
 
-  } catch (e: any) {
-    ServerLogger.system('ERROR', 'AI', 'Statement AI error', { error: String(e) });
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    ServerLogger.system('ERROR', 'AI', 'Statement AI error', { error: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'AI Processing failed' }, { status: 500 });
   }
 });

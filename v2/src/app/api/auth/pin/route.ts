@@ -18,11 +18,13 @@ export async function POST(req: Request) {
       input_code: pin 
     });
 
-    if (lErr || !lookup || lookup.length === 0) {
+    const lookupArray = lookup as { target_id: string; target_name: string }[] | null;
+
+    if (lErr || !lookupArray || lookupArray.length === 0) {
       return NextResponse.json({ error: 'Invalid PIN' }, { status: 401 });
     }
 
-    const tenantId = lookup[0].target_id;
+    const tenantId = lookupArray[0].target_id;
 
     // 2. Verify PIN
     const { data: isValid, error: vErr } = await supabaseAdmin.rpc('check_tenant_pin', {
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
       password: virtualPass,
     });
 
-    if (authErr) {
+    if (authErr || !authData.session) {
       // If virtual account doesn't exist, we could auto-provision it here, 
       // but for now, we'll assume they are seeded or handled via a migration.
       ServerLogger.system('ERROR', 'Auth', 'Virtual login failed for PIN auth', { error: String(authErr) });
@@ -66,7 +68,7 @@ export async function POST(req: Request) {
       refresh_token: authData.session.refresh_token,
     });
 
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'PIN Auth failed' }, { status: 500 });
   }
 }

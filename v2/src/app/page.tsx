@@ -7,7 +7,7 @@ import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { useTransactions } from '@/modules/finance/hooks/useTransactions';
 import { useSync, ReceiptData } from '@/modules/finance/hooks/useSync';
 import { calcTotals } from '@/modules/finance/lib/finance';
-import { AuthScreen } from '@/components/AuthScreen';
+import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
 import { StatementScanner } from '@/modules/finance/components/StatementScanner';
 import { ItemAnalytics } from '@/modules/finance/components/ItemAnalytics';
@@ -18,13 +18,16 @@ import { BudgetHealth } from '@/modules/finance/components/BudgetHealth';
 import { TeamAllocation } from '@/modules/finance/components/TeamAllocation';
 import { CommandCenter } from '@/modules/finance/components/CommandCenter';
 import { MarketTrends } from '@/modules/finance/components/MarketTrends';
-import { ManualEntryModal } from '@/modules/finance/components/ManualEntryModal';
 import { MonthlyPerformance } from '@/modules/finance/components/MonthlyPerformance';
 import { ExpenseList } from '@/modules/finance/components/ExpenseList';
+import { ManualEntryModal, ManualEntryPayload } from '@/modules/finance/components/ManualEntryModal';
+import { ParsedTransaction } from '@/modules/finance/components/StatementScanner';
+import { useCategories } from '@/modules/finance/hooks/useCategories';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
-  const { session, tenant, loading: hLoading, updateState, addCategory } = useTenant();
+  const { session, tenant, loading: hLoading, updateState } = useTenant();
+  const { addCategory } = useCategories();
   const now = new Date();
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedMonth = searchParams.get('m') || currentMonthISO;
@@ -34,7 +37,7 @@ function DashboardContent() {
   const { softDeleteTransaction, saveReceipt, addTransaction, updateTransaction } = useSync(tenant?.tenant_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
-  const [manualEntry, setManualEntry] = useState<any | null>(null);
+  const [manualEntry, setManualEntry] = useState<Partial<ManualEntryPayload> | null>(null);
 
   const selectedUser = searchParams.get('u') || (tenant ? Object.keys(tenant.names)[0] : null);
   const loading = hLoading || (tenant && eLoading);
@@ -46,7 +49,7 @@ function DashboardContent() {
     setShowScanner(false);
   };
 
-  const handleSaveStatement = async (newTransactions: any[], whoId: string, whoName: string) => {
+  const handleSaveStatement = async (newTransactions: ParsedTransaction[], whoId: string, whoName: string) => {
     const payload = newTransactions.map(tx => ({
       ...tx,
       who_id: whoId,
@@ -56,7 +59,7 @@ function DashboardContent() {
     await addTransaction(payload);
   };
 
-  const handleManualSave = async (entry: any) => {
+  const handleManualSave = async (entry: ManualEntryPayload) => {
     if (entry.id) {
       await updateTransaction(entry.id, entry);
     } else {
@@ -72,7 +75,7 @@ function DashboardContent() {
     </div>
   );
 
-  if (!tenant) return <AuthScreen session={session} />;
+  if (!tenant) return <OrgAccessForm session={session} />;
 
   // Platinum Demo Mode: Show ghost data if no real transactions exist
   const isDemo = transactions.length === 0;
@@ -161,7 +164,7 @@ function DashboardContent() {
             <MonthlyPerformance transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
             <CommandCenter
               onScan={() => setShowScanner(true)}
-              onManual={(prefill) => setManualEntry({ ...prefill, who_id: selectedUser })}
+              onManual={(prefill) => setManualEntry({ ...prefill, who_id: selectedUser || undefined })}
               onStatement={() => setShowStatement(true)}
             />
 
@@ -170,7 +173,7 @@ function DashboardContent() {
             <BudgetHealth spent={totals.spent} totalBudget={totalBudget} colSpan={6} />
 
             {/* ROW 3: STATUS & INTELLIGENCE */}
-            <OperatingMargin income={totalIncome} spent={totals.spent} goal={monthlySavingsGoal} />
+            <OperatingMargin income={totalIncome} spent={totals.spent} goal={Number(monthlySavingsGoal)} />
             <AIInsights 
               tenantId={tenant.tenant_id} 
               transactionCount={transactions.length} 
@@ -205,7 +208,7 @@ function DashboardContent() {
                 <ExpenseList 
                    transactions={displayTransactions} 
                   onDelete={softDeleteTransaction} 
-                  onEdit={(tx) => setManualEntry(tx)}
+                  onEdit={(tx) => setManualEntry({ ...tx, amount: Number(tx.amount) })}
                 />
               </div>
             </BentoCard>

@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BentoCard } from './BentoCard';
+import { BrandHeader } from './BrandHeader';
 import type { Session } from '@supabase/supabase-js';
 
-export function AuthScreen({ session }: { session: Session | null }) {
+interface Props {
+  session: Session | null;
+  onBack?: () => void;
+}
+
+export function OrgAccessForm({ session, onBack }: Props) {
   const [mode, setMode] = useState<'join' | 'create'>('join');
   const [handle, setHandle] = useState('');
   const [orgName, setOrgName] = useState('');
@@ -22,8 +27,8 @@ export function AuthScreen({ session }: { session: Session | null }) {
         }
       });
       if (error) throw error;
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Login failed');
       setLoading(false);
     }
   };
@@ -44,12 +49,14 @@ export function AuthScreen({ session }: { session: Session | null }) {
       if (!lookupData || lookupData.length === 0) throw new Error("Invalid access code.");
       
       const tenantId = lookupData[0].target_id;
-      const { error: linkErr } = await supabase.rpc('upsert_app_user_v1', { p_tenant_id: tenantId });
+      
+      // Use the switch_tenant RPC to link the user (V-25 fixed)
+      const { error: linkErr } = await supabase.rpc('switch_tenant', { p_tenant_id: tenantId });
       if (linkErr) throw linkErr;
       
       window.location.reload();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Join failed');
       setLoading(false);
     }
   };
@@ -71,23 +78,22 @@ export function AuthScreen({ session }: { session: Session | null }) {
       if (cErr) throw cErr;
       
       window.location.reload();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Create failed');
       setLoading(false);
     }
   };
 
   return (
     <div className="flex-center" style={{ minHeight: '80vh', padding: 24 }}>
-      <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: 40, borderRadius: 28, textAlign: 'center' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--bg-hover)', margin: '0 auto 24px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-          <img src="/brand/identity.png" alt="Identity" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
+      <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: 40, borderRadius: 28 }}>
+        <BrandHeader />
         
-        <h1 className="text-gradient" style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Synculariti Identity</h1>
-        <p className="card-subtitle" style={{ marginBottom: 32 }}>Secure enterprise access gatekeeper</p>
-
-        {error && <div className="status-badge status-danger" style={{ marginBottom: 24, width: '100%', justifyContent: 'center' }}>{error}</div>}
+        {error && (
+          <div className="status-badge status-danger" style={{ marginBottom: 24, width: '100%', justifyContent: 'center' }}>
+            {error}
+          </div>
+        )}
         
         {!session ? (
           <div className="flex-col gap-4">
@@ -102,14 +108,17 @@ export function AuthScreen({ session }: { session: Session | null }) {
             </button>
             <div className="flex-row items-center gap-2" style={{ justifyContent: 'center' }}>
               <span className="card-subtitle" style={{ fontSize: 13 }}>First time?</span>
-              <a href="/login" style={{ fontSize: 13, color: 'var(--accent-primary)', fontWeight: 700, textDecoration: 'none' }}>
-                Join Organization →
-              </a>
+              <span className="card-subtitle" style={{ fontSize: 13, color: 'var(--accent-primary)', fontWeight: 700 }}>
+                Join Organization Below
+              </span>
             </div>
+            <p className="card-subtitle" style={{ fontSize: 11, textAlign: 'center', marginTop: 8 }}>
+              Note: You must log in first to select or create a tenant.
+            </p>
           </div>
         ) : (
           <div className="flex-col gap-4">
-            <p className="card-subtitle" style={{ fontSize: 14 }}>
+            <p className="card-subtitle" style={{ fontSize: 14, textAlign: 'center' }}>
               Logged in as <strong style={{ color: 'var(--text-primary)' }}>{session.user.email}</strong>
             </p>
 
@@ -165,6 +174,16 @@ export function AuthScreen({ session }: { session: Session | null }) {
               >
                 {loading ? 'Verifying...' : mode === 'join' ? 'Link Organization' : 'Create Organization'}
               </button>
+
+              {onBack && (
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={onBack}
+                  style={{ width: '100%', padding: '12px', marginTop: 4, background: 'none', border: 'none', fontSize: 13 }}
+                >
+                  ← Back to Selector
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -3,7 +3,7 @@
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { useLogistics } from '@/modules/logistics/hooks/useLogistics';
 import { BentoCard } from '@/components/BentoCard';
-import { AuthScreen } from '@/components/AuthScreen';
+import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { Suspense, useState } from 'react';
 import { ItemCatalog } from '@/modules/logistics/components/ItemCatalog';
 import { NewItemModal } from '@/modules/logistics/components/NewItemModal';
@@ -21,7 +21,7 @@ function LogisticsDashboard() {
     </div>
   );
 
-  if (!tenant) return <AuthScreen session={session} />;
+  if (!tenant) return <OrgAccessForm session={session} />;
 
   return (
     <main>

@@ -56,10 +56,11 @@ export const POST = withAuth(async (request: Request, { tenantId, user }) => {
       }, { status: response.status });
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as unknown;
     return NextResponse.json(data);
-  } catch (error: any) {
-    ServerLogger.system('ERROR', 'eKasa', 'eKasa proxy exception', { error: String(error) });
-    return NextResponse.json({ error: 'Proxy failed to reach eKasa', detail: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'eKasa proxy exception';
+    ServerLogger.system('ERROR', 'eKasa', 'eKasa proxy exception', { error: msg });
+    return NextResponse.json({ error: 'Proxy failed to reach eKasa', detail: msg }, { status: 500 });
   }
 });

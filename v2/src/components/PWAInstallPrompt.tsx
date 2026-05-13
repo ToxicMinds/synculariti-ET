@@ -8,12 +8,15 @@ export function PWAInstallPrompt() {
 
   useEffect(() => {
     // 1. Detect if already in standalone mode
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        ('standalone' in window.navigator && (window.navigator as Navigator & { standalone: boolean }).standalone);
+    
+    if (isStandalone) {
       return;
     }
 
     // 2. Detect iOS
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
     setIsIOS(ios);
 
     // 3. Show after a delay to avoid annoying immediate popups

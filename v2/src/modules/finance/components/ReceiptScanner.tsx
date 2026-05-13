@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { BentoCard } from '@/components/BentoCard';
-import { CategorySelector } from '@/components/CategorySelector';
-import { CategoryPill } from '@/components/CategoryPill';
 
 import { fetchWithRetry } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
@@ -13,6 +11,7 @@ import { extractUniversal, parseEkasaError } from '@/lib/ekasa-protocols';
 import styles from './ReceiptScanner.module.css';
 
 interface ReceiptItem {
+  id?: string;
   name: string;
   amount: number;
   category: string;
@@ -27,7 +26,7 @@ interface ReceiptData {
   ico?: string | null;
   receiptNumber?: string | null;
   transactedAt?: string | null;
-  vatDetail?: any;
+  vatDetail?: Record<string, unknown> | null;
 }
 
 export function ReceiptScanner({ 
@@ -59,7 +58,7 @@ export function ReceiptScanner({
       scanner.render(onScanSuccess, onScanFailure);
 
       return () => {
-        scanner.clear().catch(error => Logger.system('ERROR', 'Scanner', 'Failed to clear QR scanner instance', { error }));
+        scanner.clear().catch((error: unknown) => Logger.system('ERROR', 'Scanner', 'Failed to clear QR scanner instance', { error: error instanceof Error ? error.message : String(error) }));
       };
     }
   }, [step]);
@@ -93,9 +92,9 @@ export function ReceiptScanner({
         })
       });
 
-      const result = await response.json();
+      const result = (await response.json()) as { success: boolean; data?: ReceiptData; triage?: string; message?: string; error?: string };
 
-      if (!result.success) {
+      if (!result.success || !result.data) {
         if (result.triage === 'REJECTED') {
           throw new Error(`Invalid Document: ${result.message}`);
         }
@@ -107,7 +106,7 @@ export function ReceiptScanner({
         store: parsed.store || 'Unknown Store',
         date: parsed.date || new Date().toISOString().split('T')[0],
         total: parsed.total || 0,
-        items: (parsed.items || []).map((it: any) => ({
+        items: (parsed.items || []).map((it) => ({
           ...it,
           selected: true
         })),
@@ -118,10 +117,11 @@ export function ReceiptScanner({
       });
 
       setStep('review');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Scan failed';
+      setError(msg);
       setStep('scan');
-      Logger.system('ERROR', 'Scanner', 'AI Invoice scan failure', e);
+      Logger.system('ERROR', 'Scanner', 'AI Invoice scan failure', { error: msg });
     } finally {
       setLoading(false);
     }
@@ -149,11 +149,11 @@ export function ReceiptScanner({
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = (await response.json().catch(() => ({}))) as { detail?: string };
         const humanMessage = parseEkasaError(response.status, errorData.detail);
         throw new Error(humanMessage);
       }
-      const ekasaData = await response.json();
+      const ekasaData = (await response.json()) as unknown;
 
       // 3. Categorize with Groq with Retry
       const groqResponse = await fetchWithRetry('/api/ai/parse-receipt', {
@@ -163,13 +163,13 @@ export function ReceiptScanner({
       });
 
       if (!groqResponse.ok) throw new Error("AI Categorization failed.");
-      const parsed = await groqResponse.json();
+      const parsed = (await groqResponse.json()) as ReceiptData;
 
       setReceipt({
         store: parsed.store || 'Unknown Store',
         date: parsed.date || new Date().toISOString().split('T')[0],
         total: parsed.total || 0,
-        items: (parsed.items || []).map((it: any) => ({
+        items: (parsed.items || []).map((it) => ({
           ...it,
           selected: true
         })),
@@ -184,16 +184,18 @@ export function ReceiptScanner({
       }
 
       setStep('review');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Scan failed';
+      setError(msg);
       setStep('scan');
-      Logger.system('ERROR', 'Scanner', 'eKasa scan failure', e);
+      Logger.system('ERROR', 'Scanner', 'eKasa scan failure', { error: msg });
     } finally {
       setLoading(false);
     }
   }
 
-  function onScanFailure(error: any) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function onScanFailure(error: unknown) {
     // Quietly ignore scan failures
   }
 
@@ -202,23 +204,12 @@ export function ReceiptScanner({
     setIsSaving(true);
     setError('');
     try {
-      // Find name for selected payer
-      // We'll pass the whole logic to the parent via onSave if we want to follow current pattern
-      // but easier to just let onSave handle the data
       await onSave(receipt, payerId);
-      // The parent will usually unmount us on success (setShowScanner(false))
-    } catch (e: any) {
-      setError(e.message || 'Failed to save receipt.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save receipt';
+      setError(msg);
       setIsSaving(false);
     }
-  }
-
-  function extractEkasaId(txt: string) {
-    const m = txt.match(/O-[0-9A-F]{32}/i);
-    if (m) return m[0].toUpperCase();
-    const mUrl = txt.match(/id=([0-9A-F]{32})/i);
-    if (mUrl && mUrl[1]) return 'O-' + mUrl[1].toUpperCase();
-    return null;
   }
 
   if (step === 'processing') {
@@ -259,7 +250,7 @@ export function ReceiptScanner({
                   onClick={() => setPayerId(id)}
                   className={`${styles.payerBtn} ${payerId === id ? styles.payerBtnActive : styles.payerBtnInactive}`}
                 >
-                  {name as string}
+                  {name}
                 </button>
               ))}
             </div>
@@ -298,12 +289,11 @@ export function ReceiptScanner({
                   </select>
                 </div>
               </div>
-              <div className={styles.itemAmount}>€{item.amount.toFixed(2)}</div>
+              <div className={item.amount < 0 ? styles.itemAmountNegative : styles.itemAmount}>€{item.amount.toFixed(2)}</div>
             </div>
           ))}
         </div>
 
-        {/* Global Add Category for Scanner Review */}
         {onAddCategory && (
           <div className={styles.missingCategoryContainer}>
             <p className={styles.missingCategoryLabel}>Missing a category?</p>

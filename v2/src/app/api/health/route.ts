@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 import { getNeo4jDriver } from '@/lib/neo4j';
 
 export async function GET() {
-  const checks = {
+  const checks: Record<string, string> = {
     supabase: 'down',
     neo4j: 'down',
   };
 
   let status = 200;
+  const supabase = await createClient();
 
   // 1. Check Supabase
   try {
@@ -18,8 +19,8 @@ export async function GET() {
       checks.supabase = `error: ${error.message}`;
       status = 503;
     }
-  } catch (e: any) {
-    checks.supabase = `error: ${e.message}`;
+  } catch (e: unknown) {
+    checks.supabase = `error: ${e instanceof Error ? e.message : String(e)}`;
     status = 503;
   }
 
@@ -31,8 +32,8 @@ export async function GET() {
       await session.run('RETURN 1');
       await session.close();
       checks.neo4j = 'ok';
-    } catch (e: any) {
-      checks.neo4j = `error: ${e.message}`;
+    } catch (e: unknown) {
+      checks.neo4j = `error: ${e instanceof Error ? e.message : String(e)}`;
       status = 503;
     }
   }

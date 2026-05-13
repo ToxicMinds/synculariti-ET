@@ -23,10 +23,11 @@ export const POST = withAuth(async (req: Request) => {
       body: JSON.stringify({ model, messages, temperature, max_tokens, stream })
     });
     
-    const data = await response.json();
+    const data = (await response.json()) as unknown;
     return NextResponse.json(data, { status: response.status });
-  } catch (error: any) {
-    return NextResponse.json({ error: { message: error.message } }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Groq API error';
+    return NextResponse.json({ error: { message: msg } }, { status: 500 });
   }
 });
 

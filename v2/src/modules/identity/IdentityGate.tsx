@@ -3,12 +3,13 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useIdentity } from './useIdentity';
 import { TenantSelector } from './TenantSelector';
-import { IdentityAuth } from './IdentityAuth';
+import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { supabase } from '@/lib/supabase';
+import { Session } from '@supabase/supabase-js';
 
 interface Props {
   children: ReactNode;
-  session: any;
+  session: Session | null;
   currentTenantId?: string; // Passed from TenantContext if already resolved
 }
 
@@ -47,7 +48,7 @@ export function IdentityGate({ children, session, currentTenantId }: Props) {
 
     // SCENARIO: No invitations found, or user chose to Join via Code
     return (
-      <IdentityAuth 
+      <OrgAccessForm 
         session={session} 
         onBack={tenants.length > 0 ? () => setShowManualAuth(false) : undefined} 
       />

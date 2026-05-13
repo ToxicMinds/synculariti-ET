@@ -4,21 +4,24 @@ import React, { useState } from 'react';
 import { labelStyle, inputStyle } from '@/components/formStyles';
 import { Expense } from '../lib/finance';
 import { CategorySelector } from '@/components/CategorySelector';
+import { AppState } from '@/modules/identity/hooks/useTenant';
+
+export interface ManualEntryPayload {
+  id?: string;
+  description: string;
+  merchant: string;
+  amount: number;
+  category: string;
+  who_id: string;
+  who: string;
+  date: string;
+}
 
 interface ManualEntryProps {
   prefill?: Partial<Expense> & { merchant?: string };
-  tenant: any;
+  tenant: AppState;
   selectedUser: string;
-  onSave: (entry: {
-    id?: string;
-    description: string;
-    merchant: string;
-    amount: number;
-    category: string;
-    who_id: string;
-    who: string;
-    date: string;
-  }) => Promise<void>;
+  onSave: (entry: ManualEntryPayload) => Promise<void>;
   onAddCategory?: (name: string) => Promise<void>;
   onClose: () => void;
 }
@@ -58,18 +61,19 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
         amount: Number(amount),
         category,
         who_id,
-        who: names[who_id] || '',
+        who: (names as Record<string, string>)[who_id] || '',
         date
       });
       onClose();
-    } catch (e: any) {
-      setError(e.message || 'Failed to save.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save';
+      setError(msg);
     } finally {
       setSaving(false);
     }
   };
 
-  const nameEntries = Object.entries(names);
+  const nameEntries = Object.entries(names as Record<string, string>);
 
   return (
     <div className="tooltip-overlay" onClick={onClose}>
@@ -194,7 +198,7 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
           <div>
             <label style={labelStyle}>Who is this for?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              {nameEntries.map(([id, name]: [string, any]) => (
+              {nameEntries.map(([id, name]) => (
                 <button
                   key={id}
                   type="button"
@@ -212,7 +216,7 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
                     transition: 'all 0.2s'
                   }}
                 >
-                  {name as string}
+                  {name}
                 </button>
               ))}
             </div>

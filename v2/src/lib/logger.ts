@@ -17,7 +17,7 @@ export class Logger {
     level: LogLevel, 
     component: LogComponent, 
     message: string, 
-    metadata: any = {}, 
+    metadata: Record<string, unknown> = {}, 
     tenantId?: string
   ) {
     // 1. Local Development visibility
@@ -33,13 +33,13 @@ export class Logger {
         message,
         metadata: {
           ...metadata,
-          stack: metadata?.stack,
+          stack: metadata.stack as string | undefined,
           timestamp: new Date().toISOString()
         },
         tenant_id: tenantId || null
       });
-    } catch (e) {
-      console.error('CRITICAL: Failed to write system telemetry:', e);
+    } catch (e: unknown) {
+      console.error('CRITICAL: Failed to write system telemetry:', e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -52,7 +52,7 @@ export class Logger {
     action: string,
     description: string,
     actorName: string,
-    metadata: any = {}
+    metadata: Record<string, unknown> = {}
   ) {
     try {
       await supabase.from('activity_log').insert({
@@ -62,8 +62,8 @@ export class Logger {
         actor_name: actorName,
         metadata
       });
-    } catch (e) {
-      this.system('ERROR', 'Sync', 'Failed to write user activity log', e, tenantId);
+    } catch (e: unknown) {
+      this.system('ERROR', 'Sync', 'Failed to write user activity log', { error: e instanceof Error ? e.message : String(e) }, tenantId);
     }
   }
 }

@@ -18,8 +18,9 @@ export interface EkasaMetadata {
   };
 }
 
-export function parseEkasaMetadata(ekasaData: any): EkasaMetadata {
-  const receipt = ekasaData?.receipt || ekasaData?.data || ekasaData || {};
+export function parseEkasaMetadata(ekasaData: unknown): EkasaMetadata {
+  const d = (ekasaData || {}) as Record<string, any>;
+  const receipt = d.receipt || d.data || d;
 
   // 1. Store Name Extraction
   const rawStore = 
@@ -28,16 +29,16 @@ export function parseEkasaMetadata(ekasaData: any): EkasaMetadata {
     receipt.organizationName || 
     receipt.merchantName || 
     receipt.name || 
-    ekasaData?.organization?.name || 
-    ekasaData?.organizationName || 
+    d.organization?.name || 
+    d.organizationName || 
     null;
 
   const store = cleanStoreName(rawStore);
 
   // 2. Tax Identifiers
-  const dic = receipt.organization?.dic || receipt.dic || ekasaData?.dic || null;
-  const ico = receipt.organization?.ico || receipt.ico || ekasaData?.ico || null;
-  const receiptNumber = receipt.receiptNumber || ekasaData?.receiptNumber || null;
+  const dic = receipt.organization?.dic || receipt.dic || d.dic || null;
+  const ico = receipt.organization?.ico || receipt.ico || d.ico || null;
+  const receiptNumber = receipt.receiptNumber || d.receiptNumber || null;
 
   // 3. Date & Time Extraction
   let date = null;
@@ -69,13 +70,13 @@ export function parseEkasaMetadata(ekasaData: any): EkasaMetadata {
   }
 
   // 4. Items & Total
-  const rawItems = receipt.items || receipt.receiptItems || receipt.lines || [];
-  const items = rawItems.map((it: any) => ({
-    originalName: it.name || it.itemName || it.description || 'Unknown Item',
+  const rawItems = (receipt.items || receipt.receiptItems || receipt.lines || []) as Array<Record<string, unknown>>;
+  const items = rawItems.map((it) => ({
+    originalName: (it.name || it.itemName || it.description || 'Unknown Item') as string,
     amount: Number(it.itemTotalPrice || it.lineTotal || it.price || it.amount || 0)
   }));
 
-  const total = Number(receipt.totalPrice || receipt.total || items.reduce((acc: number, curr: any) => acc + curr.amount, 0));
+  const total = Number(receipt.totalPrice || receipt.total || items.reduce((acc: number, curr: { amount: number }) => acc + curr.amount, 0));
 
   // 5. VAT Extraction
   const vatDetail = {

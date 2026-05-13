@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { BentoCard } from '@/components/BentoCard';
+import { AppState } from '@/modules/identity/hooks/useTenant';
 
 export function AIInsights({
   tenantId,
@@ -14,8 +15,8 @@ export function AIInsights({
   tenantId: string | undefined;
   transactionCount?: number;
   dataHash?: string;
-  updateState?: (s: any) => Promise<void>;
-  tenant?: any;
+  updateState?: (s: Partial<AppState>) => Promise<void>;
+  tenant?: AppState | null;
   isDemo?: boolean;
 }) {
   const [insight, setInsight] = useState<string | null>(null);
@@ -95,7 +96,7 @@ export function AIInsights({
         setSource('error');
         lastFetchedHash.current = cacheHash; // Mark as fetched so we don't loop
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setInsight('⚠️ Could not reach the AI service. Check your connection and try again.');
       setSource('error');
       // Do NOT mark lastFetchedHash on network error — allow manual refresh
