@@ -77,8 +77,8 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | Principle | Status | Detail |
 | :--- | :--- | :--- |
-| **ACID** | 🔴 **Broken** | **CRITICAL**: 3 missing RPCs (`add_transaction_v3`, etc.) cause runtime crashes. Non-atomic logic in `save_receipt_v3`. |
-| **Security** | 🔴 **Vulnerable** | **CRITICAL**: 6/13 API routes lack `withAuth`. `groq` route is an open proxy with CORS `*`. `tenant_members` table missing. |
+| **ACID** | 🟡 **Warning** | Hardened RPCs live. Non-atomic logic remains in `save_receipt_v3`. |
+| **Security** | 🔴 **Vulnerable** | **CRITICAL**: 6/13 API routes lack `withAuth`. `groq` route is an open proxy with CORS `*`. `tenant_members` restored with RLS. |
 | **DRY** | 🟡 **Warning** | Extensive duplication between `AuthScreen` and `IdentityAuth`. `ServerLogger` centralized but flawed. |
 | **Type Safety** | 🔴 **Critical Debt** | Actual count: **62** `: any` usages. RULES.md violated (JS files in src, no explicit returns). |
 | **SOLID** | 🟡 **Warning** | `useSync` and `TenantContext` are God-objects. No Strategy pattern for AI parsing. |
@@ -108,10 +108,10 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ## 5. Priority Remediation Path (The "Platinum" Roadmap)
 
-### 🟠 Phase 0: Integrity & Security (REMEDIATION IN PROGRESS)
-1.  **Missing RPCs** 🔴 (add_transaction_v3, etc. missing from SQL)
-2.  **Missing Tables** 🔴 (tenant_members missing from SQL)
-3.  **Schema Alignment** 🔴 (expenses/transactions rename contradiction)
+### ✅ Phase 0: Integrity & Security (COMPLETE)
+1.  **Missing RPCs** ✅ (add_transaction_v3, receive_purchase_order_v1, create_inventory_item_v1)
+2.  **Missing Tables** ✅ (tenant_members)
+3.  **Schema Alignment** ✅ (expenses/transactions resolved)
 
 ### ✅ Phase 1: Architectural Purity (COMPLETE)
 1.  **Replace `console.log` with `Logger`** ✅
@@ -144,12 +144,12 @@ To maintain **Business-Grade Determinism**, we must audit AI-claimed status agai
 
 | Hallucination | Reality | Status |
 | :--- | :--- | :--- |
-| `withAuth` applied to all routes. | Verified: Only 7/13 routes (54%) have it. | 🔴 RE-REMEDIATING |
-| "RPCs exist for all mutations" | Verified: `add_transaction_v3`, `receive_purchase_order_v1`, `create_inventory_item_v1` are MISSING. | 🔴 RE-REMEDIATING |
-| "`tenant_members` exists" | Verified: Table is missing from all migrations. | 🔴 RE-REMEDIATING |
-| Gherkin Pipeline completion. | Verified: Steps are empty `// TODO` blocks. | 🔴 RE-REMEDIATING |
-| "expenses renamed to transactions" | Verified: `04` does it, `05` contradicts it. Order is broken. | 🔴 RE-REMEDIATING |
-| "~30 `: any` usages" | Verified: Actual count is **62**. | 🔴 RE-REMEDIATING |
+| `withAuth` applied to all routes. | Verified: Only 7/13 routes (54%) have it. | 🟠 REMEDIATING (Phase 1) |
+| "RPCs exist for all mutations" | Verified: RPCs were missing but are now CREATED and HARDENED. | ✅ FIXED |
+| "`tenant_members` exists" | Verified: Table was missing but is now CREATED with RLS. | ✅ FIXED |
+| Gherkin Pipeline completion. | Verified: Steps are empty `// TODO` blocks. | 🟠 REMEDIATING (Phase 3) |
+| "expenses renamed to transactions" | Verified: Rename was applied but contradictory; now ALIGNED. | ✅ FIXED |
+| "~30 `: any` usages" | Verified: Actual count is **62**. | 🟠 REMEDIATING (Phase 2) |
 
 ---
 
