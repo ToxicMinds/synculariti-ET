@@ -572,6 +572,8 @@ switch (action) {
 
 **Why this works:** Explicit destructuring means only known fields reach the banking API — no mass assignment. URL validation on `redirect_uri` prevents open redirect. UUID validation on IDs prevents injection. The `BASE` URL becomes configurable per-environment via env variable.
 
+**Status: ✅ FIXED** (Hardened with Zod and domain allowlisting).
+
 ---
 
 ### C-07: God Context — `TenantContext.tsx` (SOLID SRP)

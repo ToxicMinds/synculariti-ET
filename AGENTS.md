@@ -116,6 +116,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 | V-30 | PIN Auth brute-force vulnerability. | API Route | 🔴 SECURITY | ✅ FIXED (Phase 8) |
 | V-32 | OfflineQueue Multi-Tab Race. | OfflineQueue | 🔴 CRITICAL | ✅ FIXED (Phase 10) |
 | V-33 | Dual-Write ACID violation (Supabase/Neo4j). | Sync Hook | 🔴 CRITICAL | ✅ FIXED (Phase 11) |
+| V-34 | Enable Banking Open Redirect. | API Route | 🔴 SECURITY | ✅ FIXED (Phase 12) |
 
 ---
 
@@ -192,6 +193,11 @@ This document is the definitive guide for AI assistants and developers. It conso
 2.  **Exactly-Once Delivery** ✅ — Asynchronous consumer with retry capping and dead-letter logic.
 3.  **Type Safety** ✅ — Removed `: any` from `neo4jBulkMerge`.
 4.  **Harden Deletion** ✅ — Atomic graph detachment for deleted transactions.
+
+### ✅ Phase 12: Bank Integration Security (C-06) (COMPLETE)
+1.  **Mass Assignment Protection** ✅ — Explicit Zod schema enforcement.
+2.  **Redirect Allowlisting** ✅ — Domain-locked `redirect_uri` validation.
+3.  **Injection Prevention** ✅ — UUID and alphanumeric type enforcement for all parameters.
 
 ---
 
