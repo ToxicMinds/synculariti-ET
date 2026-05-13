@@ -94,6 +94,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 | :--- | :--- | :--- | :--- | :--- |
 | V-01 | PO Receipt column mismatch / Double-write. | DB RPC | 🔴 CRITICAL | ✅ FIXED |
 | V-02 | Dead Outbox Bridge. | DB Triggers | 🔴 CRITICAL | ✅ FIXED |
+| V-03 | Finance Calculation Library Duplicated. | lib/finance.ts | 🔴 CRITICAL | ✅ FIXED (Phase 9) |
 | V-04 | Stale 'expenses' table reference. | API Route | 🔴 CRITICAL | ✅ FIXED |
 | V-05 | No auth guard on Export. | API Route | 🔴 SECURITY | ✅ FIXED |
 | V-07 | `console.log` bypassing Logger. | Multiple | 🟡 WARNING | ✅ FIXED |
@@ -173,6 +174,11 @@ This document is the definitive guide for AI assistants and developers. It conso
 2.  **HMAC Derivation** ✅ — `crypto.subtle` HMAC-SHA256 for virtual account passwords.
 3.  **Strict Validation** ✅ — `zod` schema enforcement for PIN format.
 4.  **Security Service Revocation** ✅ — Sensitive RPCs restricted to `service_role`.
+
+### ✅ Phase 9: Finance Logic Consolidation (C-03) (COMPLETE)
+1.  **Diverged Logic Cleanup** ✅ — Obsolete `lib/finance.ts` deleted.
+2.  **Performance Optimization** ✅ — `calcPerUserSpend` refactored to `O(N)`.
+3.  **Test Parity** ✅ — Coverage expanded to 100% of canonical library.
 
 ---
 

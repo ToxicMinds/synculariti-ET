@@ -257,6 +257,8 @@ import { calcTotals } from '@/modules/finance/lib/finance'; // Already correct
 
 **Why this works:** The `modules/finance/lib/finance.ts` version is strictly better — it handles `Transaction` type (current schema), computes `adjusted` totals (missing in legacy), uses modern `reduce` instead of `forEach`, and has 5 extra functions the legacy copy lacks. Consolidating to one source of truth ensures tests actually cover what runs in production.
 
+**Status: ✅ FIXED** (Verified with 100% test coverage and O(N) optimization).
+
 ---
 
 ### C-04: OfflineQueue — No Max Retry + Multi-Tab Race (ACID/Resilience)
