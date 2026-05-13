@@ -172,11 +172,26 @@ AS $$
 DECLARE
     v_tenant_id UUID;
     v_new_id UUID;
+    v_conversion_factor NUMERIC;
+    v_category_id UUID;
 BEGIN
     v_tenant_id := get_my_tenant();
     IF v_tenant_id IS NULL THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
+
+    -- TYPE SAFETY: Handle broken payloads with clean error messages
+    BEGIN
+        v_conversion_factor := (p_item->>'conversion_factor')::NUMERIC;
+    EXCEPTION WHEN others THEN
+        RAISE EXCEPTION 'Invalid conversion factor: %', p_item->>'conversion_factor';
+    END;
+
+    BEGIN
+        v_category_id := (p_item->>'category_id')::UUID;
+    EXCEPTION WHEN others THEN
+        v_category_id := NULL; -- Allow NULL categories if explicitly pushed as invalid
+    END;
 
     v_new_id := gen_random_uuid();
 
@@ -199,8 +214,8 @@ BEGIN
         p_item->>'type',
         p_item->>'purchasing_uom',
         p_item->>'inventory_uom',
-        (p_item->>'conversion_factor')::NUMERIC,
-        (p_item->>'category_id')::UUID
+        v_conversion_factor,
+        v_category_id
     );
 
     RETURN v_new_id;
