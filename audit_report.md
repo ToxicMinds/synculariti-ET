@@ -354,6 +354,8 @@ private static enqueueSync(type: 'ADD_TRANSACTION' | 'SAVE_RECEIPT', payload: un
 
 **Why this works:** `navigator.locks.request()` is supported in Chrome 69+, Firefox 65+, Safari 15.4+ — covers all modern browsers including WebView on Android and Safari on iOS. The lock ensures only one tab reads/writes localStorage at a time, eliminating the race. The `MAX_RETRY` cap prevents infinite retries — after 5 failures the item is evicted and logged. The `try/catch` around localStorage handles QuotaExceededError gracefully.
 
+**Status: ✅ FIXED** (Verified with Web Locks and Max-Retry eviction).
+
 ---
 
 ### C-05: Dual-Write Supabase + Neo4j with No Rollback (ACID)

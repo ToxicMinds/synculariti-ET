@@ -14,25 +14,29 @@ export function useOfflineQueue(tenantId: string | undefined, callbacks: SyncCal
     if (typeof window === 'undefined' || !tenantId) return;
     
     const handleOnline = async () => {
-      const q = OfflineQueue.getQueue();
-      if (q.length === 0) return;
-      
-      Logger.system('INFO', 'OfflineQueue', `Flushing ${q.length} queued mutations`, {}, tenantId);
-      
-      for (const item of q) {
-        try {
-          if (item.type === 'ADD_TRANSACTION') {
-            await callbacks.addTransaction(item.payload as Partial<Transaction> | Partial<Transaction>[]);
-          } else if (item.type === 'SAVE_RECEIPT') {
-            const p = item.payload as { receipt: ReceiptData; whoId: string; whoName: string; locationId?: string; currency?: string };
-            await callbacks.saveReceipt(p.receipt, p.whoId, p.whoName, p.locationId, p.currency);
+      // Use mutual exclusion lock to ensure only one tab flushes the queue
+      await OfflineQueue.withLock(async () => {
+        const q = OfflineQueue.getQueue();
+        if (q.length === 0) return;
+        
+        Logger.system('INFO', 'OfflineQueue', `Flushing ${q.length} queued mutations`, {}, tenantId);
+        
+        for (const item of q) {
+          try {
+            if (item.type === 'ADD_TRANSACTION') {
+              await callbacks.addTransaction(item.payload as Partial<Transaction> | Partial<Transaction>[]);
+            } else if (item.type === 'SAVE_RECEIPT') {
+              const p = item.payload as { receipt: ReceiptData; whoId: string; whoName: string; locationId?: string; currency?: string };
+              await callbacks.saveReceipt(p.receipt, p.whoId, p.whoName, p.locationId, p.currency);
+            }
+            // Dequeue is now async and handles its own locking internally (nested locks are fine with navigator.locks)
+            await OfflineQueue.dequeue(item.id);
+          } catch (e: unknown) {
+            await OfflineQueue.incrementRetry(item.id);
+            Logger.system('ERROR', 'OfflineQueue', `Failed to flush item ${item.id}`, { error: e });
           }
-          OfflineQueue.dequeue(item.id);
-        } catch (e: unknown) {
-          OfflineQueue.incrementRetry(item.id);
-          Logger.system('ERROR', 'OfflineQueue', `Failed to flush item ${item.id}`, { error: e });
         }
-      }
+      });
     };
 
     window.addEventListener('online', handleOnline);

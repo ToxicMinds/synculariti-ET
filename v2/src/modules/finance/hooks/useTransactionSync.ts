@@ -30,7 +30,7 @@ export function useTransactionSync(tenantId: string | undefined, callbacks?: { o
     if (!tenantId) return;
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      OfflineQueue.enqueue('ADD_TRANSACTION', transaction);
+      await OfflineQueue.enqueue('ADD_TRANSACTION', transaction);
       triggerRefresh();
       return;
     }
@@ -71,7 +71,7 @@ export function useTransactionSync(tenantId: string | undefined, callbacks?: { o
     if (selectedItems.length === 0) throw new Error('No items selected');
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      OfflineQueue.enqueue('SAVE_RECEIPT', { receipt, whoId, whoName, locationId, currency });
+      await OfflineQueue.enqueue('SAVE_RECEIPT', { receipt, whoId, whoName, locationId, currency });
       triggerRefresh();
       return;
     }

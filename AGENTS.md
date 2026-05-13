@@ -114,6 +114,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 | V-28 | `useLogistics` mixes Read+Write (SRP violation). | Logistics Hook | 🟡 SOLID | 🟠 OPEN — Phase 6 |
 | V-29 | `AuthScreen` + `IdentityAuth` DRY violation (75% identical). | Identity | 🟡 DRY | ✅ FIXED (Phase 6) |
 | V-30 | PIN Auth brute-force vulnerability. | API Route | 🔴 SECURITY | ✅ FIXED (Phase 8) |
+| V-32 | OfflineQueue Multi-Tab Race. | OfflineQueue | 🔴 CRITICAL | ✅ FIXED (Phase 10) |
 
 ---
 
@@ -179,6 +180,11 @@ This document is the definitive guide for AI assistants and developers. It conso
 1.  **Diverged Logic Cleanup** ✅ — Obsolete `lib/finance.ts` deleted.
 2.  **Performance Optimization** ✅ — `calcPerUserSpend` refactored to `O(N)`.
 3.  **Test Parity** ✅ — Coverage expanded to 100% of canonical library.
+182: 
+183: ### ✅ Phase 10: Offline Resilience (C-04) (COMPLETE)
+184: 1.  **Multi-Tab Locking** ✅ — `navigator.locks` implemented for mutual exclusion.
+185: 2.  **Retry Exhaustion** ✅ — `MAX_RETRY = 5` with permanent eviction and logging.
+186: 3.  **Observability** ✅ — High-fidelity success/failure logging in the flush cycle.
 
 ---
 
