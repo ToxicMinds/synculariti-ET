@@ -21,6 +21,15 @@ BEGIN
         RAISE EXCEPTION 'Not authenticated or tenant context missing';
     END IF;
 
+    -- SCHEMA VALIDATION: Prevent runtime casting errors
+    IF p_transaction->>'amount' IS NULL OR NOT (p_transaction->>'amount' ~ '^-?\d+(\.\d+)?$') THEN
+        RAISE EXCEPTION 'Invalid or missing amount: %', p_transaction->>'amount';
+    END IF;
+
+    IF p_transaction->>'date' IS NULL OR NOT (p_transaction->>'date' ~ '^\d{4}-\d{2}-\d{2}$') THEN
+        RAISE EXCEPTION 'Invalid or missing date format: %', p_transaction->>'date';
+    END IF;
+
     -- Extract or Generate ID
     v_new_id := COALESCE((p_transaction->>'id')::UUID, gen_random_uuid());
 
@@ -76,16 +85,16 @@ AS $$
 DECLARE
     v_tenant_id UUID;
     v_po RECORD;
-    v_item RECORD;
 BEGIN
     v_tenant_id := get_my_tenant();
     IF v_tenant_id IS NULL THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
 
-    -- 1. Verify PO ownership and status
+    -- CONCURRENCY LOCKING: Prevent double-processing via FOR UPDATE
     SELECT * INTO v_po FROM purchase_orders 
-    WHERE id = p_po_id AND tenant_id = v_tenant_id;
+    WHERE id = p_po_id AND tenant_id = v_tenant_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Purchase Order not found';
@@ -95,35 +104,33 @@ BEGIN
         RETURN jsonb_build_object('status', 'ALREADY_RECEIVED');
     END IF;
 
-    -- 2. Update PO Status
+    -- 3. Update PO Status
     UPDATE purchase_orders 
     SET status = 'RECEIVED', updated_at = NOW() 
     WHERE id = p_po_id;
 
-    -- 3. Update Inventory Ledger
-    -- Iterates through line items and adds to stock
-    FOR v_item IN SELECT * FROM po_line_items WHERE po_id = p_po_id LOOP
-        INSERT INTO inventory_ledger (
-            tenant_id, 
-            item_id, 
-            location_id, 
-            quantity, 
-            uom, 
-            entry_type, 
-            reference_id
-        )
-        VALUES (
-            v_tenant_id,
-            v_item.item_id,
-            v_po.location_id,
-            v_item.quantity,
-            v_item.uom,
-            'RECEIPT',
-            p_po_id
-        );
-    END LOOP;
+    -- 4. SET-BASED INVENTORY UPDATE: High-performance bulk insert
+    INSERT INTO inventory_ledger (
+        tenant_id, 
+        item_id, 
+        location_id, 
+        quantity, 
+        uom, 
+        entry_type, 
+        reference_id
+    )
+    SELECT 
+        v_tenant_id,
+        item_id,
+        v_po.location_id,
+        quantity,
+        uom,
+        'RECEIPT',
+        p_po_id
+    FROM po_line_items 
+    WHERE po_id = p_po_id;
 
-    -- 4. Emit to Outbox (Triggers Finance Invoice)
+    -- 5. Emit to Outbox (Triggers Finance Invoice)
     INSERT INTO outbox_events (tenant_id, event_type, payload)
     VALUES (
         v_tenant_id,
