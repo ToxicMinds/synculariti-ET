@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     if (!result.success) {
       return NextResponse.json({ 
         error: 'Invalid PIN format', 
-        details: result.error.errors 
+        details: result.error.issues 
       }, { status: 400 });
     }
     
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
     // 7. Strengthen Password Derivation (HMAC-SHA256)
     const secret = process.env.PIN_DERIVATION_SECRET;
     if (!secret) {
-      ServerLogger.system('CRITICAL', 'Auth', 'PIN_DERIVATION_SECRET is missing');
+      ServerLogger.system('ERROR', 'Auth', 'PIN_DERIVATION_SECRET is missing');
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
