@@ -15,11 +15,29 @@ CREATE TABLE IF NOT EXISTS public.tenant_members (
 -- Optimization: Explicit index for RLS lookups and email-based discovery
 CREATE INDEX IF NOT EXISTS idx_tenant_members_email ON public.tenant_members(email);
 
+-- HELPER: Break RLS Reciprocal Loops
+-- Runs outside RLS context to allow policies to check member roles without recursion.
+CREATE OR REPLACE FUNCTION public.is_tenant_management_privileged(p_tenant_id UUID)
+RETURNS BOOLEAN 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public 
+AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.tenant_members 
+        WHERE tenant_id = p_tenant_id
+          AND email = auth.jwt()->>'email' 
+          AND role IN ('OWNER', 'ADMIN')
+    );
+END;
+$$;
+
 -- RLS
 ALTER TABLE public.tenant_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenant_members FORCE ROW LEVEL SECURITY;
 
--- BREAK RECIPROCAL LOOPS: Use the SECURITY DEFINER helper instead of querying app_users directly.
+-- CLEAN POLICIES
 CREATE POLICY "Users can view their own memberships"
     ON public.tenant_members
     FOR SELECT
@@ -35,12 +53,7 @@ CREATE POLICY "Tenant owners can manage members"
     FOR ALL
     USING (
         tenant_id = public.get_my_tenant() 
-        AND EXISTS (
-            -- Subquery evaluates against the same table but is scoped by get_my_tenant()
-            SELECT 1 FROM public.tenant_members 
-            WHERE email = auth.jwt()->>'email' 
-            AND role IN ('OWNER', 'ADMIN')
-        )
+        AND public.is_tenant_management_privileged(tenant_id)
     );
 
 -- Audit Column

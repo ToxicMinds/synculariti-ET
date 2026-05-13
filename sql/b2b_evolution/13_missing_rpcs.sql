@@ -15,20 +15,26 @@ AS $$
 DECLARE
     v_tenant_id UUID;
     v_new_id UUID;
+    v_amount NUMERIC;
+    v_date DATE;
 BEGIN
     v_tenant_id := get_my_tenant();
     IF v_tenant_id IS NULL THEN
         RAISE EXCEPTION 'Not authenticated or tenant context missing';
     END IF;
 
-    -- SCHEMA VALIDATION: Prevent runtime casting errors
-    IF p_transaction->>'amount' IS NULL OR NOT (p_transaction->>'amount' ~ '^-?\d+(\.\d+)?$') THEN
-        RAISE EXCEPTION 'Invalid or missing amount: %', p_transaction->>'amount';
-    END IF;
+    -- ROBUST VALIDATION: Use explicit casting with error handling
+    BEGIN
+        v_amount := (p_transaction->>'amount')::NUMERIC;
+    EXCEPTION WHEN others THEN
+        RAISE EXCEPTION 'Invalid numeric amount provided: %', p_transaction->>'amount';
+    END;
 
-    IF p_transaction->>'date' IS NULL OR NOT (p_transaction->>'date' ~ '^\d{4}-\d{2}-\d{2}$') THEN
-        RAISE EXCEPTION 'Invalid or missing date format: %', p_transaction->>'date';
-    END IF;
+    BEGIN
+        v_date := (p_transaction->>'date')::DATE;
+    EXCEPTION WHEN others THEN
+        RAISE EXCEPTION 'Invalid date format provided: %', p_transaction->>'date';
+    END;
 
     -- Extract or Generate ID
     v_new_id := COALESCE((p_transaction->>'id')::UUID, gen_random_uuid());
@@ -57,9 +63,9 @@ BEGIN
         (p_transaction->>'who_id')::UUID,
         p_transaction->>'who',
         p_transaction->>'category',
-        (p_transaction->>'amount')::NUMERIC,
+        v_amount,
         COALESCE(p_transaction->>'currency', 'EUR'),
-        (p_transaction->>'date')::DATE,
+        v_date,
         p_transaction->>'description',
         p_transaction->>'ico',
         p_transaction->>'receipt_number',
@@ -129,6 +135,11 @@ BEGIN
         p_po_id
     FROM po_line_items 
     WHERE po_id = p_po_id;
+
+    -- VALIDATION: Prevent processing empty purchase orders
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Cannot receive empty Purchase Order: no line items found for PO %', p_po_id;
+    END IF;
 
     -- 5. Emit to Outbox (Triggers Finance Invoice)
     INSERT INTO outbox_events (tenant_id, event_type, payload)
