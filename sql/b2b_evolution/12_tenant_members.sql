@@ -2,6 +2,15 @@
 -- Purpose: Define the tenant access control list for Identity discovery.
 -- Enforces: Security Check in upsert_app_user_v1.
 
+-- HELPER: Ensure updated_at column is managed automatically
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE TABLE IF NOT EXISTS public.tenant_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
