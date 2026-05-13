@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { withAuth } from '@/lib/withAuth';
 
 const BASE = 'https://api.enablebanking.com';
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (req: Request) => {
   const appId = process.env.ENABLE_BANKING_APP_ID;
   const appSecret = process.env.ENABLE_BANKING_APP_SECRET;
 
@@ -66,4 +67,4 @@ export async function POST(req: Request) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
-}
+});

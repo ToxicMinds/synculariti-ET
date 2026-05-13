@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import { withAuth } from '@/lib/withAuth';
 
 /**
  * DEBUG API: Full sync of Supabase expenses to Neo4j.
  * Cypher 5 compliant — every statement ends with RETURN.
- * Usage: GET /api/debug/sync-neo4j?key=et-secret-sync
+ * Usage: GET /api/debug/sync-neo4j?key=...
  */
-export async function GET(req: Request) {
+export const GET = withAuth(async (req: Request) => {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
 
-  if (key !== 'et-secret-sync') {
+  // SECURITY: Replace hardcoded secret with environment variable
+  if (key !== process.env.SYNC_SECRET_KEY) {
     return NextResponse.json({ error: 'Unauthorized. Please provide the correct ?key=' }, { status: 401 });
   }
 
@@ -70,4 +72,4 @@ export async function GET(req: Request) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
-}
+});

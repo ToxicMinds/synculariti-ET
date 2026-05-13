@@ -1,20 +1,22 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import { withAuth } from '@/lib/withAuth';
 
 /**
  * BACKFILL API: Stamps tenant_id onto all existing Neo4j Transaction nodes.
  * Splits queries so every statement ends with RETURN (Cypher 5 compliant).
  *
- * Usage: GET /api/debug/backfill-neo4j?key=et-secret-sync
+ * Usage: GET /api/debug/backfill-neo4j?key=...
  * Optional: ?tenantId=xxx to only backfill one tenant
  */
-export async function GET(req: Request) {
+export const GET = withAuth(async (req: Request) => {
   const { searchParams } = new URL(req.url);
   const key = searchParams.get('key');
   const filterTenantId = searchParams.get('tenantId');
 
-  if (key !== 'et-secret-sync') {
+  // SECURITY: Replace hardcoded secret with environment variable
+  if (key !== process.env.SYNC_SECRET_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -104,4 +106,4 @@ export async function GET(req: Request) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
-}
+});

@@ -39,7 +39,7 @@ synculariti-ET/
 ├── RULES.md               ← This file — developer rulebook
 ├── vercel.json            ← eKasa proxy rewrite rules
 ├── sql/
-│   └── b2b_evolution/     ← Ordered SQL migrations (00_ → 03_)
+│   └── b2b_evolution/     ← Ordered SQL migrations (00_ → 13_)
 └── v2/                    ← Next.js application root
     └── src/
         ├── app/           ← Next.js App Router pages + API routes
