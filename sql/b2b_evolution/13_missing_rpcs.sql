@@ -4,6 +4,7 @@
 
 -- 1. add_transaction_v3
 -- Canonical RPC for manual expense entry.
+DROP FUNCTION IF EXISTS public.add_transaction_v3(JSONB);
 CREATE OR REPLACE FUNCTION public.add_transaction_v3(
     p_transaction JSONB
 )
@@ -80,6 +81,7 @@ $$;
 
 -- 2. receive_purchase_order_v1
 -- Atomic logistics-to-finance bridge.
+DROP FUNCTION IF EXISTS public.receive_purchase_order_v1(UUID);
 CREATE OR REPLACE FUNCTION public.receive_purchase_order_v1(
     p_po_id UUID
 )
@@ -161,6 +163,7 @@ $$;
 
 -- 3. create_inventory_item_v1
 -- Canonical SKU creation.
+DROP FUNCTION IF EXISTS public.create_inventory_item_v1(JSONB);
 CREATE OR REPLACE FUNCTION public.create_inventory_item_v1(
     p_item JSONB
 )
