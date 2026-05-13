@@ -78,7 +78,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 | Principle | Status | Detail |
 | :--- | :--- | :--- |
 | **ACID** | 🟢 **Hardened** | `save_receipt_v4` & `add_transactions_bulk_v1` are atomic. `TenantContext.updateState()` has a non-atomic read-before-write — needs fixing in Phase 5. |
-| **Security** | 🟠 **Partially Hardened** | 12/13 API routes protected with `withAuth`. **NEW**: 23 `SECURITY DEFINER` RPCs callable by `anon` role — Phase 4 remediation required. |
+| **Security** | 🟢 **Hardened** | 12/13 API routes protected. Rate limiting and HMAC-based PIN auth implemented (C-02). |
 | **DRY** | 🟢 **Hardened** | AI category prompts, Neo4j Cypher loops, and Auth components unified. |
 | **Type Safety** | 🟢 **Hardened** | **0** `: any` / `as any` usages in `v2/src`. 100% Type-Safe codebase. |
 | **SOLID** | 🟢 **Hardened** | `useSync`, `TenantContext`, and `useLogistics` refactored into specialized hooks (SRP). |
@@ -92,7 +92,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | ID | Violation | File | Severity | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| V-01 | PO Receipt column mismatch. | DB RPC | 🔴 CRITICAL | ✅ FIXED |
+| V-01 | PO Receipt column mismatch / Double-write. | DB RPC | 🔴 CRITICAL | ✅ FIXED |
 | V-02 | Dead Outbox Bridge. | DB Triggers | 🔴 CRITICAL | ✅ FIXED |
 | V-04 | Stale 'expenses' table reference. | API Route | 🔴 CRITICAL | ✅ FIXED |
 | V-05 | No auth guard on Export. | API Route | 🔴 SECURITY | ✅ FIXED |
@@ -111,7 +111,8 @@ This document is the definitive guide for AI assistants and developers. It conso
 | V-26 | Stale model `llama-3.1-70b-versatile` in `forecast` & `statement` routes. | AI Routes | 🟡 WARNING | ✅ FIXED (Phase 5) |
 | V-27 | Non-atomic read-before-write in `TenantContext.updateState()`. | Context | 🟡 ACID | ✅ FIXED (Phase 5) |
 | V-28 | `useLogistics` mixes Read+Write (SRP violation). | Logistics Hook | 🟡 SOLID | 🟠 OPEN — Phase 6 |
-| V-29 | `AuthScreen` + `IdentityAuth` DRY violation (75% identical). | Identity | 🟡 DRY | 🟠 OPEN — Phase 6 |
+| V-29 | `AuthScreen` + `IdentityAuth` DRY violation (75% identical). | Identity | 🟡 DRY | ✅ FIXED (Phase 6) |
+| V-30 | PIN Auth brute-force vulnerability. | API Route | 🔴 SECURITY | ✅ FIXED (Phase 8) |
 
 ---
 
@@ -166,6 +167,12 @@ This document is the definitive guide for AI assistants and developers. It conso
 2.  **God-Context Refactor (`TenantContext`)** ✅ — Extract category/budget mutations into a separate hook from core state provider.
 3.  **AI DRY Violations** ✅ — Extract prompt category mapping logic from `parse-invoice`, `parse-receipt`, and `statement` routes into `@/lib/ai-categories.ts`.
 4.  **Neo4j Cypher DRY** ✅ — Extract shared `neo4jBulkMerge()` utility to unify `sync-neo4j` and `backfill-neo4j` loops.
+
+### ✅ Phase 8: PIN Auth Hardening (C-02) (COMPLETE)
+1.  **Rate Limiting** ✅ — IP-based cumulative blocking via `check_rate_limit` RPC.
+2.  **HMAC Derivation** ✅ — `crypto.subtle` HMAC-SHA256 for virtual account passwords.
+3.  **Strict Validation** ✅ — `zod` schema enforcement for PIN format.
+4.  **Security Service Revocation** ✅ — Sensitive RPCs restricted to `service_role`.
 
 ---
 

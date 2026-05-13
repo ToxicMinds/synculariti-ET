@@ -113,49 +113,13 @@ BEGIN
     END IF;
 
     -- 3. Update PO Status
+    -- This update triggers trg_signal_procurement_finance which handles:
+    -- a) Validation of quantity_received
+    -- b) Insertion into inventory_ledger (with UOM conversion)
+    -- c) Emission of PROCUREMENT_RECEIVED outbox event
     UPDATE purchase_orders 
     SET status = 'RECEIVED', updated_at = NOW() 
     WHERE id = p_po_id;
-
-    -- 4. SET-BASED INVENTORY UPDATE: High-performance bulk insert
-    INSERT INTO inventory_ledger (
-        tenant_id, 
-        item_id, 
-        location_id, 
-        quantity, 
-        uom, 
-        entry_type, 
-        reference_id
-    )
-    SELECT 
-        v_tenant_id,
-        item_id,
-        v_po.location_id,
-        quantity,
-        uom,
-        'RECEIPT',
-        p_po_id
-    FROM po_line_items 
-    WHERE po_id = p_po_id;
-
-    -- VALIDATION: Prevent processing empty purchase orders
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Cannot receive empty Purchase Order: no line items found for PO %', p_po_id;
-    END IF;
-
-    -- 5. Emit to Outbox (Triggers Finance Invoice)
-    INSERT INTO outbox_events (tenant_id, event_type, payload)
-    VALUES (
-        v_tenant_id,
-        'PROCUREMENT_RECEIVED',
-        jsonb_build_object(
-            'po_id', p_po_id,
-            'vendor_id', v_po.vendor_id,
-            'total_amount', v_po.total_amount,
-            'currency', v_po.currency,
-            'location_id', v_po.location_id
-        )
-    );
 
     RETURN jsonb_build_object('status', 'SUCCESS', 'po_id', p_po_id);
 END;
