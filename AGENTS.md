@@ -77,14 +77,14 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 | Principle | Status | Detail |
 | :--- | :--- | :--- |
-| **ACID** | 🟢 **Hardened** | Atomic RPCs used for all ledger changes. `update_transaction_v1` avoids double-querying. Outbox bridge is verified and live. |
-| **Security** | 🟢 **Hardened** | Phase 2 eliminated all direct client DML. `withAuth` middleware applied to all routes. `upsert_app_user_v1` prevents user-hopping via email validation. |
-| **DRY** | 🟡 **Warning** | `withAuth` eliminated API boilerplate. `ServerLogger` centralized server telemetry. Remaining: Category mapping logic is still duplicated across AI API routes. |
-| **Type Safety** | 🟡 **Warning** | Critical build errors fixed. `ServerLogger` and `withAuth` strictly typed. Debt: ~30 `: any` usages remain in UI components. |
-| **SOLID** | 🟡 **Warning** | `useSync` remains a God-hook (SRP violation). `NavBar.tsx` refactored into CSS Modules. API routes lack a Strategy pattern for document parsing (OCP). |
-| **Observability** | 🟢 **Hardened** | `ServerLogger` provides safe API telemetry. `Logger.user()` added to AI routes. `ErrorBoundary` wraps the App. |
-| **Error Handling** | 🟢 **Hardened** | Unhandled promise rejections in Neo4j/Logger are caught and logged. API routes return structured errors via `withAuth`. |
-| **Resilience** | 🟢 **Hardened** | `OfflineQueue` implemented and integrated into `useSync` for all financial mutations. |
+| **ACID** | 🔴 **Broken** | **CRITICAL**: 3 missing RPCs (`add_transaction_v3`, etc.) cause runtime crashes. Non-atomic logic in `save_receipt_v3`. |
+| **Security** | 🔴 **Vulnerable** | **CRITICAL**: 6/13 API routes lack `withAuth`. `groq` route is an open proxy with CORS `*`. `tenant_members` table missing. |
+| **DRY** | 🟡 **Warning** | Extensive duplication between `AuthScreen` and `IdentityAuth`. `ServerLogger` centralized but flawed. |
+| **Type Safety** | 🔴 **Critical Debt** | Actual count: **62** `: any` usages. RULES.md violated (JS files in src, no explicit returns). |
+| **SOLID** | 🟡 **Warning** | `useSync` and `TenantContext` are God-objects. No Strategy pattern for AI parsing. |
+| **Observability** | 🟡 **Flawed** | `ServerLogger` swallows errors in empty `catch` blocks. `health` route misconfigured. |
+| **Error Handling** | 🟡 **Mixed** | ErrorBoundary exists, but many API routes lack catch-block telemetry. |
+| **Resilience** | 🟢 **Hardened** | `OfflineQueue` implementation is the only fully verified success. |
 
 ---
 
@@ -108,10 +108,10 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ## 5. Priority Remediation Path (The "Platinum" Roadmap)
 
-### ✅ Phase 0: Integrity & Security (COMPLETE)
-1.  **Hardened RLS** ✅
-2.  **Atomic Logistics** ✅
-3.  **Outbox Activation** ✅
+### 🟠 Phase 0: Integrity & Security (REMEDIATION IN PROGRESS)
+1.  **Missing RPCs** 🔴 (add_transaction_v3, etc. missing from SQL)
+2.  **Missing Tables** 🔴 (tenant_members missing from SQL)
+3.  **Schema Alignment** 🔴 (expenses/transactions rename contradiction)
 
 ### ✅ Phase 1: Architectural Purity (COMPLETE)
 1.  **Replace `console.log` with `Logger`** ✅
@@ -144,10 +144,12 @@ To maintain **Business-Grade Determinism**, we must audit AI-claimed status agai
 
 | Hallucination | Reality | Status |
 | :--- | :--- | :--- |
-| `withAuth` applied to all routes. | It was written but never imported/used in API routes. | ✅ FIXED (Phase 2) |
-| `Logger` usage in API routes. | `Logger` referenced browser globals; caused production build crashes. | ✅ FIXED (Phase 2.2) |
-| `offlineQueue.ts` implementation. | Claimed as "documented" but the file was empty/stale. | ✅ FIXED (Phase 2) |
-| Gherkin Pipeline completion. | Workflow file existed but pointed to non-existent feature paths. | ✅ FIXED (Phase 2) |
+| `withAuth` applied to all routes. | Verified: Only 7/13 routes (54%) have it. | 🔴 RE-REMEDIATING |
+| "RPCs exist for all mutations" | Verified: `add_transaction_v3`, `receive_purchase_order_v1`, `create_inventory_item_v1` are MISSING. | 🔴 RE-REMEDIATING |
+| "`tenant_members` exists" | Verified: Table is missing from all migrations. | 🔴 RE-REMEDIATING |
+| Gherkin Pipeline completion. | Verified: Steps are empty `// TODO` blocks. | 🔴 RE-REMEDIATING |
+| "expenses renamed to transactions" | Verified: `04` does it, `05` contradicts it. Order is broken. | 🔴 RE-REMEDIATING |
+| "~30 `: any` usages" | Verified: Actual count is **62**. | 🔴 RE-REMEDIATING |
 
 ---
 

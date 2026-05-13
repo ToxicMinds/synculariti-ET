@@ -93,7 +93,7 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 ### Security & API Governance
 - **No Direct DML**: The database explicitly denies `INSERT/UPDATE/DELETE` on core tables (`transactions`, `tenants`, `app_users`) to `authenticated` clients. Client-side `.insert()`, `.update()`, or `.upsert()` WILL FAIL. Always use RPCs (e.g. `add_transaction_v3`).
 - **Session-Based tenant_id**: `tenant_id` is NEVER passed as a URL param or client payload. Always derived server-side from session via RLS `get_my_tenant()`.
-- **No Stale Table References**: The core financial table is `transactions` (not `expenses`). The rename was applied in migration `05_tenant_rename.sql`. Any reference to `'expenses'` in app code is a bug.
+- **No Stale Table References**: The core financial table is `transactions` (not `expenses`). The rename was applied in migration `04_finance_schema.sql`. Any reference to `'expenses'` in app code is a bug.
 - **Auth Guard on All Routes**: Every API route that reads or writes tenant data MUST verify the session. Use the `withAuth` middleware. Do not rely on copy-pasted `getSession()` logic.
 - **Naked Tables**: Never grant `INSERT/UPDATE/DELETE` to `anon` or `authenticated` on ledger tables.
 
@@ -107,7 +107,7 @@ To achieve **Business-Grade Determinism** for arbitrary B2B invoices:
 
 ### TypeScript
 - **TypeScript only.** No `.js` files in `src/`. No `require()`.
-- **No `: any`**: The 32 current usages are tracked debt. No new `any` types without a `// REASON:` comment.
+- **No `: any`**: The **62** current usages are tracked debt. No new `any` types without a `// REASON:` comment.
 - All functions must have **explicit return types**.
 - Use `async/await`. No raw `.then()/.catch()` chains.
 
