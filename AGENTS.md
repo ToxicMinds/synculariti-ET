@@ -210,6 +210,10 @@ This document is the definitive guide for AI assistants and developers. It conso
 ### 6.2 Standalone Identity
 *   **Rule**: The App must be wrapped in `IdentityGate`. No business logic should run until `tenant_id` is resolved.
 
+### 6.3 Explicit Supabase Grants
+*   **Rule**: All new tables and functions in the `public` schema MUST include explicit `GRANT TO authenticated;` statements.
+*   **Rationale**: Supabase security update (May 30/Oct 30) disables default grants for the Data API.
+
 ---
 
 ## 9. Hallucination Audit (Anti-Entropic Sweep)

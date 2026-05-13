@@ -30,6 +30,9 @@ ALTER TABLE public.your_table FORCE ROW LEVEL SECURITY;
 -- Always isolate by the session-resolved tenant
 CREATE POLICY "Tenant isolation" ON public.your_table
   USING (tenant_id = public.get_my_tenant());
+
+-- CRITICAL: Explicit grants for Data API (Supabase Security Update May 30/Oct 30)
+GRANT ALL ON TABLE public.your_table TO authenticated;
 ```
 
 ## Identity Standards
