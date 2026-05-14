@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { BentoCard } from '@/components/BentoCard';
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { useTransactions } from '@/modules/finance/hooks/useTransactions';
-import { useSync, ReceiptData } from '@/modules/finance/hooks/useSync';
+import { useSync } from '@/modules/finance/hooks/useSync';
+import { ReceiptData } from '@/modules/finance/hooks/useScannerState';
 import { calcTotals } from '@/modules/finance/lib/finance';
 import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
@@ -21,7 +22,7 @@ import { MarketTrends } from '@/modules/finance/components/MarketTrends';
 import { MonthlyPerformance } from '@/modules/finance/components/MonthlyPerformance';
 import { ExpenseList } from '@/modules/finance/components/ExpenseList';
 import { ManualEntryModal, ManualEntryPayload } from '@/modules/finance/components/ManualEntryModal';
-import { ParsedTransaction } from '@/modules/finance/components/StatementScanner';
+import { ParsedTransaction } from '@/modules/finance/hooks/useStatementScanner';
 import { useCategories } from '@/modules/finance/hooks/useCategories';
 
 function DashboardContent() {
@@ -42,7 +43,7 @@ function DashboardContent() {
   const selectedUser = searchParams.get('u') || (tenant ? Object.keys(tenant.names)[0] : null);
   const loading = hLoading || (tenant && eLoading);
 
-  const handleSaveReceipt = async (data: ReceiptData, whoId?: string) => {
+  const handleSaveReceipt = async (data: ReceiptData, whoId: string) => {
     const finalWhoId = whoId || selectedUser;
     if (!finalWhoId || !tenant) return;
     await saveReceipt(data, finalWhoId, tenant.names[finalWhoId]);

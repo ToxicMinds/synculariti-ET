@@ -15,6 +15,8 @@ interface Neo4jCategoryFact {
   total: number;
 }
 
+import { callGroq } from '@/lib/groq';
+
 export const GET = withAuth(async (req, { tenantId }) => {
   const driver = getNeo4jDriver();
   if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
@@ -73,35 +75,18 @@ export const GET = withAuth(async (req, { tenantId }) => {
       .join('; ');
 
     try {
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            {
-              role: "system",
-              content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
+      const insightText = await callGroq("llama-3.3-70b-versatile", [
+        {
+          role: "system",
+          content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
   Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
-            },
-            {
-              role: "user",
-              content: `Category breakdown: ${categorySummary || 'No data'}.
+        },
+        {
+          role: "user",
+          content: `Category breakdown: ${categorySummary || 'No data'}.
   Top merchants: ${merchantSummary || 'No data'}.`
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 200
-        })
-      });
-
-      if (!groqRes.ok) throw new Error("Groq API error");
-
-      const aiData = await groqRes.json();
-      const insightText = aiData.choices?.[0]?.message?.content || generateFallbackInsight();
+        }
+      ], { temperature: 0.7, max_tokens: 200 }).catch(() => generateFallbackInsight());
 
       return NextResponse.json({ 
         success: true, 

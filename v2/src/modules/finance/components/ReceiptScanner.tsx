@@ -1,32 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { BentoCard } from '@/components/BentoCard';
-
-import { fetchWithRetry } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
-import { extractUniversal, parseEkasaError } from '@/lib/ekasa-protocols';
+import { useScannerState, UseScannerStateReturn, ReceiptData } from '../hooks/useScannerState';
 import styles from './ReceiptScanner.module.css';
 
-interface ReceiptItem {
-  id?: string;
-  name: string;
-  amount: number;
-  category: string;
-  selected: boolean;
-}
-
-interface ReceiptData {
-  store: string;
-  date: string;
-  total: number;
-  items: ReceiptItem[];
-  ico?: string | null;
-  receiptNumber?: string | null;
-  transactedAt?: string | null;
-  vatDetail?: Record<string, unknown> | null;
+interface ReceiptScannerProps {
+  onSave: (data: ReceiptData, whoId: string) => Promise<void>;
+  onAddCategory?: (name: string) => Promise<void>;
+  categories?: string[];
+  names?: Record<string, string>;
 }
 
 export function ReceiptScanner({ 
@@ -34,312 +20,77 @@ export function ReceiptScanner({
   onAddCategory,
   categories = DEFAULT_CATEGORIES,
   names = {}
-}: { 
-  onSave: (data: ReceiptData, whoId: string) => Promise<void>;
-  onAddCategory?: (name: string) => Promise<void>;
-  categories?: string[];
-  names?: Record<string, string>;
-}) {
-  const [step, setStep] = useState<'scan' | 'processing' | 'review'>('scan');
-  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
-  const [payerId, setPayerId] = useState<string>(Object.keys(names)[0] || '');
-  const [loading, setLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
+}: ReceiptScannerProps) {
+  const scanner = useScannerState({ categories, names, onSave });
 
+  if (scanner.step === 'processing' || scanner.isSaving) {
+    return <ProcessingStep isSaving={scanner.isSaving} />;
+  }
+
+  if (scanner.step === 'review' && scanner.receipt) {
+    return (
+      <ReviewStep 
+        scanner={scanner} 
+        names={names} 
+        categories={categories} 
+        onAddCategory={onAddCategory} 
+      />
+    );
+  }
+
+  return <ScanStep scanner={scanner} />;
+}
+
+// --- SUB-COMPONENTS ---
+
+function ProcessingStep({ isSaving }: { isSaving: boolean }) {
+  return (
+    <BentoCard title={isSaving ? "Finalizing..." : "Processing Document"}>
+      <div className={styles.processingContainer}>
+        <div className={`spinner ${styles.spinner}`}></div>
+        <p>{isSaving ? "Analyzing & Storing your record..." : "Running AI Document Triage & Extraction..."}</p>
+      </div>
+    </BentoCard>
+  );
+}
+
+function ScanStep({ scanner }: { scanner: UseScannerStateReturn }) {
   useEffect(() => {
-    if (step === 'scan') {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
+    const html5Scanner = new Html5QrcodeScanner(
+      "qr-reader",
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      /* verbose= */ false
+    );
 
-      scanner.render(onScanSuccess, onScanFailure);
+    html5Scanner.render(
+      (decodedText) => {
+        // Clear the scanner instance quickly to avoid duplicate scanning
+        html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed', { error: String(e) }));
+        scanner.processEkasaQr(decodedText);
+      },
+      () => {} // Ignore continuous scan failures
+    );
 
-      return () => {
-        scanner.clear().catch((error: unknown) => Logger.system('ERROR', 'Scanner', 'Failed to clear QR scanner instance', { error: error instanceof Error ? error.message : String(error) }));
-      };
-    }
-  }, [step]);
+    return () => {
+      html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed on unmount', { error: String(e) }));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    setStep('processing');
-    setLoading(true);
-    setError('');
-
-    try {
-      // 1. Convert to Base64 for Groq Vision
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const base64 = await base64Promise;
-
-      // 2. Call our new AI Invoice Parser (Stage 0-2)
-      const response = await fetch('/api/ai/parse-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          image: base64, 
-          categories 
-        })
-      });
-
-      const result = (await response.json()) as { success: boolean; data?: ReceiptData; triage?: string; message?: string; error?: string };
-
-      if (!result.success || !result.data) {
-        if (result.triage === 'REJECTED') {
-          throw new Error(`Invalid Document: ${result.message}`);
-        }
-        throw new Error(result.error || 'Failed to parse invoice');
-      }
-
-      const parsed = result.data;
-      setReceipt({
-        store: parsed.store || 'Unknown Store',
-        date: parsed.date || new Date().toISOString().split('T')[0],
-        total: parsed.total || 0,
-        items: (parsed.items || []).map((it) => ({
-          ...it,
-          selected: true
-        })),
-        ico: parsed.ico,
-        receiptNumber: parsed.receiptNumber,
-        transactedAt: parsed.transactedAt,
-        vatDetail: parsed.vatDetail
-      });
-
-      setStep('review');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Scan failed';
-      setError(msg);
-      setStep('scan');
-      Logger.system('ERROR', 'Scanner', 'AI Invoice scan failure', { error: msg });
-    } finally {
-      setLoading(false);
+    if (file) {
+      scanner.processInvoiceFile(file);
     }
-  }
-
-  async function onScanSuccess(decodedText: string) {
-    setStep('processing');
-    setLoading(true);
-    setError('');
-
-    try {
-      // 1. Extract eKasa ID from QR text (Using Protocol Intelligence)
-      const receiptId = extractUniversal(decodedText);
-      if (!receiptId) throw new Error("Could not find a valid eKasa ID in this QR code.");
-
-      // 2. Fetch from Portable API Route (Regionally pinned to EU)
-      const payload = typeof receiptId === 'string' 
-        ? { receiptId } 
-        : { okpData: receiptId };
-
-      const response = await fetchWithRetry(`/api/ekasa`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as { detail?: string };
-        const humanMessage = parseEkasaError(response.status, errorData.detail);
-        throw new Error(humanMessage);
-      }
-      const ekasaData = (await response.json()) as unknown;
-
-      // 3. Categorize with Groq with Retry
-      const groqResponse = await fetchWithRetry('/api/ai/parse-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ekasaData, categories })
-      });
-
-      if (!groqResponse.ok) throw new Error("AI Categorization failed.");
-      const parsed = (await groqResponse.json()) as ReceiptData;
-
-      setReceipt({
-        store: parsed.store || 'Unknown Store',
-        date: parsed.date || new Date().toISOString().split('T')[0],
-        total: parsed.total || 0,
-        items: (parsed.items || []).map((it) => ({
-          ...it,
-          selected: true
-        })),
-        ico: parsed.ico,
-        receiptNumber: parsed.receiptNumber,
-        transactedAt: parsed.transactedAt,
-        vatDetail: parsed.vatDetail
-      });
-      
-      if (!parsed.date) {
-        Logger.system('WARN', 'Scanner', 'Date missing from eKasa response — falling back to today', {});
-      }
-
-      setStep('review');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Scan failed';
-      setError(msg);
-      setStep('scan');
-      Logger.system('ERROR', 'Scanner', 'eKasa scan failure', { error: msg });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function onScanFailure(error: unknown) {
-    // Quietly ignore scan failures
-  }
-
-  async function handleSave() {
-    if (!receipt) return;
-    setIsSaving(true);
-    setError('');
-    try {
-      await onSave(receipt, payerId);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to save receipt';
-      setError(msg);
-      setIsSaving(false);
-    }
-  }
-
-  if (step === 'processing') {
-    return (
-      <BentoCard title={isSaving ? "Finalizing..." : "Processing Document"}>
-        <div className={styles.processingContainer}>
-          <div className={`spinner ${styles.spinner}`}></div>
-          <p>{isSaving ? "Analyzing & Storing your record..." : "Running AI Document Triage & Extraction..."}</p>
-        </div>
-      </BentoCard>
-    );
-  }
-
-  if (isSaving) {
-    return (
-      <BentoCard title="Saving Expense">
-        <div className={styles.processingContainer}>
-          <div className={`spinner ${styles.spinner}`}></div>
-          <p className={styles.savingText}>Analyzing & Storing...</p>
-          <p className={styles.savingSubtext}>This will only take a moment.</p>
-        </div>
-      </BentoCard>
-    );
-  }
-
-  if (step === 'review' && receipt) {
-    return (
-      <BentoCard title={`Review: ${receipt.store}`}>
-        <div style={{ marginBottom: 20 }}>
-          <p className={styles.reviewDate}>Date: {receipt.date}</p>
-          
-          <div style={{ marginTop: 12 }}>
-            <p className={styles.whoPaidLabel}>Who paid?</p>
-            <div className={styles.whoPaidContainer}>
-              {Object.entries(names).map(([id, name]) => (
-                <button
-                  key={id}
-                  onClick={() => setPayerId(id)}
-                  className={`${styles.payerBtn} ${payerId === id ? styles.payerBtnActive : styles.payerBtnInactive}`}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.itemsContainer}>
-          {receipt.items.map((item, i) => (
-            <div key={i} className={styles.itemRow}>
-              <div className={styles.itemLeft}>
-                <input 
-                  type="checkbox" 
-                  checked={item.selected} 
-                  onChange={() => {
-                    const next = [...receipt.items];
-                    next[i].selected = !next[i].selected;
-                    setReceipt({ ...receipt, items: next });
-                  }}
-                />
-                <div>
-                  <div className={styles.itemName}>{item.name}</div>
-                  <select 
-                    value={item.category} 
-                    onChange={(e) => {
-                      const next = [...receipt.items];
-                      next[i].category = e.target.value;
-                      setReceipt({ ...receipt, items: next });
-                    }}
-                    className={styles.itemCategorySelect}
-                  >
-                    {categories.length > 0 ? (
-                      categories.map((c: string) => <option key={c} value={c}>{c}</option>)
-                    ) : (
-                      <option value={item.category}>{item.category}</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-              <div className={item.amount < 0 ? styles.itemAmountNegative : styles.itemAmount}>€{item.amount.toFixed(2)}</div>
-            </div>
-          ))}
-        </div>
-
-        {onAddCategory && (
-          <div className={styles.missingCategoryContainer}>
-            <p className={styles.missingCategoryLabel}>Missing a category?</p>
-            <div className={styles.missingCategoryInputContainer}>
-              <input 
-                id="scanner-new-cat"
-                placeholder="New category name..."
-                className={styles.missingCategoryInput}
-              />
-              <button 
-                className={`btn btn-primary ${styles.missingCategoryBtn}`}
-                onClick={async () => {
-                  const el = document.getElementById('scanner-new-cat') as HTMLInputElement;
-                  if (el && el.value.trim()) {
-                    await onAddCategory(el.value.trim());
-                    el.value = '';
-                  }
-                }}
-              >
-                + Add
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className={styles.totalContainer}>
-          <span className={styles.totalLabel}>Total selected:</span>
-          <span className={styles.totalAmount}>
-            €{receipt.items.filter(i => i.selected).reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}
-          </span>
-        </div>
-
-        <div className={styles.actionButtons}>
-          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Confirm & Save'}
-          </button>
-          <button className="btn btn-secondary" onClick={() => setStep('scan')} disabled={isSaving}>Cancel</button>
-        </div>
-        {error && <div className={styles.errorMessage}>{error}</div>}
-      </BentoCard>
-    );
-  }
+  };
 
   return (
     <BentoCard title="Business Intelligence Scanner">
-      {error && <div className="status-badge status-danger" style={{ marginBottom: 16, width: '100%', justifyContent: 'center', padding: 12 }}>{error}</div>}
+      {scanner.error && (
+        <div className="status-badge status-danger" style={{ marginBottom: 16, width: '100%', justifyContent: 'center', padding: 12 }}>
+          {scanner.error}
+        </div>
+      )}
       
       <div className="flex-col gap-4">
         <div id="qr-reader" className={styles.qrContainer}></div>
@@ -367,6 +118,124 @@ export function ReceiptScanner({
           or **capture a full invoice** for AI-powered multi-stage extraction.
         </p>
       </div>
+    </BentoCard>
+  );
+}
+
+function ReviewStep({ 
+  scanner, 
+  names, 
+  categories, 
+  onAddCategory 
+}: { 
+  scanner: UseScannerStateReturn;
+  names: Record<string, string>;
+  categories: string[];
+  onAddCategory?: (name: string) => Promise<void>;
+}) {
+  const { receipt, payerId, setPayerId, updateReceiptItem, confirmAndSave, reset, isSaving, error, isVerified } = scanner;
+
+  if (!receipt) return null;
+
+  return (
+    <BentoCard title={`Review: ${receipt.store}`}>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p className={styles.reviewDate}>Date: {receipt.date}</p>
+          {isVerified ? (
+            <span className="status-badge status-success" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Verified eKasa</span>
+          ) : (
+            <span className="status-badge status-warning" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Estimated (AI)</span>
+          )}
+        </div>
+        
+        <div style={{ marginTop: 12 }}>
+          <p className={styles.whoPaidLabel}>Who paid?</p>
+          <div className={styles.whoPaidContainer}>
+            {Object.entries(names).map(([id, name]) => (
+              <button
+                key={id}
+                onClick={() => setPayerId(id)}
+                className={`${styles.payerBtn} ${payerId === id ? styles.payerBtnActive : styles.payerBtnInactive}`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.itemsContainer}>
+        {receipt.items.map((item, i) => (
+          <div key={i} className={styles.itemRow}>
+            <div className={styles.itemLeft}>
+              <input 
+                type="checkbox" 
+                checked={item.selected} 
+                onChange={() => updateReceiptItem(i, { selected: !item.selected })}
+              />
+              <div>
+                <div className={styles.itemName}>{item.name}</div>
+                <select 
+                  value={item.category || ''} 
+                  onChange={(e) => updateReceiptItem(i, { category: e.target.value })}
+                  className={styles.itemCategorySelect}
+                >
+                  <option value="">Select category...</option>
+                  {categories.length > 0 ? (
+                    categories.map((c: string) => <option key={c} value={c}>{c}</option>)
+                  ) : (
+                    item.category ? <option value={item.category}>{item.category}</option> : null
+                  )}
+                </select>
+              </div>
+            </div>
+            <div className={item.amount < 0 ? styles.itemAmountNegative : styles.itemAmount}>
+              €{item.amount.toFixed(2)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {onAddCategory && (
+        <div className={styles.missingCategoryContainer}>
+          <p className={styles.missingCategoryLabel}>Missing a category?</p>
+          <div className={styles.missingCategoryInputContainer}>
+            <input 
+              id="scanner-new-cat"
+              placeholder="New category name..."
+              className={styles.missingCategoryInput}
+            />
+            <button 
+              className={`btn btn-primary ${styles.missingCategoryBtn}`}
+              onClick={async () => {
+                const el = document.getElementById('scanner-new-cat') as HTMLInputElement;
+                if (el && el.value.trim()) {
+                  await onAddCategory(el.value.trim());
+                  el.value = '';
+                }
+              }}
+            >
+              + Add
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={styles.totalContainer}>
+        <span className={styles.totalLabel}>Total selected:</span>
+        <span className={styles.totalAmount}>
+          €{receipt.items.filter(i => i.selected).reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}
+        </span>
+      </div>
+
+      <div className={styles.actionButtons}>
+        <button className="btn btn-primary" onClick={confirmAndSave} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Confirm & Save'}
+        </button>
+        <button className="btn btn-secondary" onClick={reset} disabled={isSaving}>Cancel</button>
+      </div>
+      {error && <div className={styles.errorMessage}>{error}</div>}
     </BentoCard>
   );
 }

@@ -1,15 +1,14 @@
 import { useState, useRef } from 'react';
 import { Transaction } from '../lib/finance';
 import { CategoryPill } from '@/components/CategoryPill';
-
-type ViewMode = 'list' | 'calendar';
+import { useTransactionFilter } from '../hooks/useTransactionFilter';
 
 /**
  * SwipeableRow: Replicates the v1 mobile UX.
  * Left swipe reveals Edit/Delete.
  */
-function SwipeableRow({ tx, onDelete, onEdit }: { 
-  tx: Transaction; 
+function SwipeableRow({ tx, onDelete, onEdit }: {
+  tx: Transaction;
   onDelete: (id: string) => void;
   onEdit: (tx: Transaction) => void;
 }) {
@@ -17,34 +16,27 @@ function SwipeableRow({ tx, onDelete, onEdit }: {
   const startX = useRef(0);
   const isDragging = useRef(false);
 
-  const onTouchStart = (e: React.TouchEvent) => {
+  const onTouchStart = (e: React.TouchEvent): void => {
     startX.current = e.touches[0].clientX;
     isDragging.current = true;
   };
 
-  const onTouchMove = (e: React.TouchEvent) => {
+  const onTouchMove = (e: React.TouchEvent): void => {
     if (!isDragging.current) return;
-    const currentX = e.touches[0].clientX;
-    const diff = currentX - startX.current;
-    // Only allow left swipe (negative offset)
+    const diff = e.touches[0].clientX - startX.current;
     if (diff < 0) {
-      setSwipeOffset(Math.max(diff, -140)); // Max reveal 140px
+      setSwipeOffset(Math.max(diff, -140));
     } else {
       setSwipeOffset(0);
     }
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (): void => {
     isDragging.current = false;
-    // Snap to open or closed
-    if (swipeOffset < -70) {
-      setSwipeOffset(-140);
-    } else {
-      setSwipeOffset(0);
-    }
+    setSwipeOffset(swipeOffset < -70 ? -140 : 0);
   };
 
-  const handleDelete = () => {
+  const handleDelete = (): void => {
     if (tx.id && window.confirm('Are you sure you want to delete this transaction?')) {
       onDelete(tx.id);
       setSwipeOffset(0);
@@ -54,27 +46,9 @@ function SwipeableRow({ tx, onDelete, onEdit }: {
   return (
     <div className="desktop-hover-reveal" style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border-color)' }}>
       {/* Action Buttons (Mobile Swipe Reveal) */}
-      <div className="hide-desktop" style={{
-        position: 'absolute',
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 140,
-        display: 'flex',
-        alignItems: 'stretch'
-      }}>
-        <button 
-          onClick={() => { onEdit(tx); setSwipeOffset(0); }}
-          style={{ flex: 1, background: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-        >
-          Edit
-        </button>
-        <button 
-          onClick={handleDelete}
-          style={{ flex: 1, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-        >
-          Delete
-        </button>
+      <div className="hide-desktop" style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 140, display: 'flex', alignItems: 'stretch' }}>
+        <button onClick={() => { onEdit(tx); setSwipeOffset(0); }} style={{ flex: 1, background: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Edit</button>
+        <button onClick={handleDelete} style={{ flex: 1, background: '#ef4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Delete</button>
       </div>
 
       {/* Main Content (Swipeable Layer) */}
@@ -83,15 +57,11 @@ function SwipeableRow({ tx, onDelete, onEdit }: {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 16px', // Added padding for desktop feel
-          background: 'var(--bg-card)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '12px 16px', background: 'var(--bg-card)',
           transform: `translateX(${swipeOffset}px)`,
           transition: isDragging.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
-          position: 'relative',
-          zIndex: 2,
+          position: 'relative', zIndex: 2,
           cursor: swipeOffset !== 0 ? 'grabbing' : 'default'
         }}
       >
@@ -107,47 +77,16 @@ function SwipeableRow({ tx, onDelete, onEdit }: {
             {tx.who && <><span>·</span><span>{tx.who}</span></>}
           </div>
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Desktop Only: Hover Actions */}
-          <div className="actions hide-mobile" style={{ display: 'flex', gap: 8 }}>
-            <button 
-              onClick={() => onEdit(tx)}
-              style={{ 
-                padding: '4px 10px', 
-                borderRadius: 6, 
-                border: '1px solid var(--border-color)',
-                background: 'var(--bg-hover)',
-                color: 'var(--text-primary)',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Edit
-            </button>
-            <button 
-              onClick={handleDelete}
-              style={{ 
-                padding: '4px 10px', 
-                borderRadius: 6, 
-                border: '1px solid var(--accent-danger)',
-                background: 'transparent',
-                color: 'var(--accent-danger)',
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Delete
-            </button>
-          </div>
 
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="actions hide-mobile" style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => onEdit(tx)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-color)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+            <button onClick={handleDelete} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--accent-danger)', background: 'transparent', color: 'var(--accent-danger)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>
               {tx.currency === 'EUR' || !tx.currency ? '€' : tx.currency}{Number(tx.amount).toFixed(2)}
             </span>
-            {/* Subtle indicator for mobile users or to hint swipe */}
             <div className="hide-desktop" style={{ width: 4, height: 20, background: 'var(--border-color)', borderRadius: 2, marginLeft: 4, opacity: 0.5 }} />
           </div>
         </div>
@@ -162,7 +101,6 @@ function CalendarView({ transactions }: { transactions: Transaction[] }) {
   const month = now.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Build day totals
   const dayTotals: Record<number, number> = {};
   const dayTransactions: Record<number, Transaction[]> = {};
   transactions.forEach(t => {
@@ -174,11 +112,9 @@ function CalendarView({ transactions }: { transactions: Transaction[] }) {
     }
   });
   const maxSpend = Math.max(...Object.values(dayTotals), 1);
-
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-
   const firstDayOfMonth = new Date(year, month, 1).getDay();
-  const paddingDays = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Mon-first grid
+  const paddingDays = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
 
   return (
     <div>
@@ -198,13 +134,9 @@ function CalendarView({ transactions }: { transactions: Transaction[] }) {
               key={day}
               onClick={() => setSelectedDay(isSelected ? null : day)}
               style={{
-                borderRadius: 8,
-                padding: '6px 4px',
-                textAlign: 'center',
+                borderRadius: 8, padding: '6px 4px', textAlign: 'center',
                 cursor: total > 0 ? 'pointer' : 'default',
-                background: total > 0
-                  ? `rgba(99, 102, 241, ${intensity})`
-                  : 'var(--bg-hover)',
+                background: total > 0 ? `rgba(99, 102, 241, ${intensity})` : 'var(--bg-hover)',
                 border: isSelected ? '2px solid #6366f1' : '1px solid transparent',
                 transition: 'all 0.15s'
               }}
@@ -236,57 +168,37 @@ function CalendarView({ transactions }: { transactions: Transaction[] }) {
   );
 }
 
-export function ExpenseList({ transactions, onDelete, onEdit }: { 
-  transactions: Transaction[]; 
+const selectStyle: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-color)',
+  background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+  fontSize: 12, flex: 1, minWidth: 100, outline: 'none'
+};
+
+export function ExpenseList({ transactions, onDelete, onEdit }: {
+  transactions: Transaction[];
   onDelete: (id: string) => void;
   onEdit: (tx: Transaction) => void;
 }) {
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [whoFilter, setWhoFilter] = useState('All');
-  const [whatFilter, setWhatFilter] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-
-  const uniqueCategories = ['All', ...Array.from(new Set(transactions.map(e => e.category).filter(Boolean)))];
-  const uniqueWhos = ['All', ...Array.from(new Set(transactions.map(e => e.who).filter(Boolean)))];
-
-  const filtered = transactions.filter(e => {
-    if (categoryFilter !== 'All' && e.category !== categoryFilter) return false;
-    if (whoFilter !== 'All' && e.who !== whoFilter) return false;
-    if (whatFilter && !(e.description?.toLowerCase().includes(whatFilter.toLowerCase()) || e.category.toLowerCase().includes(whatFilter.toLowerCase()))) return false;
-    return true;
-  });
-
-  const selectStyle: React.CSSProperties = {
-    padding: '6px 10px',
-    borderRadius: 8,
-    border: '1px solid var(--border-color)',
-    background: 'var(--bg-secondary)',
-    color: 'var(--text-primary)',
-    fontSize: 12,
-    flex: 1,
-    minWidth: 100,
-    outline: 'none'
-  };
+  const {
+    categoryFilter, setCategoryFilter,
+    whoFilter, setWhoFilter,
+    whatFilter, setWhatFilter,
+    viewMode, setViewMode,
+    filteredTransactions,
+    uniqueCategories,
+    uniqueWhos
+  } = useTransactionFilter({ transactions });
 
   return (
     <div>
       {/* Search & Filter Row */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-        <input 
-          type="text" 
-          placeholder="🔍 Search descriptions..." 
+        <input
+          type="text"
+          placeholder="🔍 Search descriptions..."
           value={whatFilter}
           onChange={e => setWhatFilter(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '8px 12px',
-            borderRadius: 8,
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)',
-            fontSize: 13,
-            outline: 'none'
-          }}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
         />
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={selectStyle}>
@@ -297,11 +209,7 @@ export function ExpenseList({ transactions, onDelete, onEdit }: {
           </select>
           <button
             onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
-            style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)',
-              background: 'transparent', color: 'var(--text-secondary)', fontSize: 12,
-              fontWeight: 600, cursor: 'pointer', flexShrink: 0
-            }}
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
           >
             {viewMode === 'list' ? '📅 Calendar' : '📋 List'}
           </button>
@@ -309,22 +217,17 @@ export function ExpenseList({ transactions, onDelete, onEdit }: {
       </div>
 
       {viewMode === 'calendar' ? (
-        <CalendarView transactions={filtered} />
+        <CalendarView transactions={filteredTransactions} />
       ) : (
         <>
-          {filtered.length === 0 ? (
+          {filteredTransactions.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', fontSize: 14, padding: '12px 0', textAlign: 'center' }}>
               No transactions match your filters.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {filtered.map(tx => (
-                <SwipeableRow 
-                  key={tx.id} 
-                  tx={tx} 
-                  onDelete={onDelete} 
-                  onEdit={onEdit} 
-                />
+              {filteredTransactions.map(tx => (
+                <SwipeableRow key={tx.id} tx={tx} onDelete={onDelete} onEdit={onEdit} />
               ))}
             </div>
           )}

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
 import { getCategoryPrompt } from '@/lib/ai-categories';
 
+import { callGroq } from '@/lib/groq';
+
 export const POST = withAuth(async (req: Request) => {
 
   try {
@@ -12,18 +14,10 @@ export const POST = withAuth(async (req: Request) => {
       return NextResponse.json({ error: 'Statement text too short or empty' }, { status: 400 });
     }
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert financial data parser. 
+    let content = await callGroq("llama-3.3-70b-versatile", [
+      {
+        role: "system",
+        content: `You are an expert financial data parser. 
 Extract every valid transaction from the provided bank statement text.
 Ignore running balances, header text, and page numbers.
 Always respond with pure JSON containing a "transactions" array.
@@ -36,18 +30,12 @@ Format each item exactly like this:
 }
 ${getCategoryPrompt(categories as string[])}
 Only output the JSON object.`
-          },
-          {
-            role: "user",
-            content: text.substring(0, 8000) // limit to avoid max tokens
-          }
-        ],
-        temperature: 0.1,
-      })
-    });
-
-    const aiData = await groqRes.json();
-    let content = aiData.choices?.[0]?.message?.content || "";
+      },
+      {
+        role: "user",
+        content: text.substring(0, 8000) // limit to avoid max tokens
+      }
+    ], { temperature: 0.1, response_format: { type: 'json_object' } }).catch(() => "");
     
     // Clean up potential markdown formatting Groq might still add
     content = content.trim();
