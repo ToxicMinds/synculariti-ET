@@ -258,3 +258,32 @@
 .ledgerLink:hover {
   color: var(--text-primary);
 }
+
+.skeletonWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 16px;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.skeletonCircle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+}
+
+.skeletonBox {
+  width: 120px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+@keyframes pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.5; }
+}

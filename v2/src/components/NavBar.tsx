@@ -1,55 +1,33 @@
 'use client';
 
 import { Suspense } from 'react';
-import Link from 'next/link';
-import { useTenant } from '@/modules/identity/hooks/useTenant';
-import { useNavigation } from '@/hooks/useNavigation';
-
-import { ModuleSwitcher } from './navbar/ModuleSwitcher';
-import { MonthSelector } from './navbar/MonthSelector';
-import { ProfileMenu } from './navbar/ProfileMenu';
-
+import { NavBarContent } from './navbar/NavBarContent';
 import styles from './NavBar.module.css';
 
+/**
+ * NavBar: The "Hollow Shell" orchestrator.
+ * It contains ZERO logic and calls ZERO URL-dependent hooks.
+ * This allows layouts and 404 pages to remain static-safe.
+ */
 export function NavBar() {
-  const { tenant, resolvedWhoId } = useTenant();
-  const { months, selectedMonth, activeModule, modules, isChanging, actions } = useNavigation({
-    earliestDataDate: tenant?.created_at
-  });
-
   return (
     <nav className="navbar">
-      <ModuleSwitcher 
-        activeModule={activeModule} 
-        modules={modules} 
-      />
-
-      <div className={styles.centerGroup}>
-        <Suspense fallback={<div className={styles.fallbackSelect} />}>
-          <MonthSelector 
-            months={months}
-            selectedMonth={selectedMonth}
-            onMonthChange={actions.setMonth}
-            isChanging={isChanging}
-          />
-        </Suspense>
-      </div>
-
-      <div className={styles.rightGroup}>
-        <Link 
-          href="/ledger" 
-          className={`hide-mobile ${styles.ledgerLink}`}
-        >
-          📊 Ledger
-        </Link>
-        
-        {tenant && (
-          <ProfileMenu 
-            resolvedWhoId={resolvedWhoId} 
-            names={tenant.names} 
-          />
-        )}
-      </div>
+      <Suspense fallback={<NavBarSkeleton />}>
+        <NavBarContent />
+      </Suspense>
     </nav>
+  );
+}
+
+/**
+ * NavBarSkeleton: Prevents layout shift during Suspense handshake.
+ */
+function NavBarSkeleton() {
+  return (
+    <div className={styles.skeletonWrapper}>
+      <div className={styles.skeletonCircle} />
+      <div className={styles.skeletonBox} />
+      <div className={styles.skeletonCircle} />
+    </div>
   );
 }

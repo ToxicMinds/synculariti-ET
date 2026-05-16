@@ -103,7 +103,8 @@
 - `interface NavigationMonth`: Represents a selectable fiscal month in the platform viewport.
 - `interface ModuleDescriptor`: Canonical configuration for platform domain modules (Finance, Logistics, Identity).
 - `const MODULE_REGISTRY`: Single Source of Truth for available platform modules and their metadata.
+- `function NavBar()`: Hollow shell orchestrator for the navigation system; implements Suspense boundary for static safety.
+- `function NavBarContent()`: Dynamic navigation component; consumes useNavigation and renders module/fiscal controls.
 - `function MonthSelector()`: Modular UI component for fiscal month switching.
 - `function ModuleSwitcher()`: Modular UI component for domain navigation.
 - `function ProfileMenu()`: Modular UI component for user session actions (Export, Logout).
-- `function NavBar()`: Orchestration shell for the platform's primary navigation system.

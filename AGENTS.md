@@ -65,6 +65,7 @@ We use a deterministic AI pipeline for financial categorization:
 ### 4.4 Headless Viewport Pattern
 - All navigation, fiscal calendar generation, and module switching MUST be handled by the `useNavigation` hook.
 - UI components (e.g., `NavBar`) MUST be stateless "View" shells that consume the hook.
+- **Suspense Isolation**: Hook consumption MUST happen inside a sub-component wrapped in `<Suspense>` to ensure static-page safety (e.g. 404 pages).
 - Never manually manipulate `URLSearchParams` for month or module selection; use the `actions` provided by the viewport hook.
 
 ---
