@@ -22,9 +22,16 @@ The core infrastructure has been remediated. The following standards are now act
 - **Remediated**: `forecast`, `statement`, `insight`, `parse-invoice`, `parse-receipt`, `ekasa`.
 - **Verified**: Via `db-security.test.ts` and new unit tests for schemas/routes.
 
-### Batch F-I: SRP Decomposition (UI)
-- **Goal**: Decompose monolithic components into headless hooks.
-- **Targets**: `NavBar`, `ExpenseList`, `ReceiptScanner`, and the Finance God-Page.
+### Batch F: NavBar SRP [FIXED]
+- **Goal**: Decompose NavBar into headless hooks and static shells.
+- **Verified**: Via `NavBar.test.tsx` and successful production build (static generation safety).
+
+### Batch G: ExpenseList SRP [FIXED]
+- **Goal**: Extract gesture logic and fiscal arithmetic into headless hooks.
+- **Verified**: Via `useSwipeable.test.ts` and `useCalendarGrid.test.ts`.
+
+### Batch H-I: Remaining UI SRP
+- **Goal**: Decompose `ReceiptScanner` and the Finance God-Page.
 
 ### Batch J-K: Shared Components & Styles
 - **Goal**: Eliminate duplicate UI code for category selection, modals, and input styles.
