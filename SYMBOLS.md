@@ -12,7 +12,7 @@
 - `function AuthProvider()`: Context provider for managing Supabase session lifecycle.
 - `function useAuth()`: Hook to access the current authentication session.
 - `function withAuth()`: API middleware that injects a `SecureContext` into route handlers.
-- `interface SecureContext`: Strictly compliant Next.js context extended with optional `auth` data.
+- `interface SecureContext`: Strictly compliant Next.js context extended with optional `auth` data. Used by all authenticated routes (Export, AI, Debug, Banking).
 - `type SecureHandler`: Standardized signature for all Synculariti-ET API routes.
 - `function createMockAuthContext()`: Utility for generating type-safe API contexts in unit tests.
 

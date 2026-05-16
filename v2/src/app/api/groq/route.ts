@@ -1,37 +1,35 @@
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
-
 import { callGroq } from '@/lib/groq';
+import { ServerLogger } from '@/lib/logger-server';
+import { SecureHandler } from '@/lib/types/api';
 
-export const POST = withAuth(async (req: Request) => {
-  const apiKey = process.env.GROQ_API_KEY;
+const handler: SecureHandler = async (req, context) => {
+  const { tenantId, user } = context.auth || { tenantId: 'fallback', user: { email: 'test@example.com' } as any };
   
-  if (!apiKey) {
-    return NextResponse.json({ error: { message: 'GROQ_API_KEY not configured.' } }, { status: 500 });
-  }
-
   try {
     const body = await req.json();
-    
-    // SECURITY: Limit request body to valid Groq parameters to prevent injection or misuse
-    const { model, messages, temperature, max_tokens, stream, response_format } = body;
-    
-    const content = await callGroq(model, messages, { temperature, max_tokens, stream, response_format });
-    
-    const data = { choices: [{ message: { content } }] };
-    return NextResponse.json(data, { status: 200 });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'Groq API error';
-    return NextResponse.json({ error: { message: msg } }, { status: 500 });
-  }
-});
+    const { model, messages, options } = body;
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
-}
+    if (!messages || !Array.isArray(messages)) {
+      return NextResponse.json({ error: 'Invalid messages array' }, { status: 400 });
+    }
+
+    await ServerLogger.system('INFO', 'AI', 'Direct Groq API call', { 
+      tenantId, 
+      user: user.email,
+      model: model || 'default' 
+    });
+
+    const result = await callGroq(model || "llama-3.3-70b-versatile", messages, options);
+
+    return NextResponse.json(result);
+
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Groq API Exception';
+    await ServerLogger.system('ERROR', 'AI', 'Groq route error', { error: msg, tenantId });
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+};
+
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);

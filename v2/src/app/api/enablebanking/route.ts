@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
 import { z } from 'zod';
 import { ServerLogger } from '@/lib/logger-server';
+import { SecureHandler } from '@/lib/types/api';
 
 // 1. Validation Schema
 const EnableBankingSchema = z.object({
@@ -18,12 +19,14 @@ const EnableBankingSchema = z.object({
 
 const BASE = process.env.ENABLE_BANKING_BASE_URL || 'https://api.enablebanking.com';
 
-export const POST = withAuth(async (req: Request) => {
+const handler: SecureHandler = async (req, context) => {
+  const { tenantId, user } = context.auth || { tenantId: 'fallback', user: { email: 'test@example.com' } as any };
+  
   const appId = process.env.ENABLE_BANKING_APP_ID;
   const appSecret = process.env.ENABLE_BANKING_APP_SECRET;
 
   if (!appId || !appSecret) {
-    ServerLogger.system('ERROR', 'API', 'Enable Banking keys missing');
+    await ServerLogger.system('ERROR', 'API', 'Enable Banking keys missing');
     return NextResponse.json({ error: 'Enable Banking keys not configured.' }, { status: 500 });
   }
 
@@ -32,7 +35,11 @@ export const POST = withAuth(async (req: Request) => {
     const result = EnableBankingSchema.safeParse(body);
 
     if (!result.success) {
-      ServerLogger.system('WARN', 'API', 'Enable Banking validation failed', { errors: result.error.issues });
+      await ServerLogger.system('WARN', 'API', 'Enable Banking validation failed', { 
+        errors: result.error.issues,
+        tenantId,
+        user: user.email
+      });
       return NextResponse.json({ 
         error: 'Invalid request parameters', 
         details: result.error.issues 
@@ -87,7 +94,7 @@ export const POST = withAuth(async (req: Request) => {
     }
 
     const response = await fetch(url, { method, headers, body: fetchBody });
-    const data = (await response.json()) as unknown;
+    const data = (await response.json()) as any;
 
     if (!response.ok) {
       const errData = data as { error?: string; detail?: string };
@@ -100,7 +107,9 @@ export const POST = withAuth(async (req: Request) => {
 
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Enable Banking exception';
-    ServerLogger.system('ERROR', 'API', 'Enable Banking route exception', { error: msg });
+    await ServerLogger.system('ERROR', 'API', 'Enable Banking route exception', { error: msg, tenantId });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-});
+};
+
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);

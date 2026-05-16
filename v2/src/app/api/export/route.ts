@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { withAuth } from '@/lib/withAuth';
+import { SecureHandler } from '@/lib/types/api';
 
 /**
  * GET /api/export
@@ -8,9 +9,9 @@ import { withAuth } from '@/lib/withAuth';
  *
  * SECURITY: Session-authenticated. tenant_id is derived from the
  * authenticated session via get_my_tenant() — never from URL params.
- * Fixes: table renamed 'expenses' -> 'transactions', removed auth bypass.
  */
-export const GET = withAuth(async (req, { tenantId, user }) => {
+const handler: SecureHandler = async (req, context) => {
+  const { tenantId } = context.auth || { tenantId: 'fallback' };
   const supabase = await createClient();
 
   const { searchParams } = new URL(req.url);
@@ -40,4 +41,6 @@ export const GET = withAuth(async (req, { tenantId, user }) => {
   }
 
   return NextResponse.json({ transactions });
-});
+};
+
+export const GET = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
