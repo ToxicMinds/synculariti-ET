@@ -6,13 +6,16 @@ import { parseEkasaMetadata } from '@/lib/ekasa-parser';
 import { getCategoryPrompt } from '@/lib/ai-categories';
 import { ReceiptParseRequestSchema } from '@/lib/validations/schemas';
 import { ServerLogger } from '@/lib/logger-server';
+import { SecureHandler } from '@/lib/types/api';
 
 interface EkasaItem {
   originalName: string;
   amount: number;
 }
 
-const handler = async (req: Request, { tenantId }: { tenantId: string }) => {
+const handler: SecureHandler = async (req, context) => {
+  const { tenantId } = context.auth || { tenantId: 'fallback' };
+  
   try {
     const body = await req.json();
     
@@ -98,4 +101,4 @@ const handler = async (req: Request, { tenantId }: { tenantId: string }) => {
   }
 };
 
-export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler as any);
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);

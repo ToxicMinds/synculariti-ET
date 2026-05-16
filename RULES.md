@@ -9,7 +9,8 @@
 ## 2. Coding Standards
 - **TypeScript Only**: No `.js` files. **Zero** `: any` usages allowed. Use explicit return types for all functions.
 - **No Direct DML**: Never use `supabase.from('transactions').insert(...)`. Use the canonical RPC `save_receipt_v4`.
-- **Logger over Console**: Use `Logger.system()` (technical) or `Logger.user()` (business) in client code. Use `ServerLogger` in API routes.
+- **API Route Standards**: Every API route handler must follow the `SecureHandler` signature and use `SecureContext`.
+- **Validation**: Every API route must use Zod schemas from the shared validation registry for request parsing.
 - **Error Boundaries**: Every page-level component must be wrapped in an `ErrorBoundary`.
 
 ## 3. Security & Database Rules

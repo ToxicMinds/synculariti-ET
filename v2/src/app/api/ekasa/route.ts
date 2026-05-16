@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
 import { apiError } from '@/lib/api-error-handler';
 import { EkasaRequestSchema } from '@/lib/validations/schemas';
+import { SecureHandler } from '@/lib/types/api';
 
 /**
  * eKasa Regional Proxy (Next.js API Route)
@@ -11,7 +12,7 @@ import { EkasaRequestSchema } from '@/lib/validations/schemas';
 export const preferredRegion = 'cdg1';
 export const dynamic = 'force-dynamic';
 
-const handler = async (request: Request) => {
+const handler: SecureHandler = async (request: Request) => {
   try {
     const body = await request.json();
     
@@ -79,4 +80,3 @@ const handler = async (request: Request) => {
 };
 
 export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
-

@@ -53,7 +53,8 @@ This document is the definitive guide for AI assistants and developers. It conso
 - **No Direct DML**: DB explicitly denies `INSERT/UPDATE/DELETE` to `authenticated` clients. Use canonical RPCs (e.g., `save_receipt_v4`).
 - **Session-Based tenant_id**: `tenant_id` is resolved server-side from session via RLS — never passed as a param.
 - **search_path Safety**: All DB functions must include `SET search_path = public`.
-- **Auth Guard**: All sensitive API routes MUST be wrapped with `withAuth` middleware.
+- **Auth Guard**: All sensitive API routes MUST be wrapped with `withAuth` middleware and use the `SecureContext` pattern for type-safe App Router compliance.
+- **Input Validation**: All API routes MUST use Zod schemas from the unified validation registry for request sanitization.
 
 ### 4.3 Intelligence Strategy
 We use a deterministic AI pipeline for financial categorization:

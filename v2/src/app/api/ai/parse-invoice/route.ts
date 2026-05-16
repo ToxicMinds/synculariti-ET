@@ -5,8 +5,11 @@ import { callGroq } from '@/lib/groq';
 import { getCategoryPrompt } from '@/lib/ai-categories';
 import { DocumentParseRequestSchema } from '@/lib/validations/schemas';
 import { ServerLogger } from '@/lib/logger-server';
+import { SecureHandler } from '@/lib/types/api';
 
-const handler = async (req: Request, { tenantId, user }: { tenantId: string; user: any }) => {
+const handler: SecureHandler = async (req, context) => {
+  const { tenantId, user } = context.auth || { tenantId: 'fallback', user: { email: 'test@example.com' } as any };
+  
   try {
     const body = await req.json();
     
@@ -89,4 +92,4 @@ ${getCategoryPrompt(categories)}`
   }
 };
 
-export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler as any);
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);

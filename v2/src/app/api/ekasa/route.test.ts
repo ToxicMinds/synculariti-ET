@@ -1,6 +1,7 @@
 import { POST } from './route';
 import { NextResponse } from 'next/server';
 import { apiError } from '@/lib/api-error-handler';
+import { createMockAuthContext } from '@/lib/test-utils';
 
 // Mock apiError to verify behavior
 jest.mock('@/lib/api-error-handler', () => ({
@@ -15,9 +16,9 @@ describe('eKasa API Route Contract', () => {
       body: JSON.stringify({ receiptId: 'TIMEOUT_TRIGGER' })
     });
 
-    // In the implementation, we will mock the fetch call
-    // For the contract test, we are defining that a timeout MUST lead to an apiError call
-    const response = await POST(req);
+    // Use the new SecureContext pattern
+    const mockContext = createMockAuthContext();
+    const response = await POST(req, mockContext);
     
     expect(apiError).toHaveBeenCalledWith(
       expect.anything(),

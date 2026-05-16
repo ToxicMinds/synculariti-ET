@@ -3,8 +3,9 @@ import { withAuth } from '@/lib/withAuth';
 import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { ForecastRequestSchema } from '@/lib/validations/schemas';
+import { SecureHandler } from '@/lib/types/api';
 
-const handler = async (req: Request) => {
+const handler: SecureHandler = async (req, context) => {
   try {
     const body = await req.json();
     

@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
-import { User } from '@supabase/supabase-js';
-
-type RouteHandler = (
-  req: Request,
-  context: { tenantId: string; user: User }
-) => Promise<NextResponse>;
+import { SecureHandler } from './types/api';
 
 /**
  * withAuth: Centralized API route authentication middleware.
@@ -16,16 +11,10 @@ type RouteHandler = (
  * 2. Tenant resolution (from session, never from client payload)
  * 3. Structured error logging via ServerLogger
  *
- * USAGE:
- *   export const GET = withAuth(async (req, { tenantId }) => {
- *     // tenantId is guaranteed to be valid here
- *     return NextResponse.json({ ok: true });
- *   });
- *
- * Fixes DRY violation: API auth boilerplate was copy-pasted across 5+ routes.
+ * Pattern: Injects auth data into the context object to maintain Next.js App Router compliance.
  */
-export function withAuth(handler: RouteHandler) {
-  return async (req: Request): Promise<NextResponse> => {
+export function withAuth(handler: SecureHandler) {
+  return async (req: Request, context: { params: Promise<any> }): Promise<NextResponse> => {
     try {
       const supabase = await createClient();
 
@@ -52,7 +41,13 @@ export function withAuth(handler: RouteHandler) {
         return NextResponse.json({ error: 'Tenant not found' }, { status: 403 });
       }
 
-      return await handler(req, { tenantId, user: session.user });
+      // Merge auth into the existing context object
+      const secureContext = {
+        ...context,
+        auth: { tenantId, user: session.user }
+      };
+
+      return await handler(req, secureContext);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       await ServerLogger.system('ERROR', 'API', 'Unhandled error in withAuth wrapper', { error: msg });

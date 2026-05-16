@@ -4,8 +4,9 @@ import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { getCategoryPrompt } from '@/lib/ai-categories';
 import { StatementRequestSchema } from '@/lib/validations/schemas';
+import { SecureHandler } from '@/lib/types/api';
 
-const handler = async (req: Request) => {
+const handler: SecureHandler = async (req) => {
   try {
     const body = await req.json();
     

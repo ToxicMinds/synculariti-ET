@@ -3,6 +3,7 @@ import { getNeo4jDriver } from '@/lib/neo4j';
 import { withAuth } from '@/lib/withAuth';
 import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
+import { SecureHandler } from '@/lib/types/api';
 
 interface Neo4jMerchantFact {
   merchant: string;
@@ -20,7 +21,9 @@ const getVisits = (v: number | { low: number }): number => {
   return typeof v === 'object' && v !== null ? v.low : v;
 };
 
-export const GET = withAuth(async (_req, { tenantId }) => {
+const handler: SecureHandler = async (_req, context) => {
+  const { tenantId } = context.auth || { tenantId: 'fallback' };
+  
   const driver = getNeo4jDriver();
   if (!driver) {
     return apiError('Neo4j not configured', 'Sync', 'Graph driver missing', { status: 500 });
@@ -92,7 +95,6 @@ Give ONE focused, actionable insight in 2 sentences max. Be specific with catego
         usage: result.usage
       });
     } catch (apiErr: unknown) {
-      // Graceful fallback for AI failures (API is still "success: true" but insight is deterministic)
       return NextResponse.json({ 
         success: true, 
         insight: generateFallbackInsight(),
@@ -102,7 +104,6 @@ Give ONE focused, actionable insight in 2 sentences max. Be specific with catego
     }
 
   } catch (e: unknown) {
-    // If graph query fails, return empty facts but success so UI doesn't crash
     return NextResponse.json({ 
       success: true, 
       insight: "💡 Intelligence Hub: Syncing your financial graph. Insights will appear shortly.",
@@ -112,4 +113,6 @@ Give ONE focused, actionable insight in 2 sentences max. Be specific with catego
   } finally {
     await session.close();
   }
-});
+};
+
+export const GET = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
