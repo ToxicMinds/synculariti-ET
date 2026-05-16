@@ -67,7 +67,8 @@
 - `type ExtractionResult`: Union type for the result of an eKasa parsing attempt.
 
 ## Shared Utilities & Core Platform
-- `function callGroq()`: Unified API wrapper for the Groq SDK, providing JSON mode and robust error handling.
+- `function apiError()`: Standardized API error response handler with retry-logic and telemetry.
+- `function callGroq()`: Unified API wrapper for the Groq SDK with token usage tracking and vision support.
 - `const CATEGORY_ICONS`: Mapping of transaction categories to UI icons.
 - `const DEFAULT_CATEGORIES`: Baseline fallback categories for new tenants.
 - `class ServerLogger`: High-fidelity server-side telemetry logger.
@@ -75,6 +76,9 @@
 - `type LogLevel`: Severity levels for system/user events.
 - `class Logger`: Client-side telemetry logger interface.
 - `function getNeo4jDriver()`: Instantiates the Neo4j graph database driver.
+- `function neo4jBulkMerge()`: Unified utility for atomic, sequential transaction syncing to the graph.
+- `function neo4jDeleteTransaction()`: Removes a transaction node and its relationships from the graph.
+- `interface LockManager`: Definition for the Web Locks API (in v2/src/types/web-locks.d.ts).
 - `class OfflineQueue`: Core manager for PWA offline-first mutation resilience.
 - `interface QueuedMutation`: Represents a stalled mutation awaiting network recovery.
 - `function applySmartRules()`: Engine for auto-categorization based on historical rules.
@@ -84,3 +88,5 @@
 - `function useTenantData()`: Hook for consuming shared tenant state.
 - `function TenantMutationProvider()`: Write-side context provider for state mutations.
 - `function useTenantMutations()`: Hook for firing tenant-level global mutations.
+- `Zod Schema: Unified Validation Registry`: Centralized schemas for `Category`, `EkasaDate`, and `ReceiptMeta` to ensure cross-module data integrity.
+- `Zod Schema: API Request Schemas`: Strictly typed payloads for `Ekasa`, `Forecast`, `Statement`, and `DocumentParse` routes.

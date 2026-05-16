@@ -1,27 +1,31 @@
-import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
-import { Groq } from 'groq-sdk';
-import { parseEkasaMetadata } from '@/lib/ekasa-parser';
 import { withAuth } from '@/lib/withAuth';
+import { apiError } from '@/lib/api-error-handler';
+import { callGroq } from '@/lib/groq';
+import { parseEkasaMetadata } from '@/lib/ekasa-parser';
 import { getCategoryPrompt } from '@/lib/ai-categories';
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
-});
+import { ReceiptParseRequestSchema } from '@/lib/validations/schemas';
+import { ServerLogger } from '@/lib/logger-server';
 
 interface EkasaItem {
   originalName: string;
   amount: number;
 }
 
-export const POST = withAuth(async (req: Request, { tenantId }) => {
-
+const handler = async (req: Request, { tenantId }: { tenantId: string }) => {
   try {
-    const { ekasaData, categories } = await req.json();
-
-    if (!ekasaData) {
-      return NextResponse.json({ error: 'Missing eKasa data' }, { status: 400 });
+    const body = await req.json();
+    
+    // Validation: 400 Bad Request
+    const parsedRequest = ReceiptParseRequestSchema.safeParse(body);
+    if (!parsedRequest.success) {
+      return apiError('Validation failed', 'AI', 'Invalid receipt parse request', {
+        status: 400,
+        details: parsedRequest.error.issues
+      });
     }
+
+    const { ekasaData, categories } = parsedRequest.data;
 
     // 1. EXTRACT GROUND TRUTH FROM EKASA JSON (DO NOT LET AI TOUCH FINANCIALS)
     const metadata = parseEkasaMetadata(ekasaData);
@@ -33,7 +37,7 @@ export const POST = withAuth(async (req: Request, { tenantId }) => {
       I will provide a list of items from a receipt.
       ${needsStoreInference ? 'IDENTIFY THE SPECIFIC STORE BRAND from these items. Look for store-brand products or item names to "fingerprint" the retailer (e.g., "Dr.Max" instead of just "Pharmacy", "Lidl" instead of "Groceries").' : ''}
       Normalize item names (e.g., "Kup. sunka 100g" -> "Šunka").
-      ${getCategoryPrompt(categories as string[])}
+      ${getCategoryPrompt(categories)}
       
       RETURN JSON:
       {
@@ -46,32 +50,28 @@ export const POST = withAuth(async (req: Request, { tenantId }) => {
 
     const userPrompt = `Analyze these items: ${metadata.items.map((i: EkasaItem) => i.originalName).join(', ')}`;
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      model: 'llama-3.3-70b-versatile',
-      response_format: { type: 'json_object' }
+    const result = await callGroq('llama-3.3-70b-versatile', [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ], { 
+      temperature: 0.1,
+      cacheKey: `receipt-${metadata.total}-${metadata.items.length}-${metadata.date.substring(0, 10)}`
     });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) throw new Error('No response from AI');
-
-    const aiParsed = JSON.parse(content);
+    const aiParsed = JSON.parse(result.content);
     const aiItems = aiParsed.items || [];
     const finalStore = (needsStoreInference && aiParsed.inferredStore) 
       ? aiParsed.inferredStore 
       : metadata.store;
 
-    // Log for auditing (The "Black Site" Standard)
-    await ServerLogger.system('INFO', 'AI', 'Merchant Extraction Detail', {
+    // Log for auditing
+    ServerLogger.system('INFO', 'AI', 'Merchant Extraction Detail', {
       dic: metadata.dic,
       rawStore: metadata.store,
       inferredStore: aiParsed.inferredStore,
       finalStore,
       itemCount: metadata.items.length
-    }, tenantId);
+    });
 
     // 3. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
     const mergedItems = metadata.items.map((orig: EkasaItem, idx: number) => ({
@@ -81,6 +81,7 @@ export const POST = withAuth(async (req: Request, { tenantId }) => {
     }));
 
     return NextResponse.json({
+      success: true,
       store: finalStore,
       date: metadata.date,
       total: metadata.total,
@@ -88,11 +89,13 @@ export const POST = withAuth(async (req: Request, { tenantId }) => {
       ico: metadata.ico,
       receiptNumber: metadata.receiptNumber,
       transactedAt: metadata.transactedAt,
-      vatDetail: metadata.vatDetail
+      vatDetail: metadata.vatDetail,
+      usage: result.usage
     });
 
   } catch (error: unknown) {
-    ServerLogger.system('ERROR', 'AI', 'Receipt AI parse error', { error: error instanceof Error ? error.message : String(error) });
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Receipt processing failed' }, { status: 500 });
+    return apiError(error, 'AI', 'Receipt AI parse error', { retryable: true });
   }
-});
+};
+
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler as any);

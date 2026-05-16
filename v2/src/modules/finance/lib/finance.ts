@@ -80,23 +80,26 @@ export function calcForecast(transactions: Transaction[], totalBudget: number, n
 export function calcPerUserSpend(transactions: Transaction[], userNames: Record<string, number | string>) {
   const result: Record<string, number> = {};
   
-  // Initialize result map
+  // 1. Create Reverse Lookup Map (O(M)) to avoid nested loop in attribution
+  const nameToId: Record<string, string> = {};
   Object.keys(userNames).forEach(id => {
     result[id] = 0;
+    nameToId[String(userNames[id])] = id;
   });
 
+  // 2. Attribution Pass (O(N))
   transactions.forEach(exp => {
     if (isSavings(exp) || isAdjustment(exp)) return;
 
     let targetUserId: string | undefined;
 
-    // 1. Primary: Use who_id if present
+    // Primary: Use who_id
     if (exp.who_id) {
       targetUserId = exp.who_id;
     } 
-    // 2. Fallback: Reverse lookup from userNames mapping (for legacy v1 data)
+    // Fallback: O(1) lookup in our reverse map
     else if (exp.who) {
-      targetUserId = Object.keys(userNames).find(id => String(userNames[id]) === exp.who);
+      targetUserId = nameToId[exp.who];
     }
 
     if (targetUserId && result.hasOwnProperty(targetUserId)) {
@@ -142,14 +145,12 @@ export function calcMonthDelta(
   const prevMonthNum = month === 1 ? 12 : month - 1;
   const prevMonth = prevYear + '-' + (prevMonthNum < 10 ? '0' + prevMonthNum : '' + prevMonthNum);
 
-  const prevTotal = allTransactions
-    .filter((e) => {
-      return e.date &&
-        e.date.startsWith(prevMonth) &&
-        !isSavings(e) && 
-        !isAdjustment(e);
-    })
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const prevTotal = allTransactions.reduce((sum, e) => {
+    if (e.date && e.date.startsWith(prevMonth) && !isSavings(e) && !isAdjustment(e)) {
+      return sum + (Number(e.amount) || 0);
+    }
+    return sum;
+  }, 0);
 
   const delta = currentSpent - prevTotal;
   const deltaStr = (delta >= 0 ? '+' : '-') + currencySymbol + Math.abs(delta).toFixed(2);

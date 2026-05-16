@@ -55,17 +55,11 @@ ALTER FUNCTION public.verify_tenant_access(TEXT) SET search_path = public;
 REVOKE EXECUTE ON FUNCTION public.verify_tenant_access(TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.verify_tenant_access(TEXT) TO authenticated, service_role;
 
-ALTER FUNCTION public.verify_tenant_membership(UUID) SET search_path = public;
-REVOKE EXECUTE ON FUNCTION public.verify_tenant_membership(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.verify_tenant_membership(UUID) TO authenticated, service_role;
 
 ALTER FUNCTION public.create_organization(TEXT, TEXT) SET search_path = public;
 REVOKE EXECUTE ON FUNCTION public.create_organization(TEXT, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.create_organization(TEXT, TEXT) TO authenticated, service_role;
 
-ALTER FUNCTION public.create_organization(TEXT, TEXT, TEXT) SET search_path = public;
-REVOKE EXECUTE ON FUNCTION public.create_organization(TEXT, TEXT, TEXT) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.create_organization(TEXT, TEXT, TEXT) TO authenticated, service_role;
 
 ALTER FUNCTION public.upsert_app_user_v1(UUID) SET search_path = public;
 REVOKE EXECUTE ON FUNCTION public.upsert_app_user_v1(UUID) FROM PUBLIC, anon;

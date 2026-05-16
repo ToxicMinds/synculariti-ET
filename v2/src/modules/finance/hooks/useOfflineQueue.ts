@@ -6,7 +6,7 @@ import { ReceiptData } from './useTransactionSync';
 
 interface SyncCallbacks {
   addTransaction: (transaction: Partial<Transaction> | Partial<Transaction>[]) => Promise<void>;
-  saveReceipt: (receipt: ReceiptData, whoId: string, whoName: string, locationId?: string, currency?: string) => Promise<any>;
+  saveReceipt: (receipt: ReceiptData, whoId: string, whoName: string, locationId?: string, currency?: string) => Promise<string>;
 }
 
 export function useOfflineQueue(tenantId: string | undefined, callbacks: SyncCallbacks) {

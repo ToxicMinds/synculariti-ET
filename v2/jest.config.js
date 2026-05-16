@@ -11,4 +11,20 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1"
   },
+  projects: [
+    {
+      displayName: "frontend",
+      testEnvironment: "jsdom",
+      testMatch: ["<rootDir>/src/components/**/*.test.ts*", "<rootDir>/src/modules/**/components/**/*.test.ts*"],
+      moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+      transform: { ...tsJestTransformCfg }
+    },
+    {
+      displayName: "backend",
+      testEnvironment: "node",
+      testMatch: ["<rootDir>/src/app/api/**/*.test.ts*", "<rootDir>/src/lib/**/*.test.ts*"],
+      moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+      transform: { ...tsJestTransformCfg }
+    }
+  ]
 };

@@ -1,61 +1,87 @@
-import Groq from 'groq-sdk';
+import { ServerLogger } from './logger-server';
 
 export interface GroqMessage {
-    role: 'system' | 'user' | 'assistant';
-    content: string;
+  role: 'system' | 'user' | 'assistant';
+  content: string | any[]; // Support for vision content arrays
+}
+
+export interface GroqUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+export interface GroqResult {
+  content: string;
+  usage: GroqUsage;
+  model: string;
 }
 
 export interface GroqOptions {
-    temperature?: number;
-    max_tokens?: number;
-    stream?: boolean;
-    response_format?: { type: 'json_object' };
-}
-
-let groqClient: Groq | null = null;
-
-function getGroqClient(): Groq {
-    if (!process.env.GROQ_API_KEY) {
-        throw new Error('GROQ_API_KEY not configured');
-    }
-
-    if (!groqClient) {
-        groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
-    }
-    return groqClient;
+  temperature?: number;
+  max_tokens?: number;
+  cacheKey?: string;
 }
 
 /**
- * Unified Groq API caller using the `groq-sdk`.
- * Abstracts SDK initialization and payload unwrapping.
- * 
- * @returns The generated string content.
- * @throws An Error with a descriptive message if the request fails or returns empty.
+ * Standardized AI Call with usage tracking
+ * Ensures architectural consistency across all AI routes.
  */
 export async function callGroq(
-    model: string,
-    messages: GroqMessage[],
-    options?: GroqOptions
-): Promise<string> {
-    const client = getGroqClient();
+  model: string,
+  messages: GroqMessage[],
+  options: GroqOptions = {}
+): Promise<GroqResult> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY is not configured in environment');
+  }
 
-    const payload: any = {
+  // Future-proofing: Here we would check the cacheKey against Redis/In-memory
+  // if (options.cacheKey && await cache.has(options.cacheKey)) ...
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
         model,
         messages,
-        temperature: options?.temperature ?? 0.3,
-    };
+        temperature: options.temperature ?? 0.1,
+        max_tokens: options.max_tokens,
+        stream: false
+      })
+    });
 
-    if (options?.max_tokens !== undefined) payload.max_tokens = options.max_tokens;
-    if (options?.stream !== undefined) payload.stream = options.stream;
-    if (options?.response_format !== undefined) payload.response_format = options.response_format;
-
-    const response = await client.chat.completions.create(payload);
-    
-    const content = response?.choices?.[0]?.message?.content;
-    
-    if (!content) {
-        throw new Error('Empty response from Groq');
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.error?.message || `Groq API Error: ${response.status}`);
     }
 
-    return content;
+    const data = await response.json();
+    
+    const result: GroqResult = {
+      content: data.choices?.[0]?.message?.content || '',
+      usage: {
+        prompt_tokens: data.usage?.prompt_tokens || 0,
+        completion_tokens: data.usage?.completion_tokens || 0,
+        total_tokens: data.usage?.total_tokens || 0
+      },
+      model: data.model || model
+    };
+
+    // Log high-fidelity usage data for Batch L-M audits
+    ServerLogger.system('AI', 'Usage', `Model: ${result.model}`, {
+      usage: result.usage,
+      cacheKey: options.cacheKey
+    });
+
+    return result;
+  } catch (err) {
+    // We re-throw so that the route's apiError handler can catch and format it
+    throw err;
+  }
 }

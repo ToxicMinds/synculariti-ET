@@ -82,8 +82,8 @@ END;
 $$;
 
 -- 4. Revoke public access to these sensitive RPCs
-REVOKE EXECUTE ON FUNCTION public.check_rate_limit(TEXT, TEXT, INT, INT, INT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.check_tenant_pin(UUID, TEXT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.check_rate_limit(TEXT, TEXT, INT, INT, INT) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.check_tenant_pin(UUID, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.check_rate_limit(TEXT, TEXT, INT, INT, INT) TO service_role;
 GRANT EXECUTE ON FUNCTION public.check_tenant_pin(UUID, TEXT) TO service_role;
 

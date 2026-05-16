@@ -98,7 +98,8 @@ export function useStatementScanner({
     const symbols = Object.getOwnPropertySymbols(file);
     const implSymbol = symbols.find(s => s.toString() === 'Symbol(impl)');
     if (implSymbol) {
-      const impl = (file as any)[implSymbol];
+      interface JSDOMFileImpl { _buffer: Buffer }
+      const impl = (file as unknown as Record<symbol, JSDOMFileImpl>)[implSymbol];
       if (impl && impl._buffer) {
         text = impl._buffer.toString();
       }

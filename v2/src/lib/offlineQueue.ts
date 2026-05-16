@@ -21,7 +21,7 @@ export class OfflineQueue {
     if (typeof window === 'undefined' || !('locks' in navigator)) {
       return await fn();
     }
-    return await (navigator as any).locks.request(LOCK_KEY, async () => {
+    return await navigator.locks.request(LOCK_KEY, async () => {
       return await fn();
     });
   }

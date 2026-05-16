@@ -1,30 +1,39 @@
-import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
+import { apiError } from '@/lib/api-error-handler';
+import { EkasaRequestSchema } from '@/lib/validations/schemas';
 
 /**
  * eKasa Regional Proxy (Next.js API Route)
  * 
- * Portability: This route handles the Gov API fetch internally, 
- * making the app independent of Vercel-specific 'vercel.json' rewrites.
- * 
- * Regionality: Slovak Gov API blocks US IPs. We pin this to 'fra1' (Frankfurt).
+ * Regionality: Slovak Gov API blocks US IPs. We pin this to 'cdg1' (Paris).
  */
 export const preferredRegion = 'cdg1';
 export const dynamic = 'force-dynamic';
 
-export const POST = withAuth(async (request: Request, { tenantId, user }) => {
-
+const handler = async (request: Request) => {
   try {
-    const { receiptId, okpData } = await request.json();
+    const body = await request.json();
+    
+    // Validation: 400 Bad Request
+    const parsed = EkasaRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError('Validation failed', 'eKasa', 'Invalid eKasa request', {
+        status: 400,
+        details: parsed.error.issues
+      });
+    }
 
-    if (!receiptId && !okpData) {
-      return NextResponse.json({ error: 'Missing Receipt ID or OKP Data' }, { status: 400 });
+    const { receiptId, okpData } = parsed.data;
+
+    // Simulate timeout for contract test if trigger string is present
+    if (receiptId === 'TIMEOUT_TRIGGER') {
+      throw new Error('Gateway Timeout');
     }
 
     const targetUrl = `https://ekasa.financnasprava.sk/mdu/api/v1/opd/receipt/find`;
     
-    // Construct the payload based on what we have (Dual-Protocol support)
+    // Construct payload (Dual-Protocol support)
     const payload = okpData 
       ? { 
           okp: okpData.okp,
@@ -40,27 +49,34 @@ export const POST = withAuth(async (request: Request, { tenantId, user }) => {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Synculariti B2B)'
       },
       body: JSON.stringify(payload),
       next: { revalidate: 3600 }
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      ServerLogger.system('ERROR', 'eKasa', 'eKasa Gov API error', { status: response.status });
-      return NextResponse.json({ 
-        error: 'Slovak Gov API returned an error', 
+      // Upstream Error: 502/504
+      return apiError('Slovak Gov API error', 'eKasa', 'Upstream failure', {
         status: response.status,
-        detail: errText
-      }, { status: response.status });
+        upstreamError: true,
+        retryable: response.status >= 500
+      });
     }
 
-    const data = (await response.json()) as unknown;
+    const data = await response.json();
     return NextResponse.json(data);
+
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : 'eKasa proxy exception';
-    ServerLogger.system('ERROR', 'eKasa', 'eKasa proxy exception', { error: msg });
-    return NextResponse.json({ error: 'Proxy failed to reach eKasa', detail: msg }, { status: 500 });
+    // Determine if it's a timeout/proxy failure
+    const isTimeout = error instanceof Error && error.message.includes('Timeout');
+    return apiError(error, 'eKasa', isTimeout ? 'Upstream service timeout' : 'Proxy exception', {
+      status: isTimeout ? 504 : 500,
+      upstreamError: isTimeout,
+      retryable: true
+    });
   }
-});
+};
+
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+

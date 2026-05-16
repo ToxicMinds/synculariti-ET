@@ -1,20 +1,26 @@
-import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
-import { getCategoryPrompt } from '@/lib/ai-categories';
-
+import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
+import { getCategoryPrompt } from '@/lib/ai-categories';
+import { StatementRequestSchema } from '@/lib/validations/schemas';
 
-export const POST = withAuth(async (req: Request) => {
-
+const handler = async (req: Request) => {
   try {
-    const { text, categories } = await req.json();
-
-    if (!text || text.length < 10) {
-      return NextResponse.json({ error: 'Statement text too short or empty' }, { status: 400 });
+    const body = await req.json();
+    
+    // Validation: 400 Bad Request
+    const parsedRequest = StatementRequestSchema.safeParse(body);
+    if (!parsedRequest.success) {
+      return apiError('Validation failed', 'AI', 'Invalid statement request', {
+        status: 400,
+        details: parsedRequest.error.issues
+      });
     }
 
-    let content = await callGroq("llama-3.3-70b-versatile", [
+    const { text, categories } = parsedRequest.data;
+
+    const result = await callGroq("llama-3.3-70b-versatile", [
       {
         role: "system",
         content: `You are an expert financial data parser. 
@@ -28,30 +34,35 @@ Format each item exactly like this:
   "amount": 12.34,
   "category": "..."
 }
-${getCategoryPrompt(categories as string[])}
+${getCategoryPrompt(categories)}
 Only output the JSON object.`
       },
       {
         role: "user",
         content: text.substring(0, 8000) // limit to avoid max tokens
       }
-    ], { temperature: 0.1, response_format: { type: 'json_object' } }).catch(() => "");
+    ], { 
+      temperature: 0.1,
+      cacheKey: `stmt-${text.length}-${text.substring(0, 20)}` 
+    });
     
+    let content = result.content.trim();
     // Clean up potential markdown formatting Groq might still add
-    content = content.trim();
     if (content.startsWith('```json')) content = content.substring(7);
     if (content.startsWith('```')) content = content.substring(3);
     if (content.endsWith('```')) content = content.substring(0, content.length - 3);
 
-    const parsed = JSON.parse(content);
+    const data = JSON.parse(content);
 
     return NextResponse.json({ 
       success: true, 
-      transactions: parsed.transactions || []
+      transactions: data.transactions || [],
+      usage: result.usage
     });
 
   } catch (e: unknown) {
-    ServerLogger.system('ERROR', 'AI', 'Statement AI error', { error: e instanceof Error ? e.message : String(e) });
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'AI Processing failed' }, { status: 500 });
+    return apiError(e, 'AI', 'Statement AI error', { retryable: true });
   }
-});
+};
+
+export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);

@@ -128,7 +128,7 @@ BEGIN
 
   RETURN v_transaction_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 5. Update add_transactions_bulk_v1
 CREATE OR REPLACE FUNCTION public.add_transactions_bulk_v1(
@@ -160,7 +160,7 @@ BEGIN
 
   RETURN v_results;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 6. Update update_transaction_v1 (from 11_phase2_dml_rpcs.sql)
 CREATE OR REPLACE FUNCTION public.update_transaction_v1(

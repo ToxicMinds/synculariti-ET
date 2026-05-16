@@ -18,9 +18,38 @@ export interface EkasaMetadata {
   };
 }
 
+interface RawEkasaData {
+  receipt?: any;
+  data?: any;
+  organization?: { name?: string; dic?: string; ico?: string };
+  seller?: { name?: string };
+  organizationName?: string;
+  merchantName?: string;
+  name?: string;
+  dic?: string;
+  ico?: string;
+  receiptNumber?: string;
+  createDate?: string;
+  issueDate?: string;
+  date?: string;
+  issueTime?: string;
+  createTime?: string;
+  items?: any[];
+  receiptItems?: any[];
+  lines?: any[];
+  totalPrice?: number;
+  total?: number;
+  taxBaseBasic?: number;
+  vatAmountBasic?: number;
+  vatRateBasic?: number;
+  taxBaseReduced?: number;
+  vatAmountReduced?: number;
+  vatRateReduced?: number;
+}
+
 export function parseEkasaMetadata(ekasaData: unknown): EkasaMetadata {
-  const d = (ekasaData || {}) as Record<string, any>;
-  const receipt = d.receipt || d.data || d;
+  const d = (ekasaData || {}) as RawEkasaData;
+  const receipt = (d.receipt || d.data || d) as RawEkasaData;
 
   // 1. Store Name Extraction
   const rawStore = 

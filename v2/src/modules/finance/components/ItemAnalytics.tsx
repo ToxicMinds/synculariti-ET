@@ -20,7 +20,10 @@ interface RawReceiptItem {
   transactions: {
     description: string | null;
     date: string | null;
-  } | null | any; // Supabase nested select returns single object or array depending on relation
+  } | Array<{
+    description: string | null;
+    date: string | null;
+  }> | null;
 }
 
 export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string | undefined, isDemo?: boolean }) {

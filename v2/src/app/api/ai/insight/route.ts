@@ -1,7 +1,8 @@
-import { ServerLogger } from '@/lib/logger-server';
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
 import { withAuth } from '@/lib/withAuth';
+import { apiError } from '@/lib/api-error-handler';
+import { callGroq } from '@/lib/groq';
 
 interface Neo4jMerchantFact {
   merchant: string;
@@ -15,58 +16,50 @@ interface Neo4jCategoryFact {
   total: number;
 }
 
-import { callGroq } from '@/lib/groq';
+const getVisits = (v: number | { low: number }): number => {
+  return typeof v === 'object' && v !== null ? v.low : v;
+};
 
-export const GET = withAuth(async (req, { tenantId }) => {
+export const GET = withAuth(async (_req, { tenantId }) => {
   const driver = getNeo4jDriver();
-  if (!driver) return NextResponse.json({ error: 'Neo4j not configured' }, { status: 500 });
+  if (!driver) {
+    return apiError('Neo4j not configured', 'Sync', 'Graph driver missing', { status: 500 });
+  }
 
   const session = driver.session();
   try {
-    const merchantResult = await session.run(`
-      MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {tenant_id: $tenantId})
-      WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
-      ORDER BY visits DESC
-      LIMIT 15
-      RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
-    `, { tenantId });
+    const [merchantResult, categoryResult] = await Promise.all([
+      session.run(`
+        MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {tenant_id: $tenantId})
+        WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
+        ORDER BY visits DESC
+        LIMIT 15
+        RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
+      `, { tenantId }),
+      session.run(`
+        MATCH (t:Transaction {tenant_id: $tenantId})
+        WHERE t.category IS NOT NULL
+        WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
+        ORDER BY total DESC
+        RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
+      `, { tenantId })
+    ]);
     
-    const categoryResult = await session.run(`
-      MATCH (t:Transaction {tenant_id: $tenantId})
-      WHERE t.category IS NOT NULL
-      WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
-      ORDER BY total DESC
-      RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
-    `, { tenantId });
-
     const facts = (merchantResult.records[0]?.get('topMerchants') || []) as Neo4jMerchantFact[];
     const categories = (categoryResult.records[0]?.get('categories') || []) as Neo4jCategoryFact[];
 
-    // Fallback logic if Groq is missing or fails
     const generateFallbackInsight = () => {
       if (categories.length > 0) {
         const topCat = categories[0];
-        return `💡 Financial Insight: Your highest operating expense is ${topCat.category} at €${Number(topCat.total).toFixed(2)}. ${facts.length > 0 ? `You have high frequency with ${facts[0].merchant}.` : 'Consider auditing this category for optimization.'}`;
+        const total = typeof topCat.total === 'object' ? 0 : topCat.total;
+        return `💡 Financial Insight: Your highest operating expense is ${topCat.category} at €${Number(total).toFixed(2)}. ${facts.length > 0 ? `You have high frequency with ${facts[0].merchant}.` : 'Consider auditing this category for optimization.'}`;
       }
       return "💡 System Intelligence: Analyzing your spending patterns. Add more transactions to unlock deeper B2B insights.";
     };
 
-    if (!process.env.GROQ_API_KEY) {
-      ServerLogger.system('WARN', 'AI', 'GROQ_API_KEY missing 2014 using deterministic fallback', {});
-      return NextResponse.json({ 
-        success: true, 
-        insight: generateFallbackInsight(),
-        facts,
-        categories
-      });
-    }
-
     // Build context for Groq
     const merchantSummary = facts
-      .map((f: Neo4jMerchantFact) => {
-        const visits = typeof f.visits === 'object' && f.visits !== null ? (f.visits as { low: number }).low : f.visits;
-        return `${f.merchant}: ${visits} visits, €${Number(f.total).toFixed(2)}`;
-      })
+      .map((f: Neo4jMerchantFact) => `${f.merchant}: ${getVisits(f.visits)} visits, €${Number(f.total).toFixed(2)}`)
       .join('; ');
 
     const categorySummary = categories
@@ -75,27 +68,31 @@ export const GET = withAuth(async (req, { tenantId }) => {
       .join('; ');
 
     try {
-      const insightText = await callGroq("llama-3.3-70b-versatile", [
+      const result = await callGroq("llama-3.3-70b-versatile", [
         {
           role: "system",
           content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
-  Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
+Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
         },
         {
           role: "user",
-          content: `Category breakdown: ${categorySummary || 'No data'}.
-  Top merchants: ${merchantSummary || 'No data'}.`
+          content: `Category breakdown: ${categorySummary || 'No data'}. Top merchants: ${merchantSummary || 'No data'}.`
         }
-      ], { temperature: 0.7, max_tokens: 200 }).catch(() => generateFallbackInsight());
+      ], { 
+        temperature: 0.7, 
+        max_tokens: 200,
+        cacheKey: `insight-${tenantId}-${facts.length}-${categories.length}`
+      });
 
       return NextResponse.json({ 
         success: true, 
-        insight: insightText,
+        insight: result.content,
         facts,
-        categories
+        categories,
+        usage: result.usage
       });
     } catch (apiErr: unknown) {
-      ServerLogger.system('ERROR', 'AI', 'Groq API error 2014 using fallback', { error: apiErr instanceof Error ? apiErr.message : String(apiErr) });
+      // Graceful fallback for AI failures (API is still "success: true" but insight is deterministic)
       return NextResponse.json({ 
         success: true, 
         insight: generateFallbackInsight(),
@@ -105,8 +102,7 @@ export const GET = withAuth(async (req, { tenantId }) => {
     }
 
   } catch (e: unknown) {
-    ServerLogger.system('ERROR', 'AI', 'AI Insight core error', { error: e instanceof Error ? e.message : String(e) });
-    // Even if Neo4j fails, we try a soft fallback if possible, or a clean error
+    // If graph query fails, return empty facts but success so UI doesn't crash
     return NextResponse.json({ 
       success: true, 
       insight: "💡 Intelligence Hub: Syncing your financial graph. Insights will appear shortly.",

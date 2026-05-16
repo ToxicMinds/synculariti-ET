@@ -7,7 +7,8 @@ export type { ReceiptData };
 /**
  * useSync Hook (SOLID: Facade Pattern)
  * RESPONSIBILITY: Centralized API for Finance mutations. 
- * Delegates to useTransactionSync (ACID), useNeo4jSync (Intelligence), and useOfflineQueue.
+ * Delegates to useTransactionSync (ACID) and useOfflineQueue (Resilience).
+ * Graph sync (Neo4j) is handled server-side via the graph_sync_queue outbox (C-05).
  */
 export function useSync(tenantId: string | undefined) {
   const { addTransaction, saveReceipt, softDeleteTransaction, updateTransaction } = useTransactionSync(tenantId);
