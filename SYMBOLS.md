@@ -101,6 +101,7 @@
 
 ## UI & Navigation
 - `function useNavigation()`: Headless Viewport Controller that manages fiscal calendar logic, module switching, and URL synchronization.
+- `function useSwipeable()`: Headless hook for managing horizontal swipe gestures (Swipe-to-Reveal) across platform lists.
 - `interface NavigationMonth`: Represents a selectable fiscal month in the platform viewport.
 - `interface ModuleDescriptor`: Canonical configuration for platform domain modules (Finance, Logistics, Identity).
 - `const MODULE_REGISTRY`: Single Source of Truth for available platform modules and their metadata.
