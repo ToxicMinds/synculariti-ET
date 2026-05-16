@@ -8,6 +8,7 @@
 - **Viewport Controller**: Use the headless `useNavigation` hook for all fiscal calendar and domain navigation logic. UI components must not manually generate month lists or manipulate routing parameters.
 - **Static Safety**: Any component consuming URL-dependent hooks (e.g., `useNavigation`, `useSearchParams`) MUST be wrapped in a `<Suspense>` boundary and separated from static layout shells to prevent CSR bailouts during build-time static generation.
 - **Shared Gestures**: Use the `useSwipeable` hook for all swipe-to-reveal or horizontal gesture logic.
+- **Hardware/Intelligence Decoupling**: Complex components (like cameras/scanners) MUST decouple hardware logic (`useCamera`) from intelligence/parsing logic (`useReceiptProcessor`).
 - **Fiscal Arithmetic**: Use the `useCalendarGrid` hook for all fiscal heatmap or calendar grid generation. Never perform date math or spend aggregation directly inside a UI component.
 
 ## 2. Coding Standards

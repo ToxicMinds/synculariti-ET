@@ -30,8 +30,12 @@ The core infrastructure has been remediated. The following standards are now act
 - **Goal**: Extract gesture logic and fiscal arithmetic into headless hooks.
 - **Verified**: Via `useSwipeable.test.ts` and `useCalendarGrid.test.ts`.
 
-### Batch H-I: Remaining UI SRP
-- **Goal**: Decompose `ReceiptScanner` and the Finance God-Page.
+### Batch H: ReceiptScanner SRP [FIXED]
+- **Goal**: Decompose `ReceiptScanner` into headless hardware (`useCamera`) and intelligence (`useReceiptProcessor`) primitives.
+- **Verified**: Strict idempotency caching, AbortController timeouts, and OfflineQueue resilience verified via Red-Phase tests.
+
+### Batch I: Finance God-Page SRP
+- **Goal**: Decompose the Finance God-Page.
 
 ### Batch J-K: Shared Components & Styles
 - **Goal**: Eliminate duplicate UI code for category selection, modals, and input styles.
@@ -47,7 +51,7 @@ The core infrastructure has been remediated. The following standards are now act
 | :--- | :--- | :--- | :--- | :--- |
 | N-04 | 🔴 HIGH | Observability | `groq/route.ts` | CLOSED |
 | N-07 | 🔴 HIGH | Security | API Routes (Validation) | CLOSED |
-| V-28 | 🟡 MEDIUM | SOLID | `useLogistics` | OPEN |
+| V-28 | 🟡 MEDIUM | SOLID | `ReceiptScanner` | CLOSED |
 | ... | ... | ... | ... | ... |
 
 ---

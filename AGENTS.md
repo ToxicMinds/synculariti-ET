@@ -61,6 +61,8 @@ This document is the definitive guide for AI assistants and developers. It conso
 We use a deterministic AI pipeline for financial categorization:
 1. **Stage 1 (Vision)**: LLM-based spatial transcription.
 2. **Stage 2 (Reasoning)**: Llama 3.3 70B mapping to injected Tenant category contexts.
+- **Hardware/Intelligence Decoupling (SRP)**: Complex components (like Receipt Scanners) MUST separate hardware logic (`useCamera`) from intelligence parsing (`useReceiptProcessor`).
+- **Idempotency Shield**: All intelligence parsing MUST be gated by an idempotency hash (e.g., SHA-256 of the image blob) to prevent redundant AI API calls and ensure graceful degradation timeouts.
 
 ### 4.4 Headless Viewport Pattern
 - All navigation, fiscal calendar generation, and module switching MUST be handled by the `useNavigation` hook.
