@@ -15,7 +15,7 @@ module.exports = {
     {
       displayName: "frontend",
       testEnvironment: "jsdom",
-      testMatch: ["<rootDir>/src/components/**/*.test.ts*", "<rootDir>/src/modules/**/components/**/*.test.ts*"],
+      testMatch: ["<rootDir>/src/components/**/*.test.ts*", "<rootDir>/src/modules/**/components/**/*.test.ts*", "<rootDir>/src/hooks/**/*.test.ts*"],
       moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
       transform: { ...tsJestTransformCfg }
     },

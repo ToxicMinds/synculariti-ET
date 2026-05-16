@@ -5,6 +5,7 @@
 - **Domain Isolation**: Every business domain (`identity`, `logistics`, `finance`) MUST live in `v2/src/modules/[domain]`.
 - **Headless Logic**: Keep business logic in React hooks inside `modules/[domain]/hooks/`. UI components should be lean consumers of these hooks.
 - **Shared Utilities**: Cross-domain helpers must live in `v2/src/lib/`. Shared UI components live in `v2/src/components/`.
+- **Viewport Controller**: Use the headless `useNavigation` hook for all fiscal calendar and domain navigation logic. UI components must not manually generate month lists or manipulate routing parameters.
 
 ## 2. Coding Standards
 - **TypeScript Only**: No `.js` files. **Zero** `: any` usages allowed. Use explicit return types for all functions.

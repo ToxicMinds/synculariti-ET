@@ -38,8 +38,8 @@ The core infrastructure has been remediated. The following standards are now act
 
 | ID | Severity | Principle | Location | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| N-04 | 🔴 HIGH | Observability | `groq/route.ts` | OPEN |
-| N-07 | 🔴 HIGH | Security | API Routes (Validation) | OPEN |
+| N-04 | 🔴 HIGH | Observability | `groq/route.ts` | CLOSED |
+| N-07 | 🔴 HIGH | Security | API Routes (Validation) | CLOSED |
 | V-28 | 🟡 MEDIUM | SOLID | `useLogistics` | OPEN |
 | ... | ... | ... | ... | ... |
 

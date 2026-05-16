@@ -97,3 +97,13 @@
 - `function useTenantMutations()`: Hook for firing tenant-level global mutations.
 - `Zod Schema: Unified Validation Registry`: Centralized schemas for `Category`, `EkasaDate`, and `ReceiptMeta` to ensure cross-module data integrity.
 - `Zod Schema: API Request Schemas`: Strictly typed payloads for `Ekasa`, `Forecast`, `Statement`, and `DocumentParse` routes.
+
+## UI & Navigation
+- `function useNavigation()`: Headless Viewport Controller that manages fiscal calendar logic, module switching, and URL synchronization.
+- `interface NavigationMonth`: Represents a selectable fiscal month in the platform viewport.
+- `interface ModuleDescriptor`: Canonical configuration for platform domain modules (Finance, Logistics, Identity).
+- `const MODULE_REGISTRY`: Single Source of Truth for available platform modules and their metadata.
+- `function MonthSelector()`: Modular UI component for fiscal month switching.
+- `function ModuleSwitcher()`: Modular UI component for domain navigation.
+- `function ProfileMenu()`: Modular UI component for user session actions (Export, Logout).
+- `function NavBar()`: Orchestration shell for the platform's primary navigation system.

@@ -62,6 +62,11 @@ We use a deterministic AI pipeline for financial categorization:
 1. **Stage 1 (Vision)**: LLM-based spatial transcription.
 2. **Stage 2 (Reasoning)**: Llama 3.3 70B mapping to injected Tenant category contexts.
 
+### 4.4 Headless Viewport Pattern
+- All navigation, fiscal calendar generation, and module switching MUST be handled by the `useNavigation` hook.
+- UI components (e.g., `NavBar`) MUST be stateless "View" shells that consume the hook.
+- Never manually manipulate `URLSearchParams` for month or module selection; use the `actions` provided by the viewport hook.
+
 ---
 
 ## 5. Telemetry & Observability
