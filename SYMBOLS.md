@@ -15,6 +15,8 @@
 - `interface SecureContext`: Strictly compliant Next.js context extended with optional `auth` data. Used by all authenticated routes (Export, AI, Debug, Banking).
 - `type SecureHandler`: Standardized signature for all Synculariti-ET API routes.
 - `function createMockAuthContext()`: Utility for generating type-safe API contexts in unit tests.
+- `type LogComponent`: Centralized Single Source of Truth for platform domain logging (in v2/src/lib/types/logging.ts).
+- `type LogLevel`: Centralized taxonomy for technical and business telemetry levels.
 
 ## Finance
 - `function useCategories()`: Hook for managing tenant expense categories.

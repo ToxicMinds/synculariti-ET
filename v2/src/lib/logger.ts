@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 
-export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'PERF';
-export type LogComponent = 'API' | 'Neo4j' | 'Scanner' | 'Auth' | 'Sync' | 'AI' | 'Finance' | 'Logistics' | 'OfflineQueue' | 'Utils';
+import { LogLevel, LogComponent } from './types/logging';
 
 /**
  * Synculariti Logger (SOLID: Single Responsibility)

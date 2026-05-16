@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ServerLogger } from './logger-server';
 import { ZodIssue } from 'zod';
 
-export type LogComponent = 'AI' | 'Auth' | 'Sync' | 'Export' | 'eKasa' | 'Banking' | 'API';
+import { LogComponent } from './types/logging';
 
 export interface ApiErrorOptions {
   status?: number;

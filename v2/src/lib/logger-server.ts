@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-export type LogLevel = 'ERROR' | 'WARN' | 'INFO' | 'PERF';
-export type LogComponent = 'API' | 'Neo4j' | 'Scanner' | 'Auth' | 'Sync' | 'AI' | 'Finance' | 'Logistics' | 'eKasa' | 'OfflineQueue' | 'Utils';
+import { LogLevel, LogComponent } from './types/logging';
 
 /**
  * ServerLogger: Writes telemetry from Next.js API routes (server-side).

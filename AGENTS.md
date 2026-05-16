@@ -65,6 +65,6 @@ We use a deterministic AI pipeline for financial categorization:
 ---
 
 ## 5. Telemetry & Observability
-- **Logger, not console**: Use `Logger.system()` for technical telemetry and `Logger.user()` for business audit trails.
+- **Logger, not console**: Use `Logger.system()` for technical telemetry and `Logger.user()` for business audit trails. Use the centralized `LogComponent` type for all system logs.
 - **API Telemetry**: API routes MUST use `ServerLogger` to avoid browser global conflicts.
 - **Visibility**: If an action doesn't appear in the Activity Log, it didn't happen.
