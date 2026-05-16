@@ -60,6 +60,8 @@
 ## AI & Receipt Processing (eKasa)
 - `function getCategoryPrompt()`: Generates the context-aware prompt for the Groq categorization LLM.
 - `function cleanStoreName()`: Sanitizes raw merchant strings extracted from OCR/QR data.
+- `export const EkasaRequestSchema`: Validator for incoming eKasa proxy payloads.
+- `export const ResilientReceiptSchema`: The 'Washer' pattern that normalizes nullable parser output into guaranteed primitives.
 - `function parseEkasaMetadata()`: Parses foundational data from an eKasa QR payload.
 - `interface EkasaMetadata`: Structured representation of an eKasa receipt header.
 - `function extractBaselineId()`: Extracts the base UUID from a raw fiscal string.

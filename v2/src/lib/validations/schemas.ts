@@ -93,3 +93,17 @@ export const ReceiptParseRequestSchema = z.object({
   ekasaData: z.any(), // Structure from Slovak Gov API (complex/dynamic)
   categories: CategorySchema
 });
+
+/**
+ * Resilient Receipt Schema (The Washer)
+ * Normalizes potentially nullable parser output into guaranteed primitives.
+ */
+export const ResilientReceiptSchema = z.object({
+  store: z.preprocess((v) => v || 'Slovak Receipt', z.string()),
+  date: z.preprocess(
+    (v) => (typeof v === 'string' && v.length >= 10 ? v : '0000-00-00'),
+    z.string()
+  ).transform(v => v.substring(0, 10)),
+  total: z.preprocess((v) => Number(v || 0), z.number()),
+  items: z.array(z.any()).default([])
+});

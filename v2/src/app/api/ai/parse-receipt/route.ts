@@ -4,7 +4,7 @@ import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { parseEkasaMetadata } from '@/lib/ekasa-parser';
 import { getCategoryPrompt } from '@/lib/ai-categories';
-import { ReceiptParseRequestSchema } from '@/lib/validations/schemas';
+import { ReceiptParseRequestSchema, ResilientReceiptSchema } from '@/lib/validations/schemas';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 
@@ -19,7 +19,7 @@ const handler: SecureHandler = async (req, context) => {
   try {
     const body = await req.json();
     
-    // Validation: 400 Bad Request
+    // 1. Validation: 400 Bad Request for the main payload
     const parsedRequest = ReceiptParseRequestSchema.safeParse(body);
     if (!parsedRequest.success) {
       return apiError('Validation failed', 'AI', 'Invalid receipt parse request', {
@@ -30,15 +30,18 @@ const handler: SecureHandler = async (req, context) => {
 
     const { ekasaData, categories } = parsedRequest.data;
 
-    // 1. EXTRACT GROUND TRUTH FROM EKASA JSON (DO NOT LET AI TOUCH FINANCIALS)
-    const metadata = parseEkasaMetadata(ekasaData);
+    // 2. EXTRACT GROUND TRUTH FROM EKASA JSON
+    const rawMetadata = parseEkasaMetadata(ekasaData);
 
-    // 2. ASK AI FOR CATEGORIZATION AND STORE INFERENCE (IF NEEDED)
+    // 3. THE WASHER: Guarantee type safety for AI and caching
+    const metadata = ResilientReceiptSchema.parse(rawMetadata);
+
+    // 4. ASK AI FOR CATEGORIZATION AND STORE INFERENCE
     const needsStoreInference = metadata.store === 'Slovak Receipt';
     const systemPrompt = `
       You are a specialized financial analyst for the Slovak market.
       I will provide a list of items from a receipt.
-      ${needsStoreInference ? 'IDENTIFY THE SPECIFIC STORE BRAND from these items. Look for store-brand products or item names to "fingerprint" the retailer (e.g., "Dr.Max" instead of just "Pharmacy", "Lidl" instead of "Groceries").' : ''}
+      ${needsStoreInference ? 'IDENTIFY THE SPECIFIC STORE BRAND from these items. Look for store-brand products or item names to "fingerprint" the retailer.' : ''}
       Normalize item names (e.g., "Kup. sunka 100g" -> "Šunka").
       ${getCategoryPrompt(categories)}
       
@@ -58,7 +61,8 @@ const handler: SecureHandler = async (req, context) => {
       { role: 'user', content: userPrompt }
     ], { 
       temperature: 0.1,
-      cacheKey: `receipt-${metadata.total}-${metadata.items.length}-${metadata.date.substring(0, 10)}`
+      // Date is now guaranteed to be a string by the ResilientReceiptSchema washer
+      cacheKey: `receipt-${metadata.total}-${metadata.items.length}-${metadata.date}`
     });
 
     const aiParsed = JSON.parse(result.content);
@@ -69,14 +73,13 @@ const handler: SecureHandler = async (req, context) => {
 
     // Log for auditing
     ServerLogger.system('INFO', 'AI', 'Merchant Extraction Detail', {
-      dic: metadata.dic,
       rawStore: metadata.store,
       inferredStore: aiParsed.inferredStore,
       finalStore,
       itemCount: metadata.items.length
     });
 
-    // 3. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
+    // 5. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
     const mergedItems = metadata.items.map((orig: EkasaItem, idx: number) => ({
       name: aiItems[idx]?.name || orig.originalName,
       amount: orig.amount,
@@ -89,10 +92,6 @@ const handler: SecureHandler = async (req, context) => {
       date: metadata.date,
       total: metadata.total,
       items: mergedItems,
-      ico: metadata.ico,
-      receiptNumber: metadata.receiptNumber,
-      transactedAt: metadata.transactedAt,
-      vatDetail: metadata.vatDetail,
       usage: result.usage
     });
 

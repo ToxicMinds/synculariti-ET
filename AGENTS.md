@@ -55,6 +55,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 - **search_path Safety**: All DB functions must include `SET search_path = public`.
 - **Auth Guard**: All sensitive API routes MUST be wrapped with `withAuth` middleware and use the `SecureContext` pattern for type-safe App Router compliance.
 - **Input Validation**: All API routes MUST use Zod schemas from the unified validation registry for request sanitization.
+- **Normalizing Washer**: Use the 'Washer' pattern (Zod transforms + defaults) for all routes handling external or nullable metadata to guarantee type safety without rejecting valid but incomplete data.
 
 ### 4.3 Intelligence Strategy
 We use a deterministic AI pipeline for financial categorization:

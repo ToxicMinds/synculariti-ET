@@ -1,4 +1,4 @@
-import { CategorySchema, EkasaDateSchema, ReceiptMetaSchema } from './schemas';
+import { CategorySchema, EkasaDateSchema, ReceiptMetaSchema, ResilientReceiptSchema } from './schemas';
 
 describe('Unified Validation Schemas', () => {
   describe('CategorySchema', () => {
@@ -25,7 +25,6 @@ describe('Unified Validation Schemas', () => {
 
     it('should normalize Slovak localized date formats', () => {
       const slovakDate = '27.10.2023 10:00:00';
-      // JavaScript's new Date() usually handles this, we want to ensure it's normalized to ISO
       const result = EkasaDateSchema.parse(slovakDate);
       expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
@@ -53,6 +52,33 @@ describe('Unified Validation Schemas', () => {
         merchant: 'Store',
         categories: []
       })).toThrow();
+    });
+  });
+
+  describe('ResilientReceiptSchema (The Washer)', () => {
+    it('should provide fallbacks for completely empty metadata', () => {
+      const empty = {};
+      const result = ResilientReceiptSchema.parse(empty);
+      
+      expect(result.store).toBe('Slovak Receipt');
+      expect(result.date).toBe('0000-00-00');
+      expect(result.total).toBe(0);
+      expect(result.items).toEqual([]);
+    });
+
+    it('should normalize and truncate dates for cache keys', () => {
+      const input = { date: '2023-10-27T10:00:00Z' };
+      const result = ResilientReceiptSchema.parse(input);
+      expect(result.date).toBe('2023-10-27');
+    });
+
+    it('should handle null fields from the parser', () => {
+      const input = { store: null, date: null, total: null };
+      const result = ResilientReceiptSchema.parse(input);
+      
+      expect(result.store).toBe('Slovak Receipt');
+      expect(result.date).toBe('0000-00-00');
+      expect(result.total).toBe(0);
     });
   });
 });

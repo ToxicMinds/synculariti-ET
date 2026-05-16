@@ -10,7 +10,7 @@
 - **TypeScript Only**: No `.js` files. **Zero** `: any` usages allowed. Use explicit return types for all functions.
 - **No Direct DML**: Never use `supabase.from('transactions').insert(...)`. Use the canonical RPC `save_receipt_v4`.
 - **API Route Standards**: Every API route handler must follow the `SecureHandler` signature and use `SecureContext`.
-- **Validation**: Every API route must use Zod schemas from the shared validation registry for request parsing.
+- **Validation & Washing**: Use Zod schemas from the shared registry for request parsing. Use the 'Washer' pattern (transforms + defaults) to guarantee type safety for nullable metadata.
 - **Error Boundaries**: Every page-level component must be wrapped in an `ErrorBoundary`.
 
 ## 3. Security & Database Rules
