@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from '@/lib/supabase';
 
 import { LogLevel, LogComponent } from './types/logging';
 

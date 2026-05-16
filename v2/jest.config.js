@@ -22,9 +22,11 @@ module.exports = {
         "<rootDir>/src/modules/**/hooks/**/*.test.ts*",
         "<rootDir>/src/hooks/**/*.test.ts*"
       ],
+      setupFiles: ["<rootDir>/src/lib/mocks/envSetup.js"],
       moduleNameMapper: { 
-        "^@/(.*)$": "<rootDir>/src/$1",
-        "\\.css$": "<rootDir>/src/lib/mocks/styleMock.js"
+        "\\.css$": "<rootDir>/src/lib/mocks/styleMock.js",
+        "^@/lib/supabase$": "<rootDir>/src/lib/mocks/supabaseMock.js",
+        "^@/(.*)$": "<rootDir>/src/$1"
       },
       transform: { ...tsJestTransformCfg }
     },

@@ -24,7 +24,8 @@
 - `interface UseManualEntryFormReturn`: Contract for the useManualEntryForm hook state and actions.
 - `interface FieldErrors`: Field-level validation error map for form hooks.
 - `function useOfflineQueue()`: Hook for queuing financial mutations when offline.
-- `function useScannerState()`: Headless hook managing ReceiptScanner UI state and AI/eKasa extraction pipelines.
+- `function useReceiptProcessor()`: Headless intelligence pipeline for receipt parsing (eKasa + AI). Enforces offline resilience and idempotency.
+- `function useCamera()`: Hardware-isolated headless hook managing MediaStream lifecycle, client-side compression, and idempotency hashing.
 - `function useSync()`: Facade hook for delegating financial mutations to transaction and offline queues.
 - `function useTransactions()`: Read-only hook for fetching and subscribing to the transactions ledger.
 - `function useTransactionSync()`: Core write hook for inserting/updating transactions (ACID compliant).
