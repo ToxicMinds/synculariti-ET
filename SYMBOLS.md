@@ -30,6 +30,7 @@
 - `function useTransactionSync()`: Core write hook for inserting/updating transactions (ACID compliant).
 - `function useTransactionFilter()`: Headless hook for memoized filtering, sorting, and pagination of the transaction ledger.
 - `interface UseTransactionFilterReturn`: Contract for the useTransactionFilter hook state and actions.
+- `function useCalendarGrid()`: Headless hook for generating a fiscal month grid and intensity heatmap from transactions.
 - `function useStatementScanner()`: Headless hook managing bank statement extraction, batch processing, and reconciliation.
 - `interface UseStatementScannerReturn`: Contract for the useStatementScanner hook state and actions.
 - `interface ParsedTransaction`: Structured representation of a transaction extracted from a statement.
@@ -108,3 +109,6 @@
 - `function MonthSelector()`: Modular UI component for fiscal month switching.
 - `function ModuleSwitcher()`: Modular UI component for domain navigation.
 - `function ProfileMenu()`: Modular UI component for user session actions (Export, Logout).
+- `function FilterBar()`: Modular UI for financial transaction filtering and search.
+- `function TransactionRow()`: Modular UI for a single transaction with swipe-to-reveal gestures.
+- `function CalendarGrid()`: Modular UI for the fiscal spend heatmap.
