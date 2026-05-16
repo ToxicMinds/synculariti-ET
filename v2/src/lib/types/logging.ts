@@ -17,6 +17,8 @@ export type LogComponent =
   | 'OfflineQueue' 
   | 'Utils'
   | 'Banking'
-  | 'Export';
+  | 'Export'
+  | 'Debug'
+  | 'Usage';
 
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'PERF';

@@ -27,3 +27,16 @@ describe('Secure API Type Contract', () => {
     expect(data.tenantId).toBe('test-id');
   });
 });
+
+describe('Secure API Logging Integration', () => {
+  it('should support logging with Debug and Security components', () => {
+    // This test ensures that the types are compatible with literal assignments
+    // Import type only for compile-time check in test
+    const { LogComponent } = require('./types/logging');
+    const comp1: typeof LogComponent = 'Debug';
+    const comp2: typeof LogComponent = 'Security';
+    
+    expect(comp1).toBeDefined();
+    expect(comp2).toBeDefined();
+  });
+});

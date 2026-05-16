@@ -11,8 +11,9 @@ describe('Logging Type Contract', () => {
     const components: LogComponent[] = [
       'API', 'Neo4j', 'Scanner', 'Auth', 'Security', 
       'Sync', 'AI', 'Finance', 'Logistics', 
-      'eKasa', 'OfflineQueue', 'Utils', 'Banking', 'Export'
+      'eKasa', 'OfflineQueue', 'Utils', 'Banking', 'Export',
+      'Debug', 'Usage' // [NEW]
     ];
-    expect(components.length).toBeGreaterThan(10);
+    expect(components.length).toBeGreaterThan(12);
   });
 });

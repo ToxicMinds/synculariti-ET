@@ -74,7 +74,7 @@ export async function callGroq(
     };
 
     // Log high-fidelity usage data for Batch L-M audits
-    ServerLogger.system('AI', 'Usage', `Model: ${result.model}`, {
+    await ServerLogger.system('INFO', 'Usage', `Model: ${result.model}`, {
       usage: result.usage,
       cacheKey: options.cacheKey
     });
