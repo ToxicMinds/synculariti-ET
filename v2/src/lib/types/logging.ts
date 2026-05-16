@@ -19,6 +19,7 @@ export type LogComponent =
   | 'Banking'
   | 'Export'
   | 'Debug'
-  | 'Usage';
+  | 'Usage'
+  | 'Camera';
 
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'PERF';

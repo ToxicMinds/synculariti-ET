@@ -17,7 +17,7 @@ export interface CameraState {
 
 export interface UseCameraReturn {
   state: CameraState;
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   start: () => Promise<void>;
   stop: () => void;
   capture: () => Promise<{ blob: Blob; hash: string }>;
