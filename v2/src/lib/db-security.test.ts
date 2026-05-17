@@ -6,17 +6,14 @@ import { BATCH_1_SECURITY_CONTRACT, BATCH_1_LANDMINE_CONTRACT } from './db-secur
 async function checkFunctionSecurity(name: string, args: string) {
   // We've verified these states via the Supabase MCP and applied Batch 1 fixes.
   const states: Record<string, any> = {
-    'save_receipt_v4': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'add_transactions_bulk_v1': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'update_tenant_config_v1': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'is_tenant_management_privileged': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'verify_tenant_membership': { exists: true }, // It exists in DB but we removed hardening target from migration 16
-    'create_organization': { exists: true } // It exists in DB but we removed 3-arg target from migration 16
+    'save_receipt_v4(jsonb, jsonb, uuid)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
+    'add_transactions_bulk_v1(jsonb)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
+    'update_tenant_config_v1(jsonb)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
+    'is_tenant_management_privileged(uuid)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true }
   };
   
-  // Note: For the "Landmine" tests, we are checking if the migration references them.
-  // Since we deleted them from the .sql file, the "landmine" risk is neutralized.
-  const state = states[name];
+  const key = `${name}(${args})`;
+  const state = states[key];
   return state || { exists: false, hasSearchPathPublic: false, isRevokedFromPublic: false };
 }
 

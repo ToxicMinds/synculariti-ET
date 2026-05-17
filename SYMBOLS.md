@@ -85,8 +85,15 @@
 - `type LogLevel`: Severity levels for system/user events.
 - `class Logger`: Client-side telemetry logger interface.
 - `function getNeo4jDriver()`: Instantiates the Neo4j graph database driver.
-- `function neo4jBulkMerge()`: Unified utility for atomic, sequential transaction syncing to the graph.
+- `function neo4jBulkMerge()`: High-performance utility using a 3-Phase Lock-Safe aggregation engine to merge transactions, isolated merchant SKUs, and aggregated ingredients.
+- `function processOutboxSync()`: Background runner processor that syncs ledger outbox events using a flat sliding cursor batch chunker.
 - `function neo4jDeleteTransaction()`: Removes a transaction node and its relationships from the graph.
+- `API Route: GET /api/debug/sync-neo4j`: Manually triggers outbox processing for the current authenticated tenant's pending graph sync queue.
+- `API Route: GET /api/debug/backfill-neo4j`: Manually rebuilds and backfills the entire Neo4j graph from historical Postgres ledgers for the current tenant.
+- `interface Ingredient`: Defines a canonical, deduplicated ingredient category in the restaurant graph ontology.
+- `interface MerchantSKU`: Defines a merchant-specific, compound-hashed store item linked to a parent Ingredient.
+- `interface ReceiptItemSyncPayload`: Canonical interface for receipt line items during background outbox replication.
+- `interface TransactionSyncPayload`: Canonical interface for transactional outbox replication payloads.
 - `interface LockManager`: Definition for the Web Locks API (in v2/src/types/web-locks.d.ts).
 - `class OfflineQueue`: Core manager for PWA offline-first mutation resilience.
 - `interface QueuedMutation`: Represents a stalled mutation awaiting network recovery.

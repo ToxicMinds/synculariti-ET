@@ -30,7 +30,7 @@ export const BATCH_1_SECURITY_CONTRACT: FunctionSecurityRequirement[] = [
   },
   {
     functionName: 'add_transactions_bulk_v1',
-    args: 'jsonb[]',
+    args: 'jsonb',
     exists: true,
     hasSearchPathPublic: true,
     isRevokedFromPublic: true,

@@ -33,7 +33,11 @@ module.exports = {
     {
       displayName: "backend",
       testEnvironment: "node",
-      testMatch: ["<rootDir>/src/app/api/**/*.test.ts*", "<rootDir>/src/lib/**/*.test.ts*"],
+      testMatch: [
+        "<rootDir>/src/app/api/**/*.test.ts*", 
+        "<rootDir>/src/lib/**/*.test.ts*",
+        "<rootDir>/tests/features/**/*.test.ts*"
+      ],
       moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
       transform: { ...tsJestTransformCfg }
     }

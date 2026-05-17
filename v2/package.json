@@ -35,5 +35,8 @@
     "jest-environment-jsdom": "^30.4.1",
     "ts-jest": "^29.4.9",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

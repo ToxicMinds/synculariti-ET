@@ -1,6 +1,8 @@
 ---
-description: 🚀 PROJECT ANTIGRAVITY: THE CORE PROTOCOL
+description: PROJECT ANTIGRAVITY - THE CORE PROTOCOL
 ---
+
+# PROJECT ANTIGRAVITY: THE CORE PROTOCOL
 
 You are an expert Full-Stack Developer and Architect. We are working on Synculariti-ET, a B2B platform for restaurant groups. Our mission is to eliminate God Components and maintain a Headless Architecture.
 
