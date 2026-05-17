@@ -49,3 +49,12 @@
 - **Engine Compliance**: Ensure `package.json` contains `"engines": { "node": ">=20" }` to prevent npm installer conflicts in modern Node runtimes.
 - **Test boundaries**: Always match Jest-Cucumber BDD tests inside the `backend` node-based project to prevent jsdom context pollution.
 
+## 7. Type-Safe Polymorphic Identity Casting
+- **Polymorphic Caster Gateways**: All UUID database columns MUST use type-safe SQL helper functions (`public.safe_cast_uuid(TEXT)` and `public.safe_cast_user_uuid(TEXT)`) inside bulk ingest operations:
+    1. `public.safe_cast_uuid(TEXT)`: General-purpose helper returning UUID if valid, or `NULL` if invalid/empty.
+    2. `public.safe_cast_user_uuid(TEXT)`: Preserves lightweight mock user string identities (e.g. `'u1'`, `'u25'`) by mapping them deterministically to padded UUID blocks (e.g. `'00000000-0000-0000-0000-000000000001'::uuid`).
+- **Overflow and Fallback Guards**: Mock user IDs MUST be constrained to 12 digits max (`^u[0-9]{1,12}$`) to prevent padding overflows. Arbitrary invalid strings must fall back safely to the system guest UUID (`'00000000-0000-0000-0000-000000000000'::uuid`). Empty strings must map to `NULL` to avoid serialization crash states.
+- **Language and Performance**: Casting helper functions must be written in `LANGUAGE sql` and marked `IMMUTABLE STRICT` to allow the Postgres query optimizer to inline statements directly, eliminating PL/pgSQL procedural overhead.
+- **TypeScript Parity**: Match database-level casting behaviors with `safeCastUuid` and `safeCastUserUuid` in `v2/src/lib/uuid-helpers.ts` for clean unit testing and client-side formatting.
+
+

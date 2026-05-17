@@ -51,6 +51,22 @@ export const BATCH_1_SECURITY_CONTRACT: FunctionSecurityRequirement[] = [
     hasSearchPathPublic: true,
     isRevokedFromPublic: true,
     isGrantedToAuthenticated: true,
+  },
+  {
+    functionName: 'safe_cast_uuid',
+    args: 'text',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+    isGrantedToAuthenticated: true,
+  },
+  {
+    functionName: 'safe_cast_user_uuid',
+    args: 'text',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+    isGrantedToAuthenticated: true,
   }
 ];
 

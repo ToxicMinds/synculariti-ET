@@ -91,6 +91,15 @@ We use a deterministic AI pipeline for financial categorization:
 
 ### 6.2 CI Runner Hardening & Node.js 24 Compliance
 - **Target Node 24**: All CI execution pipelines (GitHub Actions) MUST target Node.js 24 (`node-version: '24'`) and set the `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` runner environment variable to suppress actions runner warnings and align with active deprecation deadlines.
-- **Engine Compliance**: Ensure `package.json` contains `"engines": { "node": ">=20" }` to prevent npm installer conflicts in modern Node runtimes.
+  - **Engine Compliance**: Ensure `package.json` contains `"engines": { "node": ">=20" }` to prevent npm installer conflicts in modern Node runtimes.
 - **Test boundaries**: Always match Jest-Cucumber BDD tests inside the `backend` node-based project to prevent jsdom context pollution.
+
+### 6.3 Type-Safe Polymorphic Identity Casting (Postgres & TypeScript)
+- **Zero-Crash Polymorphic Casting Gateways**: All UUID database columns MUST use type-safe SQL helper functions (`public.safe_cast_uuid(TEXT)` and `public.safe_cast_user_uuid(TEXT)`) inside bulk ingest operations. 
+  - Standard UUID strings are successfully parsed and preserved as-is.
+  - Lightweight mock staff user IDs (`'u1'`, `'u25'`) are deterministically padded to valid, type-safe UUID nodes (e.g., `'00000000-0000-0000-0000-000000000025'::uuid`) rather than nullified. This preserves user identity mapping for analytical queries and eventual graph ontology syncs.
+  - Mock IDs exceeding 12 digits (e.g., `'u9999999999999'`) are intercepted by a length-constrained regex (`^u[0-9]{1,12}$`) and cleanly mapped to the generic guest fallback UUID to prevent integer or pad overflows.
+  - Empty strings resolve to `NULL` to avoid serialization crash states. All other unmappable strings default safely to the system guest fallback UUID (`'00000000-0000-0000-0000-000000000000'::uuid`).
+- **IMMUTABLE STRICT Performance**: In order to prevent procedural PL/pgSQL context switches and optimize planning throughput, casting helpers MUST be defined in `LANGUAGE sql` and marked `IMMUTABLE STRICT`. This enables the query planner to inline statements directly.
+
 

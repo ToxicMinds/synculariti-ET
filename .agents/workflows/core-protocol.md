@@ -29,4 +29,4 @@ PHASE 3: EXECUTION (GREEN): Write the minimal logic in a headless hook to pass t
 
 PHASE 4: MOUNTING: Refactor the UI component to consume the hook. Ensure the component stays under 250 lines.
 
-PHASE 5: REGISTRY: Update SYMBOLS.md and push to GIT.
+PHASE 5: REGISTRY: Update SYMBOLS.md, AGENTS.md, RULES.md and push to GIT.
