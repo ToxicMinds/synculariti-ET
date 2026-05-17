@@ -1,15 +1,6 @@
+import './load-env';
 import { createClient } from '@supabase/supabase-js';
-import * as fs from 'fs';
-import * as path from 'path';
 import { getNeo4jDriver, neo4jBulkMerge } from '../lib/neo4j';
-
-// Load env vars
-const envPath = path.resolve(__dirname, '../../.env.local');
-const envFile = fs.readFileSync(envPath, 'utf8');
-envFile.split('\n').forEach(line => {
-  const match = line.match(/^([^#\s][^=]+)=(.*)$/);
-  if (match) process.env[match[1]] = match[2];
-});
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -86,11 +77,17 @@ async function seed() {
   if (!driver) throw new Error('Neo4j Driver could not be initialized.');
   const sessionNeo = driver.session();
 
-  console.log(`Generating ${TOTAL_TRANSACTIONS} transactions over 3 months...`);
+  console.log(`Generating ${TOTAL_TRANSACTIONS} transactions over 6 months with polymorphic user mappings...`);
 
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
   const now = new Date();
+
+  // Polymorphic mock user IDs for team allocation tracking
+  const mockUserIds = [
+    '00000000-0000-0000-0000-000000000001', // Staff Member 1 (u1)
+    '00000000-0000-0000-0000-000000000002'  // Staff Member 2 (u2)
+  ];
 
   let transactionsBatch: any[] = [];
   let itemsBatch: any[] = [];
@@ -98,7 +95,8 @@ async function seed() {
   for (let i = 1; i <= TOTAL_TRANSACTIONS; i++) {
     const vendor = VENDORS[Math.floor(Math.random() * VENDORS.length)];
     const txId = generateUUID();
-    const date = randomDate(threeMonthsAgo, now).toISOString().split('T')[0];
+    const date = randomDate(sixMonthsAgo, now).toISOString().split('T')[0];
+    const assignedWhoId = mockUserIds[Math.floor(Math.random() * mockUserIds.length)];
     
     // Generate 1 to 5 random items
     const itemCount = Math.floor(Math.random() * 5) + 1;
@@ -130,7 +128,8 @@ async function seed() {
       description: vendor.name, // The neo4jBulkMerge expects description = vendor name
       transaction_type: 'DEBIT',
       transacted_at: new Date(date).toISOString(),
-      receipt_number: `REC-${Math.floor(Math.random() * 100000)}`
+      receipt_number: `REC-${Math.floor(Math.random() * 100000)}`,
+      who_id: assignedWhoId
     });
 
     if (transactionsBatch.length === BATCH_SIZE || i === TOTAL_TRANSACTIONS) {

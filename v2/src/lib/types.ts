@@ -59,3 +59,46 @@ export interface TransactionSyncPayload {
   merchantId: string;     // Hash/UUID of normalized vendor name
   items: ReceiptItemSyncPayload[];
 }
+
+/**
+ * Polymorphic User Identity Resolution Context
+ */
+export interface UserIdentityMap {
+  /** Map of unpadded IDs (e.g., 'u1') to human names (e.g., 'Nik') */
+  rawNames: Record<string, string>;
+  /** Map of padded UUIDs (e.g., '00000000-0000-0000-0000-000000000001') to unpadded IDs */
+  uuidToId: Record<string, string>;
+}
+
+/**
+ * Mathematically Safe B2B Operating Margin Payload
+ */
+export interface OperatingMarginMetrics {
+  /** Total company income across the period */
+  income: number;
+  /** Total company spent across the period */
+  spent: number;
+  /** Retained earnings (Income - Spent) */
+  retainedEarnings: number;
+  /** True margin percentage: (Retained / Income) * 100 */
+  marginPercentage: number;
+  /** Healthy B2B target margin benchmark (default: 15%) */
+  targetBenchmark: number;
+  /** True if margin exceeds or equals the benchmark */
+  isTargetMet: boolean;
+}
+
+/**
+ * Time-Bound AI Spending Projection
+ */
+export interface TimeBoundForecast {
+  /** The daily average spend rate */
+  dailySpendRate: number;
+  /** Projected total spend at end-of-month */
+  projectedSpend: number;
+  /** Variance against budget limit */
+  variance: number;
+  /** Warning state based on remaining days and velocity */
+  status: 'EXCELLENT' | 'STABLE' | 'WARNING' | 'IN_DANGER' | 'PENDING_CONFIGURATION';
+}
+

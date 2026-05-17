@@ -6,6 +6,9 @@ import {
   calcBudgetStatus,
   calcMonthDelta,
   calcCategoryTotals,
+  normalizeUserId,
+  calcOperatingMargin,
+  calcTimeBoundForecast,
   Transaction
 } from './finance';
 
@@ -47,6 +50,15 @@ describe('Finance Calculation Library (Canonical)', () => {
       
       expect(result.u1).toBe(10);
       expect(result.u2).toBe(5);
+    });
+
+    test('Polymorphic UUID Mapping: Correctly attributes padded mock UUID to unpadded ID', () => {
+      const transactions: Transaction[] = [
+        { who_id: '00000000-0000-0000-0000-000000000002', category: 'Supplies', amount: 45, date: '2026-04-02' }
+      ];
+
+      const result = calcPerUserSpend(transactions, SAMPLE_NAMES);
+      expect(result.u2).toBe(45);
     });
 
     test('Backward Compatibility: Fallback to name-based matching', () => {
@@ -128,4 +140,58 @@ describe('Finance Calculation Library (Canonical)', () => {
       expect(result.Savings).toBeUndefined();
     });
   });
+
+  describe('normalizeUserId', () => {
+    test('correctly pads mock user IDs', () => {
+      expect(normalizeUserId('u1')).toBe('00000000-0000-0000-0000-000000000001');
+      expect(normalizeUserId('u25')).toBe('00000000-0000-0000-0000-000000000025');
+    });
+
+    test('ignores valid standard UUIDs', () => {
+      expect(normalizeUserId('e8b7d6c5-4321-abcd-ef01-23456789abcd')).toBe('e8b7d6c5-4321-abcd-ef01-23456789abcd');
+    });
+
+    test('intercepts overflow IDs exceeding 12 digits and falls back to guest fallback', () => {
+      expect(normalizeUserId('u9999999999999')).toBe('00000000-0000-0000-0000-000000000000');
+    });
+  });
+
+  describe('calcOperatingMargin', () => {
+    test('correctly calculates healthy target met', () => {
+      const result = calcOperatingMargin(10000, 8500, 15);
+      expect(result.income).toBe(10000);
+      expect(result.spent).toBe(8500);
+      expect(result.retainedEarnings).toBe(1500);
+      expect(result.marginPercentage).toBe(15);
+      expect(result.isTargetMet).toBe(true);
+    });
+
+    test('correctly handles high negative spend deficit and target failure', () => {
+      const result = calcOperatingMargin(100000, 160704.35, 15);
+      expect(result.marginPercentage).toBeCloseTo(-60.7, 1);
+      expect(result.isTargetMet).toBe(false);
+    });
+  });
+
+  describe('calcTimeBoundForecast', () => {
+    test('returns PENDING_CONFIGURATION status when totalBudget is 0', () => {
+      const transactions: Transaction[] = [
+        { amount: 150, category: 'Food', date: '2026-05-01' }
+      ];
+      const result = calcTimeBoundForecast(transactions, 0, new Date('2026-05-17'));
+      expect(result.status).toBe('PENDING_CONFIGURATION');
+    });
+
+    test('calculates correct daily rates and warns when burn rate exceeds budget', () => {
+      // May has 31 days. Spent 1700 in 17 days = 100/day. Projected 3100. Budget 2000.
+      const transactions: Transaction[] = [
+        { amount: 1700, category: 'Food', date: '2026-05-01' }
+      ];
+      const result = calcTimeBoundForecast(transactions, 2000, new Date('2026-05-17'));
+      expect(result.dailySpendRate).toBe(100);
+      expect(result.projectedSpend).toBe(3100);
+      expect(result.status).toBe('IN_DANGER');
+    });
+  });
 });
+

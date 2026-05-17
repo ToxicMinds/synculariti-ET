@@ -171,7 +171,7 @@ function DashboardContent() {
 
             {/* ROW 2: TEAM & BUDGET */}
             <TeamAllocation transactions={displayTransactions} names={tenant.names} colSpan={6} />
-            <BudgetHealth spent={totals.spent} totalBudget={totalBudget} colSpan={6} />
+            <BudgetHealth spent={totals.spent} totalBudget={totalBudget} transactions={displayTransactions} colSpan={6} />
 
             {/* ROW 3: STATUS & INTELLIGENCE */}
             <OperatingMargin income={totalIncome} spent={totals.spent} goal={Number(monthlySavingsGoal)} />

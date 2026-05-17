@@ -1,87 +1,113 @@
 import { callGroq, GroqMessage } from './groq';
 
-const mockCreate = jest.fn();
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
 
-// Mock the groq-sdk
-jest.mock('groq-sdk', () => {
-    return jest.fn().mockImplementation(() => {
-        return {
-            chat: {
-                completions: {
-                    create: mockCreate
-                }
-            }
-        };
-    });
+// Mock the server-side logger to prevent writing actual telemetry during unit tests
+jest.mock('./logger-server', () => {
+  return {
+    ServerLogger: {
+      system: jest.fn().mockResolvedValue(undefined)
+    }
+  };
 });
 
 describe('callGroq (Phase 2: Contract Revision)', () => {
-    beforeEach(() => {
-        mockCreate.mockReset();
-        process.env.GROQ_API_KEY = 'test-api-key';
+  beforeEach(() => {
+    mockFetch.mockReset();
+    process.env.GROQ_API_KEY = 'test-api-key';
+  });
+
+  const mockMessages: GroqMessage[] = [
+    { role: 'user', content: 'Hello' }
+  ];
+
+  it('returns clean string content on success', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: 'Hi there!' } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        model: 'llama-3.3-70b-versatile'
+      })
     });
 
-    const mockMessages: GroqMessage[] = [
-        { role: 'user', content: 'Hello' }
-    ];
+    const result = await callGroq('llama-3.3-70b-versatile', mockMessages);
+    
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.groq.com/openai/v1/chat/completions',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer test-api-key',
+          'Content-Type': 'application/json'
+        },
+        body: expect.any(String)
+      })
+    );
+    expect(result.content).toBe('Hi there!');
+    expect(result.usage.total_tokens).toBe(15);
+  });
 
-    it('returns clean string content on success', async () => {
-        mockCreate.mockResolvedValueOnce({
-            choices: [{ message: { content: 'Hi there!' } }]
-        });
-
-        const result = await callGroq('llama-3.3-70b-versatile', mockMessages);
-        
-        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-            model: 'llama-3.3-70b-versatile',
-            messages: mockMessages,
-        }));
-        expect(result).toBe('Hi there!');
+  it('passes options and json mode correctly', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '{"status":"ok"}' } }],
+        usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
+        model: 'llama-3.3-70b-versatile'
+      })
     });
 
-    it('passes options and json mode correctly', async () => {
-        mockCreate.mockResolvedValueOnce({
-            choices: [{ message: { content: '{"status":"ok"}' } }]
-        });
+    const options = {
+      temperature: 0.1,
+      max_tokens: 100
+    };
 
-        const options = {
-            temperature: 0.1,
-            response_format: { type: 'json_object' as const }
-        };
+    const result = await callGroq('llama-3.3-70b-versatile', mockMessages, options);
+    
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.groq.com/openai/v1/chat/completions',
+      expect.objectContaining({
+        body: expect.stringContaining('"temperature":0.1')
+      })
+    );
+    expect(result.content).toBe('{"status":"ok"}');
+  });
 
-        const result = await callGroq('llama-3.3-70b-versatile', mockMessages, options);
-        
-        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
-            model: 'llama-3.3-70b-versatile',
-            temperature: 0.1,
-            response_format: { type: 'json_object' }
-        }));
-        expect(result).toBe('{"status":"ok"}');
+  it('throws a descriptive error on API failure', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({
+        error: { message: 'Rate limit exceeded' }
+      })
     });
 
-    it('throws a descriptive error on API failure', async () => {
-        mockCreate.mockRejectedValueOnce(new Error('Rate limit exceeded'));
+    await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
+      .rejects
+      .toThrow('Rate limit exceeded');
+  });
 
-        await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
-            .rejects
-            .toThrow('Rate limit exceeded');
+  it('throws an error if GROQ_API_KEY is not set', async () => {
+    delete process.env.GROQ_API_KEY;
+
+    await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
+      .rejects
+      .toThrow('GROQ_API_KEY is not configured');
+  });
+
+  it('throws an error if the response content is empty', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: '' } }],
+        usage: { prompt_tokens: 10, completion_tokens: 0, total_tokens: 10 }
+      })
     });
 
-    it('throws an error if GROQ_API_KEY is not set', async () => {
-        delete process.env.GROQ_API_KEY;
-
-        await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
-            .rejects
-            .toThrow('GROQ_API_KEY not configured');
-    });
-
-    it('throws an error if the response content is empty', async () => {
-        mockCreate.mockResolvedValueOnce({
-            choices: [{ message: { content: '' } }]
-        });
-
-        await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
-            .rejects
-            .toThrow('Empty response from Groq');
-    });
+    await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
+      .rejects
+      .toThrow('Empty response from Groq');
+  });
 });

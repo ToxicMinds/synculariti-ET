@@ -63,8 +63,13 @@ export async function callGroq(
 
     const data = await response.json();
     
+    const content = data.choices?.[0]?.message?.content;
+    if (content === undefined || content === null || content === '') {
+      throw new Error('Empty response from Groq');
+    }
+    
     const result: GroqResult = {
-      content: data.choices?.[0]?.message?.content || '',
+      content,
       usage: {
         prompt_tokens: data.usage?.prompt_tokens || 0,
         completion_tokens: data.usage?.completion_tokens || 0,

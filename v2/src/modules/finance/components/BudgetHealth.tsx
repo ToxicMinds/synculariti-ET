@@ -2,14 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import { BentoCard } from '@/components/BentoCard';
+import { calcTimeBoundForecast, Transaction } from '../lib/finance';
 
-export function BudgetHealth({ spent, totalBudget, colSpan = 4 }: { spent: number, totalBudget: number, colSpan?: number }) {
-  const [forecast, setForecast] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+interface BudgetHealthProps {
+  spent: number;
+  totalBudget: number;
+  transactions?: Transaction[];
+  colSpan?: number;
+}
 
+export function BudgetHealth({ spent, totalBudget, transactions = [], colSpan = 4 }: BudgetHealthProps) {
+  const [aiForecast, setAiForecast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Compute real-time time-bound projection
+  const forecastMetrics = calcTimeBoundForecast(transactions, totalBudget);
+  const { dailySpendRate, projectedSpend, status } = forecastMetrics;
+
+  const remaining = totalBudget - spent;
+  const isOver = remaining < 0;
+
+  // Sync with AI forecast service ONLY when budget is configured
   useEffect(() => {
+    if (totalBudget <= 0) {
+      setAiForecast(null);
+      return;
+    }
     fetchForecast();
-  }, [spent, totalBudget]);
+  }, [spent, totalBudget, transactions]);
 
   async function fetchForecast() {
     setLoading(true);
@@ -20,6 +40,7 @@ export function BudgetHealth({ spent, totalBudget, colSpan = 4 }: { spent: numbe
 
       const response = await fetch('/api/ai/forecast', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           spent,
           budget: totalBudget,
@@ -27,34 +48,119 @@ export function BudgetHealth({ spent, totalBudget, colSpan = 4 }: { spent: numbe
           daysInMonth
         })
       });
+      
       const data = await response.json();
-      setForecast(data.aiForecast);
+      setAiForecast(data.aiForecast);
     } catch (e) {
-      setForecast("Calculation pending...");
+      setAiForecast("AI projection temporarily unavailable.");
     } finally {
       setLoading(false);
     }
   }
 
-  const remaining = totalBudget - spent;
-  const isOver = remaining < 0;
+  // Design tokens based on forecast status
+  let badgeColor = 'var(--text-muted)';
+  let badgeLabel = 'Budget Not Configured';
+  
+  if (status === 'IN_DANGER') {
+    badgeColor = 'var(--accent-danger)';
+    badgeLabel = 'In Danger';
+  } else if (status === 'WARNING') {
+    badgeColor = 'var(--accent-warn)';
+    badgeLabel = 'Warning';
+  } else if (status === 'STABLE') {
+    badgeColor = 'var(--accent-success)';
+    badgeLabel = 'Stable';
+  } else if (status === 'EXCELLENT') {
+    badgeColor = '#34d399';
+    badgeLabel = 'Excellent';
+  }
 
   return (
     <BentoCard title="Budget Health" colSpan={colSpan}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ fontSize: 32, fontWeight: 600, color: isOver ? 'var(--accent-danger)' : 'var(--text-primary)' }}>
-          €{remaining.toFixed(2)}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '12px' }}>
+        
+        {/* Real-time remaining balance & status badge */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <div>
+            <div style={{ 
+              fontSize: 32, 
+              fontWeight: 600, 
+              color: isOver ? 'var(--accent-danger)' : 'var(--text-primary)',
+              letterSpacing: '-0.02em'
+            }}>
+              €{remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4, margin: 0 }}>
+              {isOver ? 'Over target budget' : 'Remaining budget limit'}
+            </p>
+          </div>
+          
+          <span style={{ 
+            fontSize: '10px', 
+            fontWeight: 700, 
+            padding: '4px 10px', 
+            borderRadius: '12px', 
+            background: 'var(--bg-secondary)', 
+            color: badgeColor,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em'
+          }}>
+            {badgeLabel}
+          </span>
         </div>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
-          {isOver ? 'Over budget' : 'Remaining this month'}
-        </p>
 
-        <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>
+        {/* Real-time velocity analytics */}
+        <div style={{ 
+          background: 'var(--bg-secondary)', 
+          padding: '12px', 
+          borderRadius: '12px', 
+          fontSize: '13px', 
+          marginTop: '8px',
+          border: '1px solid var(--border-color)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Daily velocity:</span>
+            <span style={{ fontWeight: 600 }}>€{dailySpendRate.toFixed(2)}/day</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Projected end of month:</span>
+            <span style={{ fontWeight: 600, color: status === 'IN_DANGER' ? 'var(--accent-danger)' : 'var(--text-primary)' }}>
+              €{projectedSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+
+        {/* 🤖 AI Forecast section */}
+        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--border-color)' }}>
+          <p style={{ 
+            fontSize: 11, 
+            fontWeight: 700, 
+            color: 'var(--text-muted)', 
+            textTransform: 'uppercase', 
+            marginBottom: 8, 
+            letterSpacing: '0.05em' 
+          }}>
             🤖 AI Forecast
           </p>
-          <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-            {loading ? 'Analyzing burn rate...' : forecast}
+          <p style={{ 
+            fontSize: 13, 
+            color: 'var(--text-secondary)', 
+            lineHeight: 1.4,
+            margin: 0
+          }}>
+            {totalBudget <= 0 ? (
+              <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                Please set a target monthly budget in Settings to activate spatial AI forecasting.
+              </span>
+            ) : loading ? (
+              <span style={{ color: 'var(--text-muted)' }}>Analyzing daily spend patterns...</span>
+            ) : (
+              aiForecast
+            )}
           </p>
         </div>
       </div>

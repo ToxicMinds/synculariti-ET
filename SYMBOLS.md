@@ -36,6 +36,9 @@
 - `interface UseStatementScannerReturn`: Contract for the useStatementScanner hook state and actions.
 - `interface ParsedTransaction`: Structured representation of a transaction extracted from a statement.
 - `interface ReconciliationResult`: Result of comparing extracted statement rows against a declared total.
+- `interface UserIdentityMap`: Polymorphic mapping context for unpadded staff IDs and padded database UUIDs.
+- `interface OperatingMarginMetrics`: Professional B2B operating margin tracking payload.
+- `interface TimeBoundForecast`: Struct containing daily spend velocities, EOM projections, variance, and warning levels.
 - `interface ReceiptData`: Canonical payload for scanned receipt data (in useTransactionSync). Extended by useScannerState with a `source` field.
 - `interface ReceiptItem`: Canonical line item for a receipt (in useTransactionSync). Optional category during scan, required at save time.
 - `function calcBudgetStatus()`: Calculates budget vs. actual spend variance.
@@ -43,10 +46,13 @@
 - `function calcForecast()`: Predicts end-of-month spend based on current burn rate.
 - `function calcMonthDelta()`: Calculates the financial difference between current and previous months.
 - `function calcNetSavings()`: Computes total net savings (income minus expenses).
+- `function calcOperatingMargin()`: Calculates a mathematically sound B2B Operating Margin against benchmarks.
 - `function calcPerUserSpend()`: Computes spending distribution across team members.
+- `function calcTimeBoundForecast()`: Calculates a time-aware velocity projection forecast with zero budget safety constraints.
 - `function calcTotals()`: Calculates absolute aggregate transaction totals.
 - `function isAdjustment()`: Utility to flag balance-adjustment transactions.
 - `function isSavings()`: Utility to flag savings-related transactions.
+- `function normalizeUserId()`: Normalizes user IDs, casting light mock IDs (like 'u2') to mock UUIDs.
 - `interface Transaction`: Core ledger entity representing a financial event.
 - `type Expense`: Legacy alias for Transaction (deprecated in V2).
 

@@ -1,3 +1,5 @@
+import { OperatingMarginMetrics, TimeBoundForecast } from '../../../lib/types';
+
 export interface Transaction {
   id?: string;
   tenant_id?: string;
@@ -19,6 +21,7 @@ export interface Transaction {
 
 // Alias for backward compatibility
 export type Expense = Transaction;
+
 
 /**
  * Hybrid Category Resolver
@@ -80,11 +83,17 @@ export function calcForecast(transactions: Transaction[], totalBudget: number, n
 export function calcPerUserSpend(transactions: Transaction[], userNames: Record<string, number | string>) {
   const result: Record<string, number> = {};
   
-  // 1. Create Reverse Lookup Map (O(M)) to avoid nested loop in attribution
+  // 1. Create Reverse Lookup Map (O(M)) and Polymorphic UUID Lookup Map (O(M)) to avoid nested loop in attribution
   const nameToId: Record<string, string> = {};
+  const uuidToId: Record<string, string> = {};
+  
   Object.keys(userNames).forEach(id => {
     result[id] = 0;
     nameToId[String(userNames[id])] = id;
+    
+    // Map normalized UUID of this config id to the config id itself (e.g. '0000...0001' -> 'u1')
+    const normId = normalizeUserId(id);
+    uuidToId[normId] = id;
   });
 
   // 2. Attribution Pass (O(N))
@@ -93,11 +102,12 @@ export function calcPerUserSpend(transactions: Transaction[], userNames: Record<
 
     let targetUserId: string | undefined;
 
-    // Primary: Use who_id
+    // Primary: Use who_id (polymorphic uuid mapping)
     if (exp.who_id) {
-      targetUserId = exp.who_id;
+      const normWhoId = normalizeUserId(exp.who_id);
+      targetUserId = uuidToId[normWhoId] || exp.who_id;
     } 
-    // Fallback: O(1) lookup in our reverse map
+    // Fallback: O(1) lookup in our reverse name map
     else if (exp.who) {
       targetUserId = nameToId[exp.who];
     }
@@ -169,3 +179,109 @@ export function calcCategoryTotals(transactions: Transaction[]) {
     return acc;
   }, {} as Record<string, number>);
 }
+
+/**
+ * Normalizes user IDs, casting light mock IDs (like 'u2') to mock UUIDs.
+ * Ensures polymorphic matching between config keys and database UUIDs.
+ */
+export function normalizeUserId(id: string): string {
+  if (!id) {
+    return '00000000-0000-0000-0000-000000000000';
+  }
+
+  // 1. Standard UUID format matches pass through directly
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(id)) {
+    return id.toLowerCase();
+  }
+
+  // 2. Light Mock ID match (^u[0-9]+)
+  const mockMatch = /^u([0-9]+)$/.exec(id);
+  if (mockMatch) {
+    const digits = mockMatch[1];
+    if (digits.length > 12) {
+      return '00000000-0000-0000-0000-000000000000'; // Overflow guard
+    }
+    // Pad to 12 hex characters
+    const padded = digits.padStart(12, '0');
+    return `00000000-0000-0000-0000-${padded}`;
+  }
+
+  // Default fallback
+  return '00000000-0000-0000-0000-000000000000';
+}
+
+/**
+ * Calculates a mathematically sound B2B Operating Margin against benchmarks.
+ */
+export function calcOperatingMargin(income: number, spent: number, benchmark: number = 15): OperatingMarginMetrics {
+  const retainedEarnings = income - spent;
+  const marginPercentage = income > 0 ? (retainedEarnings / income) * 100 : 0;
+  const isTargetMet = marginPercentage >= benchmark;
+
+  return {
+    income,
+    spent,
+    retainedEarnings,
+    marginPercentage,
+    targetBenchmark: benchmark,
+    isTargetMet
+  };
+}
+
+/**
+ * Calculates a time-aware velocity projection forecast with zero budget safety constraints.
+ */
+export function calcTimeBoundForecast(
+  transactions: Transaction[],
+  totalBudget: number,
+  now: Date = new Date()
+): TimeBoundForecast {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const currentDay = Math.max(1, now.getDate());
+  const daysLeft = daysInMonth - currentDay;
+
+  const spent = transactions
+    .filter((e) => !isSavings(e) && !isAdjustment(e))
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  const recurringPaid = transactions
+    .filter((e) => e.recurring_id)
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+  const variableSpent = Math.max(0, spent - recurringPaid);
+  const dailySpendRate = currentDay > 0 ? variableSpent / currentDay : 0;
+  const projectedSpend = spent + (dailySpendRate * daysLeft);
+  const variance = projectedSpend - totalBudget;
+
+  if (totalBudget <= 0) {
+    return {
+      dailySpendRate,
+      projectedSpend,
+      variance: 0,
+      status: 'PENDING_CONFIGURATION'
+    };
+  }
+
+  let status: 'EXCELLENT' | 'STABLE' | 'WARNING' | 'IN_DANGER' | 'PENDING_CONFIGURATION';
+  if (projectedSpend > totalBudget) {
+    status = 'IN_DANGER';
+  } else if (projectedSpend > totalBudget * 0.8) {
+    status = 'WARNING';
+  } else if (projectedSpend > totalBudget * 0.5) {
+    status = 'STABLE';
+  } else {
+    status = 'EXCELLENT';
+  }
+
+  return {
+    dailySpendRate,
+    projectedSpend,
+    variance,
+    status
+  };
+}
+
+
