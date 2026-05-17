@@ -1,4 +1,5 @@
 import { ServerLogger } from './logger-server';
+import { GROQ_ERRORS } from './types';
 
 export interface GroqMessage {
   role: 'system' | 'user' | 'assistant';
@@ -34,7 +35,7 @@ export async function callGroq(
 ): Promise<GroqResult> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error('GROQ_API_KEY is not configured in environment');
+    throw new Error(GROQ_ERRORS.MISSING_API_KEY);
   }
 
   // Future-proofing: Here we would check the cacheKey against Redis/In-memory
@@ -65,7 +66,7 @@ export async function callGroq(
     
     const content = data.choices?.[0]?.message?.content;
     if (content === undefined || content === null || content === '') {
-      throw new Error('Empty response from Groq');
+      throw new Error(GROQ_ERRORS.EMPTY_RESPONSE);
     }
     
     const result: GroqResult = {

@@ -80,6 +80,8 @@
 - `function parseEkasaError()`: Maps raw eKasa API errors to human-readable strings.
 - `interface OkpData`: Structured payload for the OKP fallback protocol.
 - `type ExtractionResult`: Union type for the result of an eKasa parsing attempt.
+- `const GROQ_ERRORS`: Strict error messages contract for callGroq and its unit tests.
+- `type GroqErrorType`: Type helper for standard Groq errors.
 
 ## Shared Utilities & Core Platform
 - `function apiError()`: Standardized API error response handler with retry-logic and telemetry.
@@ -106,6 +108,9 @@
 - `function applySmartRules()`: Engine for auto-categorization based on historical rules.
 - `interface SmartRule`: Pattern-matching rule for automatic merchant categorization.
 - `const supabase`: Shared Supabase client instance.
+- `interface FunctionSecurityState`: Direct representation of live Postgres security catalog checks.
+- `const RPC_GET_SECURITY_STATE`: RPC name for Postgres catalog check function.
+- `RPC Function: public.get_function_security_state()`: Secure catalog inspector that queries pg_proc to verify search_path and EXECUTE privileges.
 - `function TenantDataProvider()`: Read-side context provider for tenant data.
 - `function useTenantData()`: Hook for consuming shared tenant state.
 - `function TenantMutationProvider()`: Write-side context provider for state mutations.

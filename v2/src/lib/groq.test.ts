@@ -1,4 +1,5 @@
 import { callGroq, GroqMessage } from './groq';
+import { GROQ_ERRORS } from './types';
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -92,9 +93,14 @@ describe('callGroq (Phase 2: Contract Revision)', () => {
   it('throws an error if GROQ_API_KEY is not set', async () => {
     delete process.env.GROQ_API_KEY;
 
-    await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
-      .rejects
-      .toThrow('GROQ_API_KEY is not configured');
+    let error: Error | null = null;
+    try {
+      await callGroq('llama-3.3-70b-versatile', mockMessages);
+    } catch (e) {
+      error = e as Error;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.message).toBe(GROQ_ERRORS.MISSING_API_KEY);
   });
 
   it('throws an error if the response content is empty', async () => {
@@ -106,8 +112,13 @@ describe('callGroq (Phase 2: Contract Revision)', () => {
       })
     });
 
-    await expect(callGroq('llama-3.3-70b-versatile', mockMessages))
-      .rejects
-      .toThrow('Empty response from Groq');
+    let error: Error | null = null;
+    try {
+      await callGroq('llama-3.3-70b-versatile', mockMessages);
+    } catch (e) {
+      error = e as Error;
+    }
+    expect(error).not.toBeNull();
+    expect(error?.message).toBe(GROQ_ERRORS.EMPTY_RESPONSE);
   });
 });

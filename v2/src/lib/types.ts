@@ -102,3 +102,41 @@ export interface TimeBoundForecast {
   status: 'EXCELLENT' | 'STABLE' | 'WARNING' | 'IN_DANGER' | 'PENDING_CONFIGURATION';
 }
 
+/**
+ * ==========================================
+ * Sprint 1: Test Integrity Initiative Contracts
+ * ==========================================
+ */
+
+/**
+ * Strict, read-only contract for all canonical Groq API error messages.
+ * Prevents magic-string drift between implementation and unit tests.
+ */
+export const GROQ_ERRORS = {
+  /** Error thrown when GROQ_API_KEY is not defined in the environment */
+  MISSING_API_KEY: 'GROQ_API_KEY is not configured in environment',
+  /** Error thrown when Groq returns an empty or invalid completion payload */
+  EMPTY_RESPONSE: 'Empty response from Groq'
+} as const;
+
+export type GroqErrorType = typeof GROQ_ERRORS[keyof typeof GROQ_ERRORS];
+
+/**
+ * Database security metadata parsed directly from Postgres system catalogs.
+ * Used by live verification contracts in db-security.test.ts.
+ */
+export interface FunctionSecurityState {
+  /** Does the target function exist with the exact matching signature? */
+  exists: boolean;
+  /** Is search_path strictly set to 'public' inside the function definition? */
+  hasSearchPathPublic: boolean;
+  /** Has execution permission been revoked from anonymous ('anon') and default public ('public') roles? */
+  isRevokedFromPublic: boolean;
+}
+
+/**
+ * Canonical RPC name to query PostgreSQL catalog function security state.
+ */
+export const RPC_GET_SECURITY_STATE = 'get_function_security_state' as const;
+
+

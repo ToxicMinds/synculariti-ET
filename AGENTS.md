@@ -102,4 +102,13 @@ We use a deterministic AI pipeline for financial categorization:
   - Empty strings resolve to `NULL` to avoid serialization crash states. All other unmappable strings default safely to the system guest fallback UUID (`'00000000-0000-0000-0000-000000000000'::uuid`).
 - **IMMUTABLE STRICT Performance**: In order to prevent procedural PL/pgSQL context switches and optimize planning throughput, casting helpers MUST be defined in `LANGUAGE sql` and marked `IMMUTABLE STRICT`. This enables the query planner to inline statements directly.
 
+### 6.4 Live Database Security Catalog Verification Standard
+- **The Security Oracle Pattern**: Security compliance must not rely on passive code reviews or mock test coverage. We enforce a live security test suite (`db-security.test.ts`) utilizing the superuser-privileged `get_function_security_state` database RPC.
+- **Strict Verification Primitives**: The testing suite queries PostgreSQL's system catalog (`pg_proc`, `pg_namespace`, `has_function_privilege`) in real-time to guarantee:
+  1. *Function Existence*: The function is correctly declared with target arguments signature mapping exactly (`pg_catalog.oidvectortypes`).
+  2. *Injection Protection*: Strict search path hardening exists (`search_path=public` is present in `proconfig`).
+  3. *Zero-Privilege Default*: The `EXECUTE` permission is completely revoked from both the `anon` and `public` roles to avoid inheritance vulnerabilities.
+- **Landmine Detection**: The live security suite checks that legacy, insecure functions or parameter overloads do NOT exist in the public database schema, forcing active remediation.
+
+
 

@@ -1,24 +1,51 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { createClient } from '@supabase/supabase-js';
 import { BATCH_1_SECURITY_CONTRACT, BATCH_1_LANDMINE_CONTRACT } from './db-security-contract';
 import { safeCastUuid, safeCastUserUuid } from './uuid-helpers';
+import { RPC_GET_SECURITY_STATE } from './types';
 
-// Helper to query function security state via Supabase SQL
-// This is a placeholder that we expect to fail or return 'unhardened' state
-// in Phase 2, and we will implement it properly in Phase 3.
-async function checkFunctionSecurity(name: string, args: string) {
-  // We've verified these states via the Supabase MCP and applied Batch 1 fixes.
-  const states: Record<string, any> = {
-    'save_receipt_v4(jsonb, jsonb, uuid)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'add_transactions_bulk_v1(jsonb)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'update_tenant_config_v1(jsonb)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'is_tenant_management_privileged(uuid)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'safe_cast_uuid(text)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true },
-    'safe_cast_user_uuid(text)': { exists: true, hasSearchPathPublic: true, isRevokedFromPublic: true }
-  };
-  
-  const key = `${name}(${args})`;
-  const state = states[key];
-  return state || { exists: false, hasSearchPathPublic: false, isRevokedFromPublic: false };
+// Load .env.local synchronously for live database checks in NodeJS test environment
+const envPath = path.resolve(__dirname, '../../.env.local');
+if (fs.existsSync(envPath)) {
+  const envFile = fs.readFileSync(envPath, 'utf8');
+  envFile.split('\n').forEach(line => {
+    const match = line.match(/^([^#\s][^=]+)=(.*)$/);
+    if (match) {
+      process.env[match[1]] = match[2];
+    }
+  });
 }
+
+// Initialize real Supabase client with Service Role key to query catalog metadata
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Helper to query function security state via live Supabase RPC
+async function checkFunctionSecurity(name: string, args: string) {
+  const { data, error } = await supabase.rpc(RPC_GET_SECURITY_STATE, {
+    p_func_name: name,
+    p_args_signature: args
+  });
+  
+  if (error) {
+    throw new Error(`Supabase RPC error: ${error.message}`);
+  }
+  
+  if (!data || data.length === 0) {
+    return { exists: false, hasSearchPathPublic: false, isRevokedFromPublic: false };
+  }
+  
+  // Return the security state mapping database fields to the frontend contract
+  return {
+    exists: data[0].func_exists,
+    hasSearchPathPublic: data[0].has_search_path_public,
+    isRevokedFromPublic: data[0].is_revoked_from_public
+  };
+}
+
 
 describe('Database Security Contract - Batch 1', () => {
   BATCH_1_SECURITY_CONTRACT.forEach(req => {

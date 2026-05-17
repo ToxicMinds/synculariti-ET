@@ -26,7 +26,8 @@
 - **DB Function Hardening**: Every `SECURITY DEFINER` function MUST:
     1. Include `SET search_path = public`.
     2. Include `REVOKE EXECUTE ON FUNCTION ... FROM anon`.
-- **Security Verification**: Critical RPCs must be registered in `v2/src/lib/db-security-contract.ts` for automated contract testing.
+- **Security Verification**: Critical RPCs must be registered in `v2/src/lib/db-security-contract.ts` for automated catalog contract testing.
+- **Automated Catalog Contracts**: We validate database state in real-time with a live integration test suite (`db-security.test.ts`) that queries the PostgreSQL catalog using the `get_function_security_state` oracle RPC. This ensures every critical function strictly enforces injection protection (`search_path=public`) and completely revokes execution privileges from `public` and `anon` roles.
 - **Migration Protocol**: Add new numbered files to `sql/b2b_evolution/`. Never alter applied migrations.
 
 ## 4. AI & Groq Strategy
