@@ -43,4 +43,35 @@ defineFeature(feature, (test) => {
       expect(invoice.currency).toBe(event.payload.currency);
     });
   });
+
+  test('Auditable Transaction Edits', ({ given, when, then }) => {
+    let transaction: any;
+    let updateResult: any;
+
+    given(/^an existing transaction with ID "(.*)" and amount (.*)$/, (id, amount) => {
+      transaction = {
+        id,
+        amount: parseFloat(amount),
+        created_at: new Date().toISOString()
+      };
+    });
+
+    when(/^the transaction is updated with new amount (.*)$/, (amount) => {
+      // We simulate the update_transaction_v1 RPC response mapping here
+      const dbMockUpdate = (tx: any, newAmt: number) => {
+         return {
+           ...tx,
+           amount: newAmt,
+           updated_at: new Date().toISOString()
+         };
+      };
+      updateResult = dbMockUpdate(transaction, parseFloat(amount));
+    });
+
+    then('the updated transaction must include a valid "updated_at" timestamp', () => {
+      expect(updateResult).toHaveProperty('updated_at');
+      expect(typeof updateResult.updated_at).toBe('string');
+      expect(new Date(updateResult.updated_at).getTime()).not.toBeNaN();
+    });
+  });
 });

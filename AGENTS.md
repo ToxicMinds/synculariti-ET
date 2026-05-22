@@ -51,6 +51,7 @@ This document is the definitive guide for AI assistants and developers. It conso
 
 ### 4.2 Security & API Governance
 - **No Direct DML**: DB explicitly denies `INSERT/UPDATE/DELETE` to `authenticated` clients. Use canonical RPCs (e.g., `save_receipt_v4`).
+- **Data Integrity Contracts**: All ledger mutations MUST maintain strict compliance with schema contracts, including propagating `updated_at` timestamps to prevent `42703 undefined_column` crashes.
 - **Session-Based tenant_id**: `tenant_id` is resolved server-side from session via RLS — never passed as a param.
 - **search_path Safety**: All DB functions must include `SET search_path = public`.
 - **Auth Guard**: All sensitive API routes MUST be wrapped with `withAuth` middleware and use the `SecureContext` pattern for type-safe App Router compliance.

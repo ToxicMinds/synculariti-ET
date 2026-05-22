@@ -17,6 +17,8 @@ export interface Transaction {
   currency?: string;
   location_id?: string;
   invoice_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Alias for backward compatibility

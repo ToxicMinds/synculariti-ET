@@ -14,6 +14,7 @@
 ## 2. Coding Standards
 - **TypeScript Only**: No `.js` files. **Zero** `: any` usages allowed. Use explicit return types for all functions.
 - **No Direct DML**: Never use `supabase.from('transactions').insert(...)`. Use the canonical RPC `save_receipt_v4`.
+- **Data Integrity Contracts**: All ledger mutations MUST maintain strict compliance with schema contracts, including propagating `updated_at` timestamps to prevent `42703 undefined_column` crashes.
 - **Logger, not console**: NEVER use `console.log`, `console.warn`, or `console.error` in production code. Use `Logger.system()` for technical events and `Logger.user()` for business events. Use centralized `LogComponent` types.
 - **User Activity**: EVERY mutation MUST call `Logger.user(tenantId, action, description, actorName)`.
 - **API Route Standards**: Every API route handler must follow the `SecureHandler` signature and use `SecureContext`.

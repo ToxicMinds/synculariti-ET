@@ -53,7 +53,7 @@
 - `function isAdjustment()`: Utility to flag balance-adjustment transactions.
 - `function isSavings()`: Utility to flag savings-related transactions.
 - `function normalizeUserId()`: Normalizes user IDs, casting light mock IDs (like 'u2') to mock UUIDs.
-- `interface Transaction`: Core ledger entity representing a financial event.
+- `interface Transaction`: Core ledger entity representing a financial event. Includes strict `created_at` and `updated_at` audit trails.
 - `type Expense`: Legacy alias for Transaction (deprecated in V2).
 
 ## Logistics & Inventory
