@@ -111,5 +111,10 @@ We use a deterministic AI pipeline for financial categorization:
   3. *Zero-Privilege Default*: The `EXECUTE` permission is completely revoked from both the `anon` and `public` roles to avoid inheritance vulnerabilities.
 - **Landmine Detection**: The live security suite checks that legacy, insecure functions or parameter overloads do NOT exist in the public database schema, forcing active remediation.
 
+### 6.5 WhatsApp Sidecar & Gateway Architecture
+- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
+- **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
+- **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
+
 
 

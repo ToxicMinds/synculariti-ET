@@ -7,5 +7,9 @@
     "build": "npm run build --prefix v2",
     "start": "npm run start --prefix v2",
     "test": "npm test --prefix v2"
-  }
+  },
+  "workspaces": [
+    "v2",
+    "packages/*"
+  ]
 }

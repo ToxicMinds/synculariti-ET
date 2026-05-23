@@ -59,4 +59,9 @@
 - **Language and Performance**: Casting helper functions must be written in `LANGUAGE sql` and marked `IMMUTABLE STRICT` to allow the Postgres query optimizer to inline statements directly, eliminating PL/pgSQL procedural overhead.
 - **TypeScript Parity**: Match database-level casting behaviors with `safeCastUuid` and `safeCastUserUuid` in `v2/src/lib/uuid-helpers.ts` for clean unit testing and client-side formatting.
 
+## 8. WhatsApp Sidecar & Gateway Architecture
+- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
+- **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
+- **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
+
 

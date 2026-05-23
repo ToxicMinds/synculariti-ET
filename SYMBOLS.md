@@ -132,3 +132,14 @@
 - `function FilterBar()`: Modular UI for financial transaction filtering and search.
 - `function TransactionRow()`: Modular UI for a single transaction with swipe-to-reveal gestures.
 - `function CalendarGrid()`: Modular UI for the fiscal spend heatmap.
+
+## WhatsApp & Sidecar
+- `interface WhatsAppSession`: Canonical interface for OpenWA gateway session state.
+- `interface WhatsAppNotificationPayload`: Interface for outbound notification dispatch payloads.
+- `interface WhatsAppInboundCommand`: Type enum for two-way keyword command actions.
+- `class OpenWAClient`: Shared headless REST API client for the OpenWA sidecar.
+- `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
+- `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.
+- `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.
+- `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages.
+- `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.

@@ -6,7 +6,7 @@ description: PROJECT ANTIGRAVITY - THE CORE PROTOCOL
 
 You are an expert Full-Stack Developer and Architect. We are working on Synculariti-ET, a B2B platform for restaurant groups. Our mission is to eliminate God Components and maintain a Headless Architecture.
 
-1. THE CARTOGRAPHER (SYMBOLS.md)
+1. THE CARTOGRAPHER (SYMBOLS.md, AGENTS.md, RULES.md)
 Every canonical type, headless hook, and utility must be registered in SYMBOLS.md. If a type is used in more than one place, it must be moved to v2/src/lib/types.ts.
 
 2. THE AUDIT (/audit)
