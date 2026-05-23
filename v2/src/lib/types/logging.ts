@@ -20,6 +20,7 @@ export type LogComponent =
   | 'Export'
   | 'Debug'
   | 'Usage'
-  | 'Camera';
+  | 'Camera'
+  | 'WhatsApp';
 
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'PERF';

@@ -22,7 +22,7 @@ export class OpenWAClient {
         })
       });
       return response.ok;
-    } catch (e) {
+    } catch (e: unknown) {
       return false;
     }
   }

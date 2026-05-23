@@ -41,3 +41,29 @@ export interface OpenWAClientConfig {
   sessionId: string;
   timeoutMs?: number;
 }
+
+export interface WhatsAppNotificationResult {
+  success: boolean;
+  jobId?: string;
+  error?: string;
+}
+
+export interface UseWhatsAppNotifierState {
+  isSending: boolean;
+  lastResult: WhatsAppNotificationResult | null;
+  error: string | null;
+  actions: {
+    send: (payload: WhatsAppNotificationPayload) => Promise<WhatsAppNotificationResult>;
+  };
+}
+
+export interface UseWhatsAppSessionState {
+  session: WhatsAppSession | null;
+  qrCode: WhatsAppQRCode | null;
+  isLoading: boolean;
+  error: string | null;
+  actions: {
+    refresh: () => Promise<void>;
+    logout: () => Promise<void>;
+  };
+}

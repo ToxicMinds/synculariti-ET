@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   WhatsAppSession,
   WhatsAppQRCode,
-  UseWhatsAppSessionState
+  UseWhatsAppSessionState,
+  getErrorMessage
 } from '@synculariti/whatsapp-client';
 
 export function useWhatsAppSession(): UseWhatsAppSessionState {
@@ -20,8 +21,8 @@ export function useWhatsAppSession(): UseWhatsAppSessionState {
       const data = await res.json();
       setSession(data.session);
       setQrCode(data.qrCode || null);
-    } catch (e: any) {
-      setError(e.message || 'Unknown error');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setIsLoading(false);
     }
@@ -31,8 +32,8 @@ export function useWhatsAppSession(): UseWhatsAppSessionState {
     try {
       await fetch('/api/whatsapp/session', { method: 'DELETE' });
       await refresh();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     }
   };
 

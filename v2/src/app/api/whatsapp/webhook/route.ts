@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
-import { verifyWebhookSignature } from '@synculariti/whatsapp-client/src/hmac'; // Direct import due to tsconfig exports setup in monorepo
+import { verifyWebhookSignature, getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
 
 export async function POST(req: Request) {
@@ -24,8 +24,9 @@ export async function POST(req: Request) {
     // TODO (Phase 5/Execution): Write to whatsapp_inbox table.
     
     return NextResponse.json({ success: true }, { status: 200 });
-  } catch (e: any) {
-    await ServerLogger.system('ERROR', 'WhatsApp', `Webhook processing error`, { error: e.message });
+  } catch (e: unknown) {
+    const errMsg = getErrorMessage(e);
+    await ServerLogger.system('ERROR', 'WhatsApp', `Webhook processing error`, { error: errMsg });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

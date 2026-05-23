@@ -1,10 +1,10 @@
 import { WhatsAppNotificationEvent, WhatsAppInboundCommand } from './types';
 
-export const Templates: Record<WhatsAppNotificationEvent, (data: any) => string> = {
-  PROCUREMENT_RECEIVED: (data) => `📦 PO Received: ${data.poNumber}\nSupplier: ${data.supplier}`,
-  INVOICE_APPROVED: (data) => `✅ Invoice Approved: ${data.invoiceId}`,
-  RECEIPT_SCANNED: (data) => `🧾 Receipt Scanned: ${data.totalAmount}`,
-  LOW_STOCK_ALERT: (data) => `⚠️ Low Stock: ${data.itemName}`,
+export const Templates: Record<WhatsAppNotificationEvent, (data: Record<string, string | number>) => string> = {
+  PROCUREMENT_RECEIVED: (data) => `📦 PO Received: ${String(data['poNumber'] || '')}\nSupplier: ${String(data['supplier'] || '')}`,
+  INVOICE_APPROVED: (data) => `✅ Invoice Approved: ${String(data['invoiceId'] || '')}`,
+  RECEIPT_SCANNED: (data) => `🧾 Receipt Scanned: ${String(data['totalAmount'] || '')}`,
+  LOW_STOCK_ALERT: (data) => `⚠️ Low Stock: ${String(data['itemName'] || '')}`,
 };
 
 export function parseInboundCommand(body: string): WhatsAppInboundCommand {

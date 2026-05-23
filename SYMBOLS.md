@@ -138,6 +138,7 @@
 - `interface WhatsAppNotificationPayload`: Interface for outbound notification dispatch payloads.
 - `interface WhatsAppInboundCommand`: Type enum for two-way keyword command actions.
 - `class OpenWAClient`: Shared headless REST API client for the OpenWA sidecar.
+- `function getErrorMessage()`: Type-safe utility to parse and format unknown caught errors safely without using `any`.
 - `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
 - `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.
 - `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.

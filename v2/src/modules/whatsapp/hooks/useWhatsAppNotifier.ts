@@ -2,7 +2,8 @@ import { useState } from 'react';
 import {
   WhatsAppNotificationPayload,
   WhatsAppNotificationResult,
-  UseWhatsAppNotifierState
+  UseWhatsAppNotifierState,
+  getErrorMessage
 } from '@synculariti/whatsapp-client';
 
 export function useWhatsAppNotifier(): UseWhatsAppNotifierState {
@@ -30,8 +31,8 @@ export function useWhatsAppNotifier(): UseWhatsAppNotifierState {
       
       setLastResult(result);
       return result;
-    } catch (e: any) {
-      const err = e.message || 'Unknown error';
+    } catch (e: unknown) {
+      const err = getErrorMessage(e);
       setError(err);
       return { success: false, error: err };
     } finally {

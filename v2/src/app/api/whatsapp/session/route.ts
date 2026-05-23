@@ -2,7 +2,7 @@ export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
-import { OpenWAClient } from '@synculariti/whatsapp-client/src/client'; // Direct import
+import { OpenWAClient, getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
 
 export const GET = withAuth(async (req, context) => {
@@ -28,8 +28,9 @@ export const GET = withAuth(async (req, context) => {
       },
       qrCode: null 
     });
-  } catch (e: any) {
-    await ServerLogger.system('ERROR', 'WhatsApp', `Session check failed`, { error: e.message });
+  } catch (e: unknown) {
+    const errMsg = getErrorMessage(e);
+    await ServerLogger.system('ERROR', 'WhatsApp', `Session check failed`, { error: errMsg });
     return NextResponse.json({ error: 'Session check failed' }, { status: 500 });
   }
 });

@@ -115,6 +115,7 @@ We use a deterministic AI pipeline for financial categorization:
 - **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
 - **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
+- **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 
 
 

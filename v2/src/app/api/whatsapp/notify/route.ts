@@ -2,7 +2,7 @@ export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
-import { WhatsAppNotificationPayload } from '@synculariti/whatsapp-client';
+import { WhatsAppNotificationPayload, getErrorMessage } from '@synculariti/whatsapp-client';
 import { z } from 'zod';
 import { ServerLogger } from '@/lib/logger-server';
 
@@ -11,7 +11,7 @@ const payloadSchema = z.object({
   locationName: z.string(),
   event: z.enum(['PROCUREMENT_RECEIVED', 'INVOICE_APPROVED', 'RECEIPT_SCANNED', 'LOW_STOCK_ALERT']),
   recipientPhone: z.string(),
-  data: z.record(z.union([z.string(), z.number()]))
+  data: z.record(z.string(), z.union([z.string(), z.number()]))
 });
 
 export const POST = withAuth(async (req, context) => {
@@ -30,8 +30,9 @@ export const POST = withAuth(async (req, context) => {
     });
 
     return NextResponse.json({ success: true, jobId: mockJobId }, { status: 202 });
-  } catch (e: any) {
-    await ServerLogger.system('ERROR', 'WhatsApp', `Validation error`, { error: e.message });
+  } catch (e: unknown) {
+    const errMsg = getErrorMessage(e);
+    await ServerLogger.system('ERROR', 'WhatsApp', `Validation error`, { error: errMsg });
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
   }
 });

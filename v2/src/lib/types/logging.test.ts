@@ -12,7 +12,7 @@ describe('Logging Type Contract', () => {
       'API', 'Neo4j', 'Scanner', 'Auth', 'Security', 
       'Sync', 'AI', 'Finance', 'Logistics', 
       'eKasa', 'OfflineQueue', 'Utils', 'Banking', 'Export',
-      'Debug', 'Usage', 'Camera' // [NEW]
+      'Debug', 'Usage', 'Camera', 'WhatsApp' // [NEW]
     ];
     expect(components.length).toBeGreaterThan(12);
   });
