@@ -134,6 +134,8 @@
 - `function CalendarGrid()`: Modular UI for the fiscal spend heatmap.
 
 ## WhatsApp & Sidecar
+- `Table: public.api_keys`: Secure storage for third-party integration tokens mapped to tenants.
+- `Table: public.whatsapp_outbox`: Audit ledger (Who, What, When) for outbound messaging events.
 - `interface WhatsAppSession`: Canonical interface for OpenWA gateway session state.
 - `interface WhatsAppNotificationPayload`: Interface for outbound notification dispatch payloads.
 - `interface WhatsAppInboundCommand`: Type enum for two-way keyword command actions.
