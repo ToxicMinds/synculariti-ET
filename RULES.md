@@ -60,6 +60,7 @@
 - **TypeScript Parity**: Match database-level casting behaviors with `safeCastUuid` and `safeCastUserUuid` in `v2/src/lib/uuid-helpers.ts` for clean unit testing and client-side formatting.
 
 ## 8. WhatsApp Sidecar & Gateway Architecture
+- **Third-Party API Gateway**: External applications must NOT communicate directly with the sidecar. All external requests must route through the Next.js Shared Endpoint (`/api/whatsapp/notify`) using a Tenant API Key (`X-Api-Key` verified against `public.api_keys`).
 - **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
 - **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
