@@ -70,7 +70,7 @@ const handler: SecureHandler = async (req, context) => {
 
     // 3. Map into TransactionSyncPayload
     const payloadsToSync: TransactionSyncPayload[] = transactions.map(txRow => {
-      const vendorName = (txRow.who || txRow.description || 'Unknown Merchant').trim();
+      const vendorName = (txRow.description || txRow.who || 'Unknown Merchant').trim();
       const merchantId = `merchant-${vendorName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
       const currency = txRow.currency || 'EUR';
 
