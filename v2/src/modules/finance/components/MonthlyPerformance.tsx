@@ -14,8 +14,11 @@ export function MonthlyPerformance({
 }) {
   const [y, m] = selectedMonth.split('-');
   const currentPrefix = `${y}-${m}`;
-  const prevDate = new Date(parseInt(y), parseInt(m) - 2, 1);
-  const prevPrefix = prevDate.toISOString().slice(0, 7);
+  const year = parseInt(y);
+  const month = parseInt(m);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevPrefix = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
   const currentMonthTx = transactions.filter(t => t.date?.startsWith(currentPrefix) && t.category !== 'Savings' && t.category !== 'Adjustment');
   const prevMonthTx = transactions.filter(t => t.date?.startsWith(prevPrefix) && t.category !== 'Savings' && t.category !== 'Adjustment');

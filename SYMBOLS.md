@@ -157,5 +157,11 @@
 - `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks.
 - `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links.
 - `Component: ActionClient`: Client component implementing user selection buttons, loading states, and submitting decisions to the server action.
+- `interface POApprovalService`: Service contract for handling Purchase Order approval decisions from WhatsApp/web.
+- `class DefaultPOApprovalService`: Implementation of POApprovalService mapping Approve/Reject/Modify decisions to receive_purchase_order_v1 RPC and table mutations.
+- `interface FinanceAuditService`: Service contract for processing audit anomaly decisions (Approve Anyway, Request Re-upload, Reject Expense).
+- `class DefaultFinanceAuditService`: Implementation of FinanceAuditService performing transaction approval, re-upload state updates, or soft-deleting rejected transactions.
+- `interface POSDiscrepancyService`: Service contract for resolving POS cash discrepancy actions (Log as Shrinkage, Recount Required, Deduct from Register).
+- `class DefaultPOSDiscrepancyService`: Implementation of POSDiscrepancyService logging ledger adjustments via add_transaction_v3 RPC, or returning recount/deduction resolutions.
 
 

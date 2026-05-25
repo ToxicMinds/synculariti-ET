@@ -79,9 +79,8 @@ async function seed() {
 
   console.log(`Generating ${TOTAL_TRANSACTIONS} transactions over 6 months with polymorphic user mappings...`);
 
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const now = new Date();
+  const startDate = new Date('2026-03-01T00:00:00Z');
+  const endDate = new Date('2026-04-30T23:59:59Z');
 
   // Polymorphic mock user IDs for team allocation tracking
   const mockUserIds = [
@@ -95,7 +94,7 @@ async function seed() {
   for (let i = 1; i <= TOTAL_TRANSACTIONS; i++) {
     const vendor = VENDORS[Math.floor(Math.random() * VENDORS.length)];
     const txId = generateUUID();
-    const date = randomDate(sixMonthsAgo, now).toISOString().split('T')[0];
+    const date = randomDate(startDate, endDate).toISOString().split('T')[0];
     const assignedWhoId = mockUserIds[Math.floor(Math.random() * mockUserIds.length)];
     
     // Generate 1 to 5 random items
