@@ -55,6 +55,7 @@ export interface TransactionSyncPayload {
   tenantId: string;
   amount: number;
   date: string;
+  category?: string;
   vendorName: string;
   merchantId: string;     // Hash/UUID of normalized vendor name
   items: ReceiptItemSyncPayload[];

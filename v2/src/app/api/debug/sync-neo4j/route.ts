@@ -68,7 +68,7 @@ const handler: SecureHandler = async (req, context) => {
           // Fetch full transaction row to get latest state
           const { data: txRow, error: txError } = await supabase
             .from('transactions')
-            .select('id, amount, date, who, description, currency, tenant_id')
+            .select('id, amount, date, category, who, description, currency, tenant_id')
             .eq('id', event.entity_id)
             .single();
 
@@ -100,11 +100,21 @@ const handler: SecureHandler = async (req, context) => {
             };
           });
 
+          let primaryCategory = txRow.category;
+          if (!primaryCategory && mappedItems.length > 0) {
+            const catCounts: Record<string, number> = {};
+            for (const item of mappedItems) {
+              catCounts[item.itemCategory] = (catCounts[item.itemCategory] || 0) + 1;
+            }
+            primaryCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
+          }
+
           payloadsToSync.push({
             txId: txRow.id,
             tenantId: txRow.tenant_id,
             amount: Number(txRow.amount),
             date: txRow.date,
+            category: primaryCategory,
             vendorName,
             merchantId,
             items: mappedItems,

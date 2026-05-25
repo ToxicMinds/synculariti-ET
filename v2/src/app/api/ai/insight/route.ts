@@ -34,22 +34,21 @@ const handler: SecureHandler = async (_req, context) => {
 
   const session = driver.session();
   try {
-    const [merchantResult, categoryResult] = await Promise.all([
-      session.run(`
-        MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {tenant_id: $tenantId})
-        WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
-        ORDER BY visits DESC
-        LIMIT 15
-        RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
-      `, { tenantId }),
-      session.run(`
-        MATCH (t:Transaction {tenant_id: $tenantId})
-        WHERE t.category IS NOT NULL
-        WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
-        ORDER BY total DESC
-        RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
-      `, { tenantId })
-    ]);
+    const merchantResult = await session.run(`
+      MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {tenant_id: $tenantId})
+      WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
+      ORDER BY visits DESC
+      LIMIT 15
+      RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
+    `, { tenantId });
+
+    const categoryResult = await session.run(`
+      MATCH (t:Transaction {tenant_id: $tenantId})
+      WHERE t.category IS NOT NULL
+      WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
+      ORDER BY total DESC
+      RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
+    `, { tenantId });
     
     const facts = (merchantResult.records[0]?.get('topMerchants') || []) as Neo4jMerchantFact[];
     const categories = (categoryResult.records[0]?.get('categories') || []) as Neo4jCategoryFact[];

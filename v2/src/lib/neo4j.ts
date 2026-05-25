@@ -58,8 +58,8 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
        ON CREATE SET m.name = txData.vendorName
 
        MERGE (t:Transaction {id: txData.txId})
-       ON CREATE SET t.amount = txData.amount, t.date = txData.date, t.tenant_id = txData.tenantId
-       ON MATCH SET t.amount = txData.amount, t.date = txData.date
+       ON CREATE SET t.amount = txData.amount, t.date = txData.date, t.tenant_id = txData.tenantId, t.category = txData.category
+       ON MATCH SET t.amount = txData.amount, t.date = txData.date, t.category = txData.category
 
        MERGE (m)-[:PROCESSED]->(t)`,
       { batch: mappedPayload }
