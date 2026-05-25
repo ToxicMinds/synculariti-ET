@@ -19,9 +19,9 @@ const TOTAL_TRANSACTIONS = 5000;
 const BATCH_SIZE = 500;
 
 const VENDORS = [
-  { name: 'Metro Cash & Carry SR', cat: 'COGS - Dry Goods', items: ['Metro Chef Múka hladká 10x1kg', 'Cukor kryštálový 10x1kg', 'Slnečnicový olej 10l', 'Soľ jedlá 1kg', 'Toaletný papier 3-vrstvový', 'Savo proti plesniam'] },
-  { name: 'LUNYS s.r.o.', cat: 'COGS - Produce', items: ['Zemiaky neskoré prané', 'Cibuľa žltá', 'Mrkva praná', 'Citróny', 'Jablká Gala', 'Cesnak', 'Rajčiny kríčkové', 'Šalát ľadový'] },
-  { name: 'Bidfood Slovakia', cat: 'COGS - Meat', items: ['Bravčová krkovička bez kosti', 'Hovädzie zadné', 'Kura chladené voľné', 'Zemiakové hranolky 10mm 4x2.5kg', 'Losos filet s kožou', 'Bravčové karé', 'Hovädzie kosti na vývar'] },
+  { name: 'Metro Cash & Carry SR', cat: 'COGS - Dry Goods', items: ['Metro Chef Múka hladká 10x1kg', 'Cukor kryštálový 10x1kg', 'Slnečnicový olej 10l', 'Soľ jedlá 1kg', 'Toaletný papier 3-vrstvový', 'Savo proti plesniam', 'Mlieko 1L', 'Maslo 250g'] },
+  { name: 'LUNYS s.r.o.', cat: 'COGS - Produce', items: ['Zemiaky neskoré prané', 'Cibuľa žltá', 'Mrkva praná', 'Citróny', 'Jablká Gala', 'Cesnak', 'Rajčiny kríčkové', 'Šalát ľadový', 'Mlieko 1L', 'Kuracie prsia 1kg'] },
+  { name: 'Bidfood Slovakia', cat: 'COGS - Meat', items: ['Bravčová krkovička bez kosti', 'Hovädzie zadné', 'Kura chladené voľné', 'Zemiakové hranolky 10mm 4x2.5kg', 'Losos filet s kožou', 'Bravčové karé', 'Hovädzie kosti na vývar', 'Maslo 250g'] },
   { name: 'Kofola a.s.', cat: 'COGS - Beverages', items: ['Kofola originál 50L KEG', 'Vinea biela 0.25l sklo', 'Rajec jemne sýtený 0.33l sklo'] },
   { name: 'Heineken Slovensko', cat: 'COGS - Alcohol', items: ['Zlatý Bažant 12% 50L KEG', 'Krušovice 10% 50L KEG', 'Zlatý Bažant 0.0% Radler'] },
   { name: 'ZSE Energia', cat: 'OPEX - Utilities', items: ['Záloha za elektrinu'] },
