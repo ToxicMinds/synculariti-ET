@@ -4,7 +4,6 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useIdentity } from './useIdentity';
 import { TenantSelector } from './TenantSelector';
 import { OrgAccessForm } from '@/components/OrgAccessForm';
-import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
 interface Props {

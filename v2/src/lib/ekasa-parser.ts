@@ -19,8 +19,8 @@ export interface EkasaMetadata {
 }
 
 interface RawEkasaData {
-  receipt?: any;
-  data?: any;
+  receipt?: Record<string, unknown>;
+  data?: Record<string, unknown>;
   organization?: { name?: string; dic?: string; ico?: string };
   seller?: { name?: string };
   organizationName?: string;
@@ -34,9 +34,9 @@ interface RawEkasaData {
   date?: string;
   issueTime?: string;
   createTime?: string;
-  items?: any[];
-  receiptItems?: any[];
-  lines?: any[];
+  items?: Array<Record<string, unknown>>;
+  receiptItems?: Array<Record<string, unknown>>;
+  lines?: Array<Record<string, unknown>>;
   totalPrice?: number;
   total?: number;
   taxBaseBasic?: number;

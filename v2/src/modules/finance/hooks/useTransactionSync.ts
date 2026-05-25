@@ -3,6 +3,7 @@ import { Transaction } from '../lib/finance';
 import { Logger } from '@/lib/logger';
 import { useTenantContext } from '@/context/TenantContext';
 import { OfflineQueue } from '@/lib/offlineQueue';
+import { notifyLargeInvoice } from '@/actions/notifyLargeInvoice';
 
 export interface ReceiptItem {
   id?: string;
@@ -52,6 +53,13 @@ export function useTransactionSync(tenantId: string | undefined) {
 
     Logger.user(tenantId, 'TRANSACTION_ADDED', `Added ${items.length} manual transaction(s)`, 'Tenant Member');
     triggerRefresh();
+
+    const largeItems = items.filter(t => Number(t.amount) > 500);
+    if (largeItems.length > 0) {
+      notifyLargeInvoice(tenantId, items).catch(err =>
+        Logger.system('WARN', 'Sync', 'notifyLargeInvoice failed', { error: err }, tenantId)
+      );
+    }
   };
 
   const saveReceipt = async (

@@ -27,14 +27,15 @@ export async function GET() {
   // 2. Check Neo4j
   const driver = getNeo4jDriver();
   if (driver) {
+    const session = driver.session();
     try {
-      const session = driver.session();
       await session.run('RETURN 1');
-      await session.close();
       checks.neo4j = 'ok';
     } catch (e: unknown) {
       checks.neo4j = `error: ${e instanceof Error ? e.message : String(e)}`;
       status = 503;
+    } finally {
+      await session.close();
     }
   }
 

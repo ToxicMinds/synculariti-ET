@@ -14,7 +14,7 @@ import { SecureHandler } from './types/api';
  * Pattern: Injects auth data into the context object to maintain Next.js App Router compliance.
  */
 export function withAuth(handler: SecureHandler) {
-  return async (req: Request, context: { params: Promise<any> }): Promise<NextResponse> => {
+  return async (req: Request, context: { params: Promise<Record<string, string | string[] | undefined>> }): Promise<NextResponse> => {
     try {
       const supabase = await createClient();
 

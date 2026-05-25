@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     });
 
     if (limitErr) {
-      ServerLogger.system('ERROR', 'Auth', 'Rate limit RPC failed', { error: String(limitErr) });
+      await ServerLogger.system('ERROR', 'Auth', 'Rate limit RPC failed', { error: String(limitErr) });
       // Fail open or closed? For auth, we fail closed to be safe.
       return NextResponse.json({ error: 'Security service unavailable' }, { status: 503 });
     }
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
     // 7. Strengthen Password Derivation (HMAC-SHA256)
     const secret = process.env.PIN_DERIVATION_SECRET;
     if (!secret) {
-      ServerLogger.system('ERROR', 'Auth', 'PIN_DERIVATION_SECRET is missing');
+      await ServerLogger.system('ERROR', 'Auth', 'PIN_DERIVATION_SECRET is missing');
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
@@ -132,7 +132,7 @@ export async function POST(req: Request) {
     });
 
     if (authErr || !authData.session) {
-      ServerLogger.system('ERROR', 'Auth', 'Virtual login failed', { 
+      await ServerLogger.system('ERROR', 'Auth', 'Virtual login failed', { 
         error: authErr?.message,
         email: virtualEmail
       });
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
 
   } catch (e: unknown) {
     const errorMsg = e instanceof Error ? e.message : 'Unknown auth error';
-    ServerLogger.system('ERROR', 'Auth', 'PIN Auth Exception', { error: errorMsg });
+    await ServerLogger.system('ERROR', 'Auth', 'PIN Auth Exception', { error: errorMsg });
     return NextResponse.json({ error: 'Authentication processing error' }, { status: 500 });
   }
 }

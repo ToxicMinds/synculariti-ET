@@ -3,9 +3,12 @@ import { withAuth } from '@/lib/withAuth';
 import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { ForecastRequestSchema } from '@/lib/validations/schemas';
+import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 
 const handler: SecureHandler = async (req, context) => {
+  const { tenantId } = context.auth || { tenantId: 'fallback' };
+  await ServerLogger.system('INFO', 'AI', 'Forecast request started', { tenantId });
   try {
     const body = await req.json();
     

@@ -21,3 +21,21 @@ export async function fetchWithRetry(url: string, options: RequestInit = {}, ret
     throw error;
   }
 }
+
+/**
+ * Strips markdown code block fences from AI JSON responses.
+ */
+export function cleanMarkdownJsonBlock(input: string): string {
+  let content = input.trim();
+  if (content.startsWith('```json')) content = content.slice(7);
+  if (content.startsWith('```')) content = content.slice(3);
+  if (content.endsWith('```')) content = content.slice(0, -3);
+  return content.trim();
+}
+
+/**
+ * Formats a number as a locale-aware currency string.
+ */
+export function formatCurrency(amount: number, currency = 'EUR'): string {
+  return new Intl.NumberFormat('sk-SK', { style: 'currency', currency }).format(amount);
+}

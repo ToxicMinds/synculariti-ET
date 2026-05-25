@@ -4,9 +4,13 @@ import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { getCategoryPrompt } from '@/lib/ai-categories';
 import { StatementRequestSchema } from '@/lib/validations/schemas';
+import { ServerLogger } from '@/lib/logger-server';
+import { cleanMarkdownJsonBlock } from '@/lib/utils';
 import { SecureHandler } from '@/lib/types/api';
 
-const handler: SecureHandler = async (req) => {
+const handler: SecureHandler = async (req, context) => {
+  const { tenantId } = context.auth || { tenantId: 'fallback' };
+  await ServerLogger.system('INFO', 'AI', 'Statement parse request', { tenantId });
   try {
     const body = await req.json();
     
@@ -47,12 +51,7 @@ Only output the JSON object.`
       cacheKey: `stmt-${text.length}-${text.substring(0, 20)}` 
     });
     
-    let content = result.content.trim();
-    // Clean up potential markdown formatting Groq might still add
-    if (content.startsWith('```json')) content = content.substring(7);
-    if (content.startsWith('```')) content = content.substring(3);
-    if (content.endsWith('```')) content = content.substring(0, content.length - 3);
-
+    const content = cleanMarkdownJsonBlock(result.content);
     const data = JSON.parse(content);
 
     return NextResponse.json({ 

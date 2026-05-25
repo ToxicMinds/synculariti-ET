@@ -26,7 +26,7 @@ interface RawReceiptItem {
   }> | null;
 }
 
-export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string | undefined, isDemo?: boolean }) {
+export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
   const [items, setItems] = useState<AggregatedItem[]>([]);
   const [loading, setLoading] = useState(!isDemo);
 
@@ -42,10 +42,8 @@ export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string |
       return;
     }
 
-    if (tenantId) {
-      fetchTopItems();
-    }
-  }, [tenantId, isDemo]);
+    fetchTopItems();
+  }, [isDemo]);
 
   async function fetchTopItems() {
     setLoading(true);
@@ -60,8 +58,7 @@ export function ItemAnalytics({ tenantId, isDemo = false }: { tenantId: string |
             description,
             date
           )
-        `)
-        .eq('tenant_id', tenantId);
+        `);
 
       if (error) throw error;
 

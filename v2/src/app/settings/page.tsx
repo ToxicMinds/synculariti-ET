@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { BentoCard } from '@/components/BentoCard';
+import { Logger } from '@/lib/logger';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -27,13 +28,22 @@ export default function SettingsPage() {
     }
   }, [tenant]);
 
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+
   const handleSave = async () => {
     setSaving(true);
+    setMessage(null);
     try {
       await updateState({ names, emails, budgets });
-      alert('Organization settings updated successfully!');
+      setMessage('Organization settings updated successfully!');
+      setMessageType('success');
+      Logger.user(tenant?.tenant_id || '', 'SETTINGS_UPDATED', 'Organization settings saved', 'User');
     } catch (e) {
-      alert('Error saving settings: ' + (e as Error).message);
+      const errMsg = e instanceof Error ? e.message : 'Unknown error saving settings';
+      setMessage('Error saving settings: ' + errMsg);
+      setMessageType('error');
+      Logger.system('ERROR', 'UI', 'Settings save failed', { error: errMsg });
     } finally {
       setSaving(false);
     }
@@ -76,6 +86,16 @@ export default function SettingsPage() {
         <Link href="/" className="btn btn-secondary">← Back to Dashboard</Link>
       </header>
 
+      {message && (
+        <div style={{
+          maxWidth: 1000, margin: '0 auto 16px', padding: '12px 20px', borderRadius: 12,
+          backgroundColor: messageType === 'success' ? 'rgba(0,200,100,0.15)' : 'rgba(255,80,80,0.15)',
+          color: messageType === 'success' ? '#00c864' : '#ff5050',
+          fontSize: 14, fontWeight: 600, textAlign: 'center'
+        }}>
+          {message}
+        </div>
+      )}
       <div style={{ maxWidth: 1000, margin: '0 auto' }} className="bento-grid">
         
         {/* ROW 1: FINANCIAL LIMITS SUMMARY */}

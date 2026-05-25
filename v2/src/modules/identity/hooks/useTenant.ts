@@ -25,6 +25,7 @@ export interface AppState {
   handle: string;
   names: Record<string, string>;
   emails?: Record<string, string>;
+  phones?: Record<string, string>;
   income: Record<string, number>;
   budgets: Record<string, number>;
   memory: Record<string, string>;

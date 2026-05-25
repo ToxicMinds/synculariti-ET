@@ -20,7 +20,7 @@ const EnableBankingSchema = z.object({
 const BASE = process.env.ENABLE_BANKING_BASE_URL || 'https://api.enablebanking.com';
 
 const handler: SecureHandler = async (req, context) => {
-  const { tenantId, user } = context.auth || { tenantId: 'fallback', user: { email: 'test@example.com' } as any };
+  const { tenantId, user } = context.auth!;
   
   const appId = process.env.ENABLE_BANKING_APP_ID;
   const appSecret = process.env.ENABLE_BANKING_APP_SECRET;
@@ -94,12 +94,12 @@ const handler: SecureHandler = async (req, context) => {
     }
 
     const response = await fetch(url, { method, headers, body: fetchBody });
-    const data = (await response.json()) as any;
+    const data: Record<string, unknown> = await response.json();
 
     if (!response.ok) {
-      const errData = data as { error?: string; detail?: string };
+      const errMsg = typeof data.error === 'string' ? data.error : typeof data.detail === 'string' ? data.detail : 'Enable Banking API Error';
       return NextResponse.json({ 
-        error: errData.error || errData.detail || 'Enable Banking API Error' 
+        error: errMsg
       }, { status: response.status });
     }
 

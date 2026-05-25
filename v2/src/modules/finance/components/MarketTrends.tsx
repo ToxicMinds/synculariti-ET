@@ -27,7 +27,7 @@ ChartJS.register(
   Filler
 );
 
-export function MarketTrends({ transactions, selectedMonth, colSpan = 8 }: { transactions: Transaction[], selectedMonth: string, colSpan?: number, isDemo?: boolean }) {
+export function MarketTrends({ transactions, selectedMonth, colSpan = 8 }: { transactions: Transaction[], selectedMonth: string, colSpan?: number }) {
   // Logic: Group transactions by month for the last 6 months
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const [y, m] = selectedMonth.split('-');

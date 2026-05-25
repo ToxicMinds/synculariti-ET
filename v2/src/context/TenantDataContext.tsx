@@ -49,6 +49,7 @@ export function TenantDataProvider({ children }: { children: ReactNode }) {
         handle: h.handle || '',
         names: h.config?.names || {},
         emails: h.config?.emails || {},
+        phones: h.config?.phones || {},
         income: h.config?.income || {},
         budgets: h.config?.budgets || {},
         memory: h.config?.memory || {},

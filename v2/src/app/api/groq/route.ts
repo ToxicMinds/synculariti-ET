@@ -5,7 +5,7 @@ import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 
 const handler: SecureHandler = async (req, context) => {
-  const { tenantId, user } = context.auth || { tenantId: 'fallback', user: { email: 'test@example.com' } as any };
+  const { tenantId, user } = context.auth!;
   
   try {
     const body = await req.json();

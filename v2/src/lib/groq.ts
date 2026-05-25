@@ -1,9 +1,13 @@
 import { ServerLogger } from './logger-server';
 import { GROQ_ERRORS } from './types';
 
+type GroqVisionContent =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+
 export interface GroqMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string | any[]; // Support for vision content arrays
+  content: string | GroqVisionContent[];
 }
 
 export interface GroqUsage {

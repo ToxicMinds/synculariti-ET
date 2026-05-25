@@ -4,9 +4,8 @@ import { useState } from 'react';
 import { BentoCard } from '@/components/BentoCard';
 import { InventoryItem, InventoryCategory } from '../types';
 
-export function ItemCatalog({ items, categories, onAddItem }: { 
+export function ItemCatalog({ items, onAddItem }: { 
   items: InventoryItem[], 
-  categories: InventoryCategory[],
   onAddItem: () => void 
 }) {
   const [search, setSearch] = useState('');

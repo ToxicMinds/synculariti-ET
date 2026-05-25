@@ -201,7 +201,7 @@ function DashboardContent() {
               <div style={{ marginTop: 20 }}><DailyTrend transactions={displayTransactions} /></div>
             </BentoCard>
 
-            <MarketTrends transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} isDemo={isDemo} />
+            <MarketTrends transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
 
             {/* ROW 6: LIST & BREAKDOWN */}
             <BentoCard colSpan={8} rowSpan={2} title="All Transactions">
@@ -220,7 +220,7 @@ function DashboardContent() {
 
             {/* ROW 7: DEEP ANALYTICS */}
             <BentoCard colSpan={12} title="Top Items (Deep Analytics)">
-              <ItemAnalytics tenantId={tenant.tenant_id} isDemo={isDemo} />
+              <ItemAnalytics isDemo={isDemo} />
             </BentoCard>
 
             {displayTransactions.length === 0 && (

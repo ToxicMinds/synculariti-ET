@@ -5,10 +5,11 @@ import { callGroq } from '@/lib/groq';
 import { getCategoryPrompt } from '@/lib/ai-categories';
 import { DocumentParseRequestSchema } from '@/lib/validations/schemas';
 import { ServerLogger } from '@/lib/logger-server';
+import { cleanMarkdownJsonBlock } from '@/lib/utils';
 import { SecureHandler } from '@/lib/types/api';
 
 const handler: SecureHandler = async (req, context) => {
-  const { tenantId, user } = context.auth || { tenantId: 'fallback', user: { email: 'test@example.com' } as any };
+  const { tenantId, user } = context.auth!;
   
   try {
     const body = await req.json();
@@ -71,11 +72,7 @@ ${getCategoryPrompt(categories)}`
       cacheKey: `invoice-${image.substring(image.length - 30)}`
     });
 
-    let content = parse.content.trim();
-    if (content.startsWith('```json')) content = content.substring(7);
-    if (content.startsWith('```')) content = content.substring(3);
-    if (content.endsWith('```')) content = content.substring(0, content.length - 3);
-
+    const content = cleanMarkdownJsonBlock(parse.content);
     const result = JSON.parse(content);
 
     await ServerLogger.user(tenantId, 'INVOICE_PARSED', `AI parsed invoice from ${result.store || 'Unknown'}`, user.email || 'User');

@@ -3,6 +3,7 @@ import { getNeo4jDriver } from '@/lib/neo4j';
 import { withAuth } from '@/lib/withAuth';
 import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
+import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 
 interface Neo4jMerchantFact {
@@ -23,6 +24,8 @@ const getVisits = (v: number | { low: number }): number => {
 
 const handler: SecureHandler = async (_req, context) => {
   const { tenantId } = context.auth || { tenantId: 'fallback' };
+
+  await ServerLogger.system('INFO', 'AI', 'Insight request started', { tenantId });
   
   const driver = getNeo4jDriver();
   if (!driver) {
@@ -95,6 +98,7 @@ Give ONE focused, actionable insight in 2 sentences max. Be specific with catego
         usage: result.usage
       });
     } catch (apiErr: unknown) {
+      await ServerLogger.system('WARN', 'AI', 'Groq insight call failed, using fallback', { tenantId, error: apiErr instanceof Error ? apiErr.message : String(apiErr) });
       return NextResponse.json({ 
         success: true, 
         insight: generateFallbackInsight(),
@@ -104,6 +108,7 @@ Give ONE focused, actionable insight in 2 sentences max. Be specific with catego
     }
 
   } catch (e: unknown) {
+    await ServerLogger.system('ERROR', 'AI', 'Insight route Neo4j query failed', { tenantId, error: e instanceof Error ? e.message : String(e) });
     return NextResponse.json({ 
       success: true, 
       insight: "💡 Intelligence Hub: Syncing your financial graph. Insights will appear shortly.",

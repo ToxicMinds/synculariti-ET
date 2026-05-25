@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
 import { apiError } from '@/lib/api-error-handler';
 import { EkasaRequestSchema } from '@/lib/validations/schemas';
+import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 
 /**
@@ -12,7 +13,9 @@ import { SecureHandler } from '@/lib/types/api';
 export const preferredRegion = 'cdg1';
 export const dynamic = 'force-dynamic';
 
-const handler: SecureHandler = async (request: Request) => {
+const handler: SecureHandler = async (request: Request, context) => {
+  const { tenantId } = context.auth || { tenantId: 'fallback' };
+  await ServerLogger.system('INFO', 'eKasa', 'eKasa proxy request', { tenantId });
   try {
     const body = await request.json();
     
@@ -28,7 +31,7 @@ const handler: SecureHandler = async (request: Request) => {
     const { receiptId, okpData } = parsed.data;
 
     // Simulate timeout for contract test if trigger string is present
-    if (receiptId === 'TIMEOUT_TRIGGER') {
+    if (process.env.NODE_ENV === 'test' && receiptId === 'TIMEOUT_TRIGGER') {
       throw new Error('Gateway Timeout');
     }
 

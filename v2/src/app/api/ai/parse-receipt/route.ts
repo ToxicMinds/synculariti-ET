@@ -54,7 +54,7 @@ const handler: SecureHandler = async (req, context) => {
       }
     `;
 
-    const userPrompt = `Analyze these items: ${metadata.items.map((i: EkasaItem) => i.originalName).join(', ')}`;
+    const userPrompt = `Analyze these items: ${(metadata.items as EkasaItem[]).map((i) => i.originalName).join(', ')}`;
 
     const result = await callGroq('llama-3.3-70b-versatile', [
       { role: 'system', content: systemPrompt },
@@ -72,7 +72,7 @@ const handler: SecureHandler = async (req, context) => {
       : metadata.store;
 
     // Log for auditing
-    ServerLogger.system('INFO', 'AI', 'Merchant Extraction Detail', {
+    await ServerLogger.system('INFO', 'AI', 'Merchant Extraction Detail', {
       rawStore: metadata.store,
       inferredStore: aiParsed.inferredStore,
       finalStore,
@@ -80,7 +80,7 @@ const handler: SecureHandler = async (req, context) => {
     });
 
     // 5. MERGE AI CATEGORIES WITH ORIGINAL PRICES (GROUND TRUTH)
-    const mergedItems = metadata.items.map((orig: EkasaItem, idx: number) => ({
+    const mergedItems = (metadata.items as EkasaItem[]).map((orig, idx) => ({
       name: aiItems[idx]?.name || orig.originalName,
       amount: orig.amount,
       category: aiItems[idx]?.category || 'Others'

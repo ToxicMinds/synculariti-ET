@@ -48,7 +48,6 @@ function LogisticsDashboard() {
         {/* Item Catalog */}
         <ItemCatalog 
           items={items} 
-          categories={categories} 
           onAddItem={() => setShowNewItem(true)} 
         />
 

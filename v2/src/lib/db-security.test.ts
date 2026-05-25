@@ -3,7 +3,7 @@ import * as path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { BATCH_1_SECURITY_CONTRACT, BATCH_1_LANDMINE_CONTRACT } from './db-security-contract';
 import { safeCastUuid, safeCastUserUuid } from './uuid-helpers';
-import { RPC_GET_SECURITY_STATE } from './types';
+import { RPC_GET_SECURITY_STATE, FunctionSecurityState } from './types';
 
 // Load .env.local synchronously for live database checks in NodeJS test environment
 const envPath = path.resolve(__dirname, '../../.env.local');
@@ -24,7 +24,7 @@ const supabase = createClient(
 );
 
 // Helper to query function security state via live Supabase RPC
-async function checkFunctionSecurity(name: string, args: string) {
+async function checkFunctionSecurity(name: string, args: string): Promise<FunctionSecurityState> {
   const { data, error } = await supabase.rpc(RPC_GET_SECURITY_STATE, {
     p_func_name: name,
     p_args_signature: args

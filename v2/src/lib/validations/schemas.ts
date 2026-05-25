@@ -67,7 +67,7 @@ export const ForecastRequestSchema = z.object({
   budget: z.number().min(0),
   daysElapsed: z.number().min(0),
   daysInMonth: z.number().positive(),
-  history: z.array(z.any()).optional()
+  history: z.array(z.unknown()).optional()
 });
 
 /**
@@ -90,7 +90,7 @@ export const DocumentParseRequestSchema = z.object({
  * AI eKasa Receipt Parse Request Schema
  */
 export const ReceiptParseRequestSchema = z.object({
-  ekasaData: z.any(), // Structure from Slovak Gov API (complex/dynamic)
+  ekasaData: z.unknown(), // Structure from Slovak Gov API (complex/dynamic)
   categories: CategorySchema
 });
 
@@ -105,5 +105,5 @@ export const ResilientReceiptSchema = z.object({
     z.string()
   ).transform(v => v.substring(0, 10)),
   total: z.preprocess((v) => Number(v || 0), z.number()),
-  items: z.array(z.any()).default([])
+  items: z.array(z.unknown()).default([])
 });

@@ -13,7 +13,7 @@ export interface AuthContext {
  * Strictly compliant Next.js Context extended with Auth data for Synculariti-ET.
  */
 export interface SecureContext {
-  params: Promise<Record<string, string>>;
+  params: Promise<Record<string, string | string[] | undefined>>;
   auth?: AuthContext; // Populated by withAuth middleware or Test Mock
 }
 

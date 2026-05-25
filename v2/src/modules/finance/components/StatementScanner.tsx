@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useStatementScanner, ParsedTransaction } from '../hooks/useStatementScanner';
-import { AppState } from '@/modules/identity/hooks/useTenant';
 
 interface StatementScannerProps {
   names: Record<string, string>;
