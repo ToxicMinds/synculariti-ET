@@ -1,6 +1,14 @@
 import { loadFeature, defineFeature } from 'jest-cucumber';
 import path from 'path';
 import { NextRequest } from 'next/server';
+// Mock @/lib/supabase to prevent SSR creation crash in Node test context
+jest.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: jest.fn(),
+    rpc: jest.fn(),
+  },
+}));
+
 import { POST } from '../../src/app/api/whatsapp/webhook/route';
 import { verifyWebhookSignature } from '@synculariti/whatsapp-client';
 

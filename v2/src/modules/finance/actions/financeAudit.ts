@@ -24,13 +24,15 @@ export interface FinanceAuditService {
 }
 
 export class DefaultFinanceAuditService implements FinanceAuditService {
+  constructor(private supabaseClient = supabase) {}
+
   async processDecision(
     tenantId: string,
     outboxId: string,
     decision: AuditDecision,
     adminPhone: string
   ): Promise<{ success: boolean; resolution: string }> {
-    const { data: outbox, error: outboxError } = await supabase
+    const { data: outbox, error: outboxError } = await this.supabaseClient
       .from('whatsapp_outbox')
       .select('*')
       .eq('id', outboxId)
@@ -46,7 +48,7 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
     }
 
     if (decision === 'Approve Anyway') {
-      const { error } = await supabase
+      const { error } = await this.supabaseClient
         .from('transactions')
         .update({
           vat_detail: { audit_status: 'APPROVED' },
@@ -58,7 +60,7 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
       if (error) throw new Error(`Failed to approve transaction: ${error.message}`);
       return { success: true, resolution: 'APPROVED' };
     } else if (decision === 'Request Re-upload') {
-      const { error } = await supabase
+      const { error } = await this.supabaseClient
         .from('transactions')
         .update({
           vat_detail: { audit_status: 'PENDING_REUPLOAD' },
@@ -70,7 +72,7 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
       if (error) throw new Error(`Failed to update transaction for re-upload: ${error.message}`);
       return { success: true, resolution: 'PENDING_REUPLOAD' };
     } else if (decision === 'Reject Expense') {
-      const { error } = await supabase
+      const { error } = await this.supabaseClient
         .from('transactions')
         .update({
           is_deleted: true,

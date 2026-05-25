@@ -24,13 +24,15 @@ export interface POSDiscrepancyService {
 }
 
 export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
+  constructor(private supabaseClient = supabase) {}
+
   async processDecision(
     tenantId: string,
     outboxId: string,
     decision: DiscrepancyDecision,
     managerPhone: string
   ): Promise<{ success: boolean; resolution: string }> {
-    const { data: outbox, error: outboxError } = await supabase
+    const { data: outbox, error: outboxError } = await this.supabaseClient
       .from('whatsapp_outbox')
       .select('*')
       .eq('id', outboxId)
@@ -44,7 +46,7 @@ export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
     const locationId = outbox.payload?.metadata?.locationId || null;
 
     if (decision === 'Log as Shrinkage') {
-      const { error } = await supabase.rpc('add_transaction_v3', {
+      const { error } = await this.supabaseClient.rpc('add_transaction_v3', {
         p_transaction: {
           location_id: locationId,
           category: 'Adjustment',

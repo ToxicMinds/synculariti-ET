@@ -24,13 +24,15 @@ export interface POApprovalService {
 }
 
 export class DefaultPOApprovalService implements POApprovalService {
+  constructor(private supabaseClient = supabase) {}
+
   async processDecision(
     tenantId: string,
     outboxId: string,
     decision: POApprovalDecision,
     managerPhone: string
   ): Promise<{ success: boolean; newStatus: string }> {
-    const { data: outbox, error: outboxError } = await supabase
+    const { data: outbox, error: outboxError } = await this.supabaseClient
       .from('whatsapp_outbox')
       .select('*')
       .eq('id', outboxId)
@@ -46,7 +48,7 @@ export class DefaultPOApprovalService implements POApprovalService {
     }
 
     if (decision === 'Approve') {
-      const { error } = await supabase.rpc('receive_purchase_order_v1', {
+      const { error } = await this.supabaseClient.rpc('receive_purchase_order_v1', {
         p_po_id: poId
       });
       if (error) {
@@ -54,7 +56,7 @@ export class DefaultPOApprovalService implements POApprovalService {
       }
       return { success: true, newStatus: 'APPROVED' };
     } else if (decision === 'Reject') {
-      const { error } = await supabase
+      const { error } = await this.supabaseClient
         .from('purchase_orders')
         .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
         .eq('id', poId)
@@ -64,7 +66,7 @@ export class DefaultPOApprovalService implements POApprovalService {
       }
       return { success: true, newStatus: 'REJECTED' };
     } else if (decision === 'Modify') {
-      const { error } = await supabase
+      const { error } = await this.supabaseClient
         .from('purchase_orders')
         .update({ status: 'DRAFT', updated_at: new Date().toISOString() })
         .eq('id', poId)
