@@ -140,6 +140,8 @@
 - `RPC Function: public.purge_expired_whatsapp_logs(days_to_keep INT)`: Revoked-execution routine that deletes both outbox and inbox records older than 30 days.
 - `type InboundWhatsAppEvent`: Discriminated union for incoming webhook events (text vs. poll_vote).
 - `interface OutboundMessageContext`: The mapping context used by the sidecar to link WhatsApp message stanzas to outbox records.
+- `class SessionCache`: TTL-based memory cache used by the Sidecar to route inbound replies back to the initiating application.
+- `class WebhookDispatcher`: Sidecar utility that generates Web Crypto HMAC-SHA256 signatures and fires event payloads to webhooks.
 - `interface WhatsAppSession`: Canonical interface for OpenWA gateway session state.
 - `interface WhatsAppNotificationPayload`: Interface for outbound notification dispatch payloads.
 - `interface WhatsAppInboundCommand`: Type enum for two-way keyword command actions.
