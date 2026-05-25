@@ -147,7 +147,7 @@ export async function queryWasteRisk(
   tenantId: string
 ): Promise<InsightFinding | null> {
   const result = await session.run(`
-    MATCH (t:Transaction {tenant_id: $tid})-[:CONTAINS]->(sku:MerchantSKU)-[:IS_INSTANCE_OF]->(ing:Ingredient)
+    MATCH (t:Transaction {tenant_id: $tid})-[c:CONTAINS]->(sku:MerchantSKU)-[:IS_INSTANCE_OF]->(ing:Ingredient)
     WHERE ing.perishability_days IS NOT NULL AND ing.perishability_days < 14
       AND t.day_of_week IS NOT NULL
     WITH ing.name AS ingredient, ing.perishability_days AS shelfLife,
