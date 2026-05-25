@@ -117,6 +117,65 @@ We use a deterministic AI pipeline for financial categorization:
 - **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
+- **Shared HMAC Primitive**: All signing operations (sidecar dispatch AND server action dispatch) MUST use `signHmacPayload()` exported from `@synculariti/whatsapp-client`. Never re-implement the algorithm inline.
+
+### 6.6 Integrating External Applications with the WhatsApp Sidecar
+
+Any internal module or external application (e.g., an ERP, a POS system, a third-party SaaS) can trigger a WhatsApp workflow that collects a user decision back via an Action Link. The protocol is as follows:
+
+**Step 1 — Obtain a Tenant API Key**
+Create a row in `public.api_keys` for the tenant. The `key_value` is the secret the calling system will present in `X-Api-Key`.
+
+**Step 2 — Insert into the Outbox via the Shared Endpoint**
+POST to `https://<your-domain>/api/whatsapp/notify` with:
+```json
+{
+  "recipientPhone": "421900123456",
+  "payload": {
+    "type": "poll",
+    "name": "Approve Invoice #INV-042",
+    "options": ["Approve", "Reject", "Request Changes"]
+  },
+  "webhookUrl": "https://your-app.com/api/whatsapp-callback",
+  "webhookSecret": "<a-secret-you-generate>"
+}
+```
+Header: `X-Api-Key: <your-tenant-api-key>`
+
+The endpoint atomically inserts a `whatsapp_outbox` record with `status: PENDING`. The outbox record stores your `webhookUrl` and `webhookSecret`.
+
+**Step 3 — The Sidecar Delivers the Message (Automatic)**
+The Supabase Edge Function `process-outbox` listens on DB webhook inserts. It picks up the record and sends the poll to WhatsApp via the GCP sidecar. The user receives the message. For action-link flows, the message includes a URL of the form `https://<your-domain>/action/<outbox-id>`.
+
+**Step 4 — Your App Receives the Webhook**
+When the recipient responds (either via WhatsApp natively OR via the Action Link web page), Synculariti fires a POST to your `webhookUrl` with:
+```json
+{
+  "type": "poll_vote",
+  "outboxId": "<uuid>",
+  "recipientPhone": "421900123456",
+  "tenantId": "<uuid>",
+  "decision": "Approve",
+  "timestamp": 1748167200000
+}
+```
+Header: `X-OpenWA-Signature: <hmac-sha256-hex>`
+
+**Step 5 — Verify the Signature**
+Use `signHmacPayload(body, webhookSecret)` and compare to the header value, or use `verifyWebhookSignature(body, signature, webhookSecret)` from `@synculariti/whatsapp-client`. Only process payloads that pass verification.
+
+**Step 6 — Act on the Decision (Your Module's Responsibility)**
+The WhatsApp module's responsibility ends at delivery. Your webhook handler is fully responsible for updating invoice status, triggering procurement flows, or any other business logic. This ensures strict SRP between the messaging layer and domain logic.
+
+**Security Checklist for External Integrators:**
+- [ ] Generate a high-entropy `webhookSecret` (≥ 32 random bytes, hex-encoded)
+- [ ] Verify `X-OpenWA-Signature` on every inbound webhook before processing
+- [ ] Your `webhookUrl` must be HTTPS
+- [ ] Store the `outboxId` to correlate responses to your original request
+- [ ] Handle idempotency — a network retry may deliver the same webhook twice
+
+
+
 
 
 

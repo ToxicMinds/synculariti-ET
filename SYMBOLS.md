@@ -146,6 +146,7 @@
 - `interface WhatsAppNotificationPayload`: Interface for outbound notification dispatch payloads.
 - `interface WhatsAppInboundCommand`: Type enum for two-way keyword command actions.
 - `class OpenWAClient`: Shared headless REST API client for the OpenWA sidecar.
+- `function signHmacPayload(payload, secret)`: **Canonical shared HMAC-SHA256 signing primitive** exported from `@synculariti/whatsapp-client`. Used by both the GCP Sidecar (`WebhookDispatcher`) and the Next.js `dispatchDecision` Server Action. Never re-implement inline — always import from this package.
 - `function getErrorMessage()`: Type-safe utility to parse and format unknown caught errors safely without using `any`.
 - `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
 - `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.

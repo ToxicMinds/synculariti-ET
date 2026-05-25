@@ -1,9 +1,43 @@
 # Synculariti-ET: Current System Audit & Backlog
 
 **Status:** Infrastructure hardened (partial). **40 open issues** — ordered and batched below.
-**Last Update:** 2026-05-17
+**Last Update:** 2026-05-25 (Phase 4: WhatsApp Module Cleanup)
 
 > **Agent Assessment:** I have reviewed the entirety of this audit report. I fully **AGREE** with the assessment of the issues and the vast majority of the proposed solutions. The focus on Test Integrity, Type Safety, and Observability aligns perfectly with the "Business-Grade Determinism" core tenet. I have noted one minor architectural adjustment for V-02 below, but otherwise endorse this roadmap completely.
+
+---
+
+## WhatsApp Module — Phase 4 Findings (2026-05-25)
+
+These issues were discovered and **resolved** during the Phase 4 cleanup of the WhatsApp Chunk 4 implementation.
+
+| ID | Principle | Location | Severity | Finding | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| W-01 | **DRY** | `dispatchDecision.ts` + `sidecar.ts::WebhookDispatcher` | 🔴 HIGH | `signPayload` was implemented verbatim in two places — identical HMAC-SHA256 algorithm with no shared source of truth. A single algorithm change would require two coordinated updates. | ✅ **Fixed** — Extracted to `signHmacPayload()` in `@synculariti/whatsapp-client/hmac.ts`. Both consumers now import from the single canonical source. |
+| W-02 | **Type Safety** | `dispatchDecision.ts` lines 41, 46 | 🔴 HIGH | `options: any` in Supabase cookie adapter callbacks — broke the zero-`:any` contract introduced in Sprint 2. | ✅ **Fixed** — Replaced with `CookieOptions` from `@supabase/ssr`. |
+| W-03 | **Type Safety** | `sidecar.ts::dispatchSecureEvent` line 85 | 🔴 HIGH | `payload: any` — the method accepted untyped payloads, defeating runtime safety. | ✅ **Fixed** — Replaced with `Record<string, unknown>`. |
+| W-04 | **Observability** | `supabase/functions/process-outbox/handler.ts` line 63 | 🟡 MEDIUM | `console.error(...)` used inside the Edge Function — violates the "Logger, not console" rule and makes failures invisible in production observability. | ✅ **Fixed** — Replaced with structured error metadata written into the `processed_at` field of the outbox update, keeping failures observable at the DB layer. |
+| W-05 | **ACID** | `dispatchDecision.ts` — webhook dispatch before DB update | 🟡 MEDIUM | Split-brain risk: if the webhook fires successfully but the subsequent `UPDATE` to set `COMPLETED` fails (network partition, timeout), the outbox record stays `PENDING` and the action link can be submitted again, causing duplicate webhook delivery. | ⚠️ **Documented / Deferred** — A comment is added in the code. Full fix requires a Postgres RPC that atomically marks `COMPLETED` and returns the payload for the caller to dispatch. Tracked as **V-49** below. |
+
+### New Backlog Item from WhatsApp Phase 4:
+
+| ID | Severity | Principle | Location | Issue | Solution |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| V-49 | 🟡 MEDIUM | **ACID** | `dispatchDecision.ts` | Split-brain between webhook delivery and DB status update — a failed `UPDATE` leaves an action re-submittable. | Create an RPC `complete_whatsapp_action_v1(action_id UUID)` that atomically sets `status = COMPLETED` and returns the `webhook_url` + `webhook_secret`. The Server Action then dispatches the webhook *after* the atomic update, inverting the current order. |
+
+---
+
+## Project-Wide Violation Counts (as of 2026-05-25)
+
+| Principle | Pre-WhatsApp | WhatsApp Introduced | WhatsApp Fixed | **Current Open** |
+| :--- | :--- | :--- | :--- | :--- |
+| **DRY** | 7 | 1 | 1 | **7** |
+| **ACID** | 0 | 1 | 0 | **1** (V-49) |
+| **SOLID** | 8 | 0 | 0 | **8** |
+| **Type Safety (`:any`)** | 9 | 2 | 2 | **9** |
+| **Observability** | 7 | 1 | 1 | **7** |
+
+> The WhatsApp module introduced **5 violations** and resolved **4** of them in Phase 4. Only the ACID split-brain (V-49) is carried forward as a tracked backlog item.
 
 ---
 
@@ -92,7 +126,13 @@ Small, targeted fixes with security impact. No architectural changes needed.
 | V-35 | 🟡 MEDIUM | `useTransactionFilter.ts` | `limit`, `offset`, `setLimit`, `setOffset` declared but never consumed | Remove dead pagination state, or implement actual pagination on the filtered results. |
 | V-44 | 🟢 LOW | `BentoCard.tsx`, `CategoryPill.tsx`, `InfoTooltip.tsx`, `BrandHeader.tsx` | Missing `React.memo` on stable presentational components; N resize listeners | Add `React.memo` to pure presentational components. Deduplicate resize listeners via shared `useWindowSize` hook. |
 
-### Sprint 8: Cleanup
+### Sprint 8: WhatsApp ACID Hardening
+
+| ID | Severity | Principle | Location | Issue | Solution |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| V-49 | 🟡 MEDIUM | **ACID** | `dispatchDecision.ts` | Split-brain between webhook delivery and DB status update. If the `UPDATE` fails after the webhook fires, the action link stays `PENDING` and can be re-submitted, causing a duplicate webhook delivery. | Create RPC `complete_whatsapp_action_v1(action_id UUID)` that atomically marks `COMPLETED` and returns `webhook_url` + `webhook_secret`. The Server Action dispatches the webhook **after** the atomic update. |
+
+### Sprint 9: Cleanup
 
 | ID | Severity | Location | Issue | Solution |
 | :--- | :--- | :--- | :--- | :--- |
@@ -122,6 +162,11 @@ Small, targeted fixes with security impact. No architectural changes needed.
 | Financial ACID (O(N)) | `finance.test.ts` | ✅ |
 | API Validation | `schemas.test.ts` | ✅ |
 | eKasa Timeout | `ekasa/route.test.ts` | ✅ |
+| WhatsApp Inbound Webhook | `whatsapp.test.ts` | ✅ |
+| WhatsApp Outbox Edge Function | `process-outbox.test.ts` | ✅ |
+| WhatsApp dispatchDecision | `dispatchDecision.test.ts` | ✅ |
+| WhatsApp Sidecar (SessionCache + WebhookDispatcher) | `sidecar.test.ts` | ✅ |
+| WhatsApp OpenWAClient (sendText + sendPoll) | `client.test.ts` | ✅ |
 
 ## Broken Contracts (Sprint 1 Completed 🟢)
 

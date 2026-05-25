@@ -1,4 +1,4 @@
-import { verifyWebhookSignature } from './hmac';
+import { signHmacPayload } from './hmac';
 
 export interface OutboundContext {
   whatsappMessageId: string;
@@ -57,35 +57,14 @@ export class SessionCache implements ISessionCache {
 
 export class WebhookDispatcher {
   /**
-   * Generates HMAC-SHA256 signature natively using Web Crypto API.
-   * Matches the verification algorithm on the Next.js side.
+   * Signs and dispatches a secure event to a webhook URL.
+   * Uses the shared `signHmacPayload` from @synculariti/whatsapp-client/hmac
+   * to guarantee algorithm parity with the Next.js receiver.
    */
-  private async signPayload(payload: string, secret: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const key = await globalThis.crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-
-    const signatureBuf = await globalThis.crypto.subtle.sign(
-      'HMAC',
-      key,
-      encoder.encode(payload)
-    );
-
-    // Convert ArrayBuffer to Hex String
-    return Array.from(new Uint8Array(signatureBuf))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  async dispatchSecureEvent(targetUrl: string, payload: any, secret: string): Promise<boolean> {
+  async dispatchSecureEvent(targetUrl: string, payload: Record<string, unknown>, secret: string): Promise<boolean> {
     try {
       const payloadString = JSON.stringify(payload);
-      const signature = await this.signPayload(payloadString, secret);
+      const signature = await signHmacPayload(payloadString, secret);
 
       const response = await fetch(targetUrl, {
         method: 'POST',
@@ -97,8 +76,10 @@ export class WebhookDispatcher {
       });
 
       return response.ok;
-    } catch (e) {
-      console.error('Webhook dispatch failed:', e);
+    } catch (e: unknown) {
+      // Fire-and-forget safety: log but don't crash the calling context
+      const msg = e instanceof Error ? e.message : String(e);
+      globalThis.console?.error?.('[WebhookDispatcher] dispatch failed:', msg);
       return false;
     }
   }

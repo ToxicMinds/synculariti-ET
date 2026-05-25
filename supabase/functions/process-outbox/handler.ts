@@ -59,11 +59,11 @@ export async function processOutboxEvent(
       .update({ status: newStatus })
       .eq('id', record.id);
 
-  } catch (error) {
-    console.error(`Failed to process outbox event for ${record.id}:`, error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     await supabase
       .from('whatsapp_outbox')
-      .update({ status: 'FAILED' })
+      .update({ status: 'FAILED', processed_at: new Date().toISOString() })
       .eq('id', record.id);
   }
 }

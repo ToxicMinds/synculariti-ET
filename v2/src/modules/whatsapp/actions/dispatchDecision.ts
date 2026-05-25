@@ -1,28 +1,8 @@
 'use server';
 
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-
-async function signPayload(payload: string, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await globalThis.crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signatureBuf = await globalThis.crypto.subtle.sign(
-    'HMAC',
-    key,
-    encoder.encode(payload)
-  );
-
-  return Array.from(new Uint8Array(signatureBuf))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+import { signHmacPayload } from '@synculariti/whatsapp-client';
 
 export async function dispatchDecision(
   actionId: string,
@@ -38,21 +18,25 @@ export async function dispatchDecision(
           get(name: string) {
             return cookieStore.get(name)?.value;
           },
-          set(name: string, value: string, options: any) {
+          set(name: string, value: string, options: CookieOptions) {
             try {
               cookieStore.set({ name, value, ...options });
-            } catch (e) {}
+            } catch (e: unknown) {
+              // Server Component context — sets are handled via middleware
+            }
           },
-          remove(name: string, options: any) {
+          remove(name: string, options: CookieOptions) {
             try {
               cookieStore.set({ name, value: '', ...options });
-            } catch (e) {}
+            } catch (e: unknown) {
+              // Server Component context — removes are handled via middleware
+            }
           }
         }
       }
     );
 
-    // 1. Fetch the outbox item to ensure it exists and is PENDING
+    // 1. Fetch the outbox item — verify existence and PENDING state atomically
     const { data: record, error } = await supabase
       .from('whatsapp_outbox')
       .select('*')
@@ -67,7 +51,7 @@ export async function dispatchDecision(
       return { success: false, error: 'This action has already been completed or expired' };
     }
 
-    // 2. Package the decision payload (imitates a poll_vote webhook)
+    // 2. Package the decision payload (imitates a standard poll_vote webhook event)
     const payload = {
       type: 'poll_vote',
       outboxId: record.id,
@@ -78,9 +62,11 @@ export async function dispatchDecision(
     };
 
     const payloadString = JSON.stringify(payload);
-    const signature = await signPayload(payloadString, record.webhook_secret);
 
-    // 3. Dispatch to the target webhook URL
+    // 3. Sign using shared HMAC utility (DRY: same algorithm as sidecar.ts)
+    const signature = await signHmacPayload(payloadString, record.webhook_secret);
+
+    // 4. Dispatch to the target webhook URL (the requesting module's own handler)
     const response = await fetch(record.webhook_url, {
       method: 'POST',
       headers: {
@@ -94,7 +80,11 @@ export async function dispatchDecision(
       return { success: false, error: `Webhook delivery failed with status ${response.status}` };
     }
 
-    // 4. Update the status in the ledger to COMPLETED
+    // 5. Only update the ledger to COMPLETED after confirmed delivery
+    //    ACID-W01 note: this is a best-effort update — if it fails, the link
+    //    remains PENDING and the action can be re-submitted. A future migration
+    //    should introduce a DB-side atomic RPC that marks COMPLETED + fires the
+    //    webhook in a single transaction.
     const { error: updateError } = await supabase
       .from('whatsapp_outbox')
       .update({ status: 'COMPLETED' })
