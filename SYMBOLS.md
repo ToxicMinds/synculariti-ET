@@ -136,6 +136,10 @@
 ## WhatsApp & Sidecar
 - `Table: public.api_keys`: Secure storage for third-party integration tokens mapped to tenants.
 - `Table: public.whatsapp_outbox`: Audit ledger (Who, What, When) for outbound messaging events.
+- `Table: public.whatsapp_inbox`: Secure storage for HMAC-verified inbound messages mapped to tenants and outbox items.
+- `RPC Function: public.purge_expired_whatsapp_logs(days_to_keep INT)`: Revoked-execution routine that deletes both outbox and inbox records older than 30 days.
+- `type InboundWhatsAppEvent`: Discriminated union for incoming webhook events (text vs. poll_vote).
+- `interface OutboundMessageContext`: The mapping context used by the sidecar to link WhatsApp message stanzas to outbox records.
 - `interface WhatsAppSession`: Canonical interface for OpenWA gateway session state.
 - `interface WhatsAppNotificationPayload`: Interface for outbound notification dispatch payloads.
 - `interface WhatsAppInboundCommand`: Type enum for two-way keyword command actions.
@@ -146,3 +150,4 @@
 - `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.
 - `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
+
