@@ -116,6 +116,7 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
   1. *Phase 1 (Parents Ingest)*: UNWIND transactions, MERGE `:Merchant` and `:Transaction` nodes and link them.
   2. *Phase 2 (Eager Aggregation)*: Deduplicate global `:Ingredient` nodes **before** merging using `WITH DISTINCT item.canonicalIngredientId AS ingId, item`. This guarantees a single write-lock per unique ingredient across the entire batch context.
   3. *Phase 3 (SKU Construction)*: UNWIND flat items, MATCH parents/ingredients via unique constraints, and MERGE `:MerchantSKU` nodes, avoiding concurrent collisions.
+  - **Idempotent Property Propagation**: Every `MERGE` in all 3 phases MUST include BOTH `ON CREATE SET` and `ON MATCH SET` for all properties. Without `ON MATCH SET`, re-running backfill on existing nodes/relationships silently skips property updates, leaving stale nulls (e.g., `unit_price` on `[:CONTAINS]`).
 - **Flat-Memory Cursor Sliding Loops**: Bulk outbox syncing MUST process queues using flat sliding loop index windows (`.slice(i, i + BATCH_SIZE)`) instead of mutating arrays via `.splice()`. This guarantees $O(1)$ memory allocation and prevents V8 garbage collection thrashing.
 - **Outbox Integrity & Self-Healing**: Dynamic outbox queues (`graph_sync_queue`) record CRUD events in real-time. If a transaction SKU or ingredient arrives out-of-order, the engine MUST self-heal by merging missing parent transaction nodes before executing SKU connections.
 

@@ -128,9 +128,14 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
 
        MERGE (sku:MerchantSKU {id: item.skuId})
        ON CREATE SET sku.raw_name = item.itemName, sku.currency = item.currency, sku.unit_price = item.itemUnitPrice
+       ON MATCH SET sku.raw_name = item.itemName, sku.currency = item.currency, sku.unit_price = item.itemUnitPrice
 
        MERGE (t)-[r:CONTAINS]->(sku)
        ON CREATE SET
+         r.amount = item.itemAmount,
+         r.quantity = item.itemQuantity,
+         r.unit_price = item.itemUnitPrice
+       ON MATCH SET
          r.amount = item.itemAmount,
          r.quantity = item.itemQuantity,
          r.unit_price = item.itemUnitPrice

@@ -60,6 +60,8 @@
 - **Test boundaries**: Always match Jest-Cucumber BDD tests inside the `backend` node-based project to prevent jsdom context pollution.
 - **Temporal Enrichment**: Every sync payload must call `enrichDate(date)` from `lib/holidays.ts` and pass the 8 temporal fields (`dayOfWeek`...`isBeforeHoliday`) through Phase 1 of the Cypher engine. The `category` field must also be propagated to `:Transaction` nodes.
 - **Unit Price / Quantity**: Every `ReceiptItemSyncPayload` must carry `itemQuantity` and `itemUnitPrice`; Phase 3 stores these on `[:CONTAINS]` edges and `:MerchantSKU` nodes. Default to `1` / total amount when explicit data is unavailable.
+- **ON MATCH SET on all Phases**: Every `MERGE` that sets properties MUST include BOTH `ON CREATE SET` and `ON MATCH SET`. Without `ON MATCH SET`, re-running the backfill on existing nodes/relationships silently skips property updates, leaving stale/null values. This applies to Phase 1 (Transaction/Merchant), Phase 2 (Ingredient), and Phase 3 (MerchantSKU/CONTAINS).
+- **Idempotent Backfill**: Re-running `backfill-neo4j` must always converge the graph to the correct state. `ON MATCH SET` guarantees idempotency.
 
 ## 7. Type-Safe Polymorphic Identity Casting
 - **Polymorphic Caster Gateways**: All UUID database columns MUST use type-safe SQL helper functions (`public.safe_cast_uuid(TEXT)` and `public.safe_cast_user_uuid(TEXT)`) inside bulk ingest operations:
