@@ -87,14 +87,35 @@ Every `:MerchantSKU` node and `CONTAINS` relationship stores:
 
 A **Slovak holiday calendar** (`lib/holidays.ts`) covers 2025-2026 and provides `enrichDate()` for any transaction date.
 
-### 4.7 POS Data Architecture (Future)
+### 4.7 Ingredient Mapping Ontology (`neo4j-ontology.ts`)
+The `mapToOntologyItem(name, merchantId, currency)` function maps raw receipt item names to canonical ingredients:
+- **Keyword matching**: `mliek`/`milk` → Milk, `masl`/`butter` → Butter, `kur`/`chick`/`hydin` → Chicken Breast, `múk`/`muka`/`flour` → Flour, `kofol`/`cola`/`pepsi` → Cola Beverage, `piv`/`beer`/`bažant`/`keg` → Draft Beer, `zemiak`/`potat` → Potatoes
+- **Fallthrough**: Items not matching any keyword get `canonicalName = raw name`, `baseUnit` = parsed from name, `perishability` = 30
+- **SKU ID**: `sku-{merchantId}-{lowercased-item-name-with-special-chars-as-hyphens}`
+- **Ingredient ID**: `ing-{lowercased-canonical-name-with-special-chars-as-hyphens}`
+- **Two items mapping to the same Ingredient ID (via keyword) across different merchants enable Price Intelligence comparisons**, verifying the price of that ingredient at each merchant.
+
+### 4.8 Seed Data Insight Requirements
+All 3 analytical insight queries require specific seed data patterns:
+
+| Query | Requirement | Example |
+|-------|-------------|---------|
+| **Price Intel** | Same ingredient sold by 2+ merchants with >=2 purchases each | Mlieko 1L at Metro + LUNYS → ing-milk |
+| **Timing** | Spend variance >10% across days or >15% weekend vs weekday | Model weekend 2x multiplier in Neo4j |
+| **Waste** | Ingredients with perilability_days < 14 purchased on weekend/before-holiday | Mlieko 1L (7d), Kuracie prsia 1kg (5d at LUNYS + Kura chladené voľné at Bidfood → same ing-chicken-breast) |
+
+- Multi-merchant items MUST share keyword-matching canonical ingredient IDs per `mapToOntologyItem()`
+- Perishable items MUST have perilability_days < 14 (Milk=7, Chicken Breast=5 from keyword rules)
+- For timing: apply a 2x multiplier to weekend transaction amounts directly in Neo4j if seed data is too uniform
+
+### 4.9 POS Data Architecture (Future)
 The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'menu_item'`, `'inventory_adjustment'` in addition to `'transaction'` and `'merchant'`. When POS data flows in, it will use the same outbox pattern:
 1. POS system writes to a new `pos_sales` table via RPC.
 2. RPC enqueues `entity_type = 'sale'` to `graph_sync_queue`.
 3. Sync runner processes events: MATCH purchased ingredients → menu items → sales for margin analysis.
 4. No schema changes needed — the architecture is already prepared.
 
-### 4.4 Headless Viewport Pattern
+### 4.10 Headless Viewport Pattern
 - All navigation, fiscal calendar generation, and module switching MUST be handled by the `useNavigation` hook.
 - UI components (e.g., `NavBar`) MUST be stateless "View" shells that consume the hook.
 - **Suspense Isolation**: Hook consumption MUST happen inside a sub-component wrapped in `<Suspense>` to ensure static-page safety (e.g. 404 pages).
@@ -118,7 +139,9 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
   3. *Phase 3 (SKU Construction)*: UNWIND flat items, MATCH parents/ingredients via unique constraints, and MERGE `:MerchantSKU` nodes, avoiding concurrent collisions.
   - **Idempotent Property Propagation**: Every `MERGE` in all 3 phases MUST include BOTH `ON CREATE SET` and `ON MATCH SET` for all properties. Without `ON MATCH SET`, re-running backfill on existing nodes/relationships silently skips property updates, leaving stale nulls (e.g., `unit_price` on `[:CONTAINS]`).
 - **Flat-Memory Cursor Sliding Loops**: Bulk outbox syncing MUST process queues using flat sliding loop index windows (`.slice(i, i + BATCH_SIZE)`) instead of mutating arrays via `.splice()`. This guarantees $O(1)$ memory allocation and prevents V8 garbage collection thrashing.
+- **Items Array Required for Phases 2+3**: `neo4jBulkMerge` checks each payload for an `items` field. Legacy `Transaction` objects (without `items`) only trigger Phase 1 (Merchant+Transaction nodes). Phases 2+3 (Ingredient, SKU, CONTAINS) only run when payloads carry the full `ReceiptItemSyncPayload[]`. The seed script (`seed_demo_2026.ts`) passes `Transaction` objects → only Phase 1 runs during seeding. Use `rebuild-neo4j-graph.ts` or the `backfill-neo4j` API route to rebuild the full graph from Postgres receipt_items.
 - **Outbox Integrity & Self-Healing**: Dynamic outbox queues (`graph_sync_queue`) record CRUD events in real-time. If a transaction SKU or ingredient arrives out-of-order, the engine MUST self-heal by merging missing parent transaction nodes before executing SKU connections.
+- **Neo4j Free Tier Memory Limits**: AuraDB free tier has ~2.2GB transaction memory limit. When syncing 10K+ transactions with items, use MAX_BATCH_SIZE=100 in `neo4jBulkMerge` calls to avoid `MemoryPoolOutOfMemoryError`. The `rebuild-neo4j-graph.ts` script uses a sliding window of 100.
 
 ### 6.2 CI Runner Hardening & Node.js 24 Compliance
 - **Target Node 24**: All CI execution pipelines (GitHub Actions) MUST target Node.js 24 (`node-version: '24'`) and set the `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` runner environment variable to suppress actions runner warnings and align with active deprecation deadlines.
@@ -141,7 +164,27 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
   3. *Zero-Privilege Default*: The `EXECUTE` permission is completely revoked from both the `anon` and `public` roles to avoid inheritance vulnerabilities.
 - **Landmine Detection**: The live security suite checks that legacy, insecure functions or parameter overloads do NOT exist in the public database schema, forcing active remediation.
 
-### 6.5 WhatsApp Sidecar & Gateway Architecture
+### 6.5 Supabase Pagination (1000-Row Default Limit)
+- **Default Limit**: Supabase `.select()` silently caps at 1000 rows. Any query on tables that may exceed 1000 rows MUST paginate with `.range(start, end)` or `.limit(N)`.
+- **Pagination Pattern**: Use `PAGE_SIZE = 1000` with a `while` loop:
+  ```typescript
+  let allRows: any[] = [], page = 0;
+  while (true) {
+    const { data: chunk } = await supabase
+      .from('transactions').select('*')
+      .eq('tenant_id', tenantId)
+      .order('id')
+      .range(page * 1000, (page + 1) * 1000 - 1);
+    if (!chunk || chunk.length === 0) break;
+    allRows = allRows.concat(chunk);
+    if (chunk.length < 1000) break;
+    page++;
+  }
+  ```
+- **Why not `.limit()` alone**: `.limit(N)` only caps the client-side limit. Without `.order()`, the data order is undefined across pages. Always combine `.order('id')` with `.range()`.
+- **Applies to**: `backfill-neo4j`, scripts that bulk-export data, analytics queries, and any ETL pipeline reading from Supabase.
+
+### 6.6 WhatsApp Sidecar & Gateway Architecture
 - **Third-Party API Gateway**: External applications must NOT communicate directly with the sidecar. All external requests must route through the Next.js Shared Endpoint (`/api/whatsapp/notify`) using a Tenant API Key (`X-Api-Key` verified against `public.api_keys`).
 - **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
 - **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
@@ -150,7 +193,7 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
 - **Shared HMAC Primitive**: All signing operations (sidecar dispatch AND server action dispatch) MUST use `signHmacPayload()` exported from `@synculariti/whatsapp-client`. Never re-implement the algorithm inline.
 - **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
 
-### 6.6 Integrating External Applications with the WhatsApp Sidecar
+### 6.7 Integrating External Applications with the WhatsApp Sidecar
 
 Any internal module or external application (e.g., an ERP, a POS system, a third-party SaaS) can trigger a WhatsApp workflow that collects a user decision back via an Action Link. The protocol is as follows:
 

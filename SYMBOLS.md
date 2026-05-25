@@ -105,8 +105,10 @@
 - `function articulateFinding(finding)`: Template fallback that programmatically generates a natural-language insight string when LLM is unavailable.
 - `function pickWinningFinding(findings)`: Scores all findings by impact and returns the highest-impact winner.
 - `function analyzeInsights(session, tenantId)`: Orchestrator that runs all 3 analytical queries, picks the winner, calls LLM as narrator, and returns the insight string (lib/insight-queries.ts)
+- `function mapToOntologyItem(name, merchantId, currency)`: Maps raw receipt item name to canonical ingredient via keyword matching (mliek→Milk, kur→Chicken Breast, etc.). Returns `{ skuId, canonicalName, canonicalIngredientId, baseUnit, perishability }`. (lib/neo4j-ontology.ts)
 - `API Route: GET /api/debug/sync-neo4j`: Manually triggers outbox processing for the current authenticated tenant's pending graph sync queue.
 - `API Route: GET /api/debug/backfill-neo4j`: Manually rebuilds and backfills the entire Neo4j graph from historical Postgres ledgers for the current tenant.
+- `Script: rebuild-neo4j-graph.ts`: Utility that deletes all tenant Neo4j data, reads all Postgres transactions+receipt_items, calls `mapToOntologyItem()` on each item, builds `TransactionSyncPayload[]` with items array, and calls `neo4jBulkMerge()` in small batches (100 tx/batch) to avoid AuraDB free tier memory limits. Usage: `npx tsx src/scripts/rebuild-neo4j-graph.ts`.
 - `interface Ingredient`: Defines a canonical, deduplicated ingredient category in the restaurant graph ontology.
 - `interface MerchantSKU`: Defines a merchant-specific, compound-hashed store item linked to a parent Ingredient.
 - `interface ReceiptItemSyncPayload`: Canonical interface for receipt line items during background outbox replication. Now carries `itemQuantity` (default 1), `itemUnitPrice` (default total amount), and a `category` field mapped from the parent transaction.

@@ -30,6 +30,7 @@
 - **Security Verification**: Critical RPCs must be registered in `v2/src/lib/db-security-contract.ts` for automated catalog contract testing.
 - **Automated Catalog Contracts**: We validate database state in real-time with a live integration test suite (`db-security.test.ts`) that queries the PostgreSQL catalog using the `get_function_security_state` oracle RPC. This ensures every critical function strictly enforces injection protection (`search_path=public`) and completely revokes execution privileges from `public` and `anon` roles.
 - **Migration Protocol**: Add new numbered files to `sql/b2b_evolution/`. Never alter applied migrations.
+- **Supabase Pagination**: Supabase `.select()` defaults to 1000 rows minimum. Any query on tables that may exceed 1000 rows MUST paginate with `.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)` using `PAGE_SIZE = 1000` and `.order('id')`. This applies to ETL scripts, backfill routes, and analytics queries.
 
 ## 4. AI & Groq Strategy
 - **Model**: `llama-3.3-70b-versatile`
@@ -43,6 +44,10 @@
   5. Cache result in `tenants.config.ai_insight` with 24h TTL
 - **Graph Enrichment**: Every `:Transaction` node must store temporal fields (`day_of_week`, `is_weekend`, `month`, `quarter`, `is_holiday`, `holiday_name`, `days_to_next_holiday`, `is_before_holiday`). Every `:MerchantSKU` and `[:CONTAINS]` must store `unit_price` and `quantity`.
 - **Date Utility**: Use `enrichDate()` from `lib/holidays.ts` (covers 2025–2026 Slovak holidays) for all temporal enrichment.
+- **Seed Data Requirements**: For all 3 queries to produce non-null findings:
+  - *Price Intel*: Need the same ingredient sold by 2+ merchants with >=2 purchases each. Items MUST share keyword-matching canonical ingredient IDs per `mapToOntologyItem()`.
+  - *Waste*: Need ingredients with `perishability_days < 14` (Milk=7, Chicken Breast=5).
+  - *Timing*: If seed data is too uniform, apply a 2x weekend multiplier directly in Neo4j (< 10% day-of-week variance or < 15% weekend vs weekday = null).
 
 ## 5. Deployment & Testing
 - **Build First**: `npm run build` must pass locally before any push to `main`.
@@ -62,6 +67,8 @@
 - **Unit Price / Quantity**: Every `ReceiptItemSyncPayload` must carry `itemQuantity` and `itemUnitPrice`; Phase 3 stores these on `[:CONTAINS]` edges and `:MerchantSKU` nodes. Default to `1` / total amount when explicit data is unavailable.
 - **ON MATCH SET on all Phases**: Every `MERGE` that sets properties MUST include BOTH `ON CREATE SET` and `ON MATCH SET`. Without `ON MATCH SET`, re-running the backfill on existing nodes/relationships silently skips property updates, leaving stale/null values. This applies to Phase 1 (Transaction/Merchant), Phase 2 (Ingredient), and Phase 3 (MerchantSKU/CONTAINS).
 - **Idempotent Backfill**: Re-running `backfill-neo4j` must always converge the graph to the correct state. `ON MATCH SET` guarantees idempotency.
+- **Items Array Required**: `neo4jBulkMerge` only runs Phases 2+3 when payloads carry an `items` field with `ReceiptItemSyncPayload[]`. Legacy `Transaction` objects (without `items`) only trigger Phase 1. Use `rebuild-neo4j-graph.ts` or the `backfill-neo4j` API route to build the full graph from Postgres receipt_items.
+- **Neo4j Free Tier Memory**: AuraDB free tier has ~2.2GB transaction memory. Batch with MAX_BATCH_SIZE=100 for 10K+ transactions with items to avoid `MemoryPoolOutOfMemoryError`.
 
 ## 7. Type-Safe Polymorphic Identity Casting
 - **Polymorphic Caster Gateways**: All UUID database columns MUST use type-safe SQL helper functions (`public.safe_cast_uuid(TEXT)` and `public.safe_cast_user_uuid(TEXT)`) inside bulk ingest operations:
