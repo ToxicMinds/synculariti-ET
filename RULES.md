@@ -33,8 +33,16 @@
 
 ## 4. AI & Groq Strategy
 - **Model**: `llama-3.3-70b-versatile`
-- **Context Injection**: Always pass the `tenant.categories` list to categorization prompts.
+- **Categorization**: Always pass the `tenant.categories` list to categorization prompts.
 - **Validation**: Sanitize and validate LLM outputs before database persistence.
+- **Insights Pipeline**: Use the Structured Query → LLM Narration pattern:
+  1. Run 3 parallel analytical Cypher queries (Price Intelligence, Timing Patterns, Waste Risk) on separate Neo4j sessions
+  2. Score each finding by impact; pick the highest-impact winner
+  3. LLM receives only the winning finding's structured data — it narrates, never guesses
+  4. Fall back to `articulateFinding()` template if LLM is unavailable
+  5. Cache result in `tenants.config.ai_insight` with 24h TTL
+- **Graph Enrichment**: Every `:Transaction` node must store temporal fields (`day_of_week`, `is_weekend`, `month`, `quarter`, `is_holiday`, `holiday_name`, `days_to_next_holiday`, `is_before_holiday`). Every `:MerchantSKU` and `[:CONTAINS]` must store `unit_price` and `quantity`.
+- **Date Utility**: Use `enrichDate()` from `lib/holidays.ts` (covers 2025–2026 Slovak holidays) for all temporal enrichment.
 
 ## 5. Deployment & Testing
 - **Build First**: `npm run build` must pass locally before any push to `main`.
@@ -50,6 +58,8 @@
 - **CI Node 24 Hardening**: All workflow pipelines (GitHub Actions) MUST target Node.js 24 and set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to suppress deprecation warnings and align runner execution early.
 - **Engine Compliance**: Ensure `package.json` contains `"engines": { "node": ">=20" }` to prevent npm installer conflicts in modern Node runtimes.
 - **Test boundaries**: Always match Jest-Cucumber BDD tests inside the `backend` node-based project to prevent jsdom context pollution.
+- **Temporal Enrichment**: Every sync payload must call `enrichDate(date)` from `lib/holidays.ts` and pass the 8 temporal fields (`dayOfWeek`...`isBeforeHoliday`) through Phase 1 of the Cypher engine. The `category` field must also be propagated to `:Transaction` nodes.
+- **Unit Price / Quantity**: Every `ReceiptItemSyncPayload` must carry `itemQuantity` and `itemUnitPrice`; Phase 3 stores these on `[:CONTAINS]` edges and `:MerchantSKU` nodes. Default to `1` / total amount when explicit data is unavailable.
 
 ## 7. Type-Safe Polymorphic Identity Casting
 - **Polymorphic Caster Gateways**: All UUID database columns MUST use type-safe SQL helper functions (`public.safe_cast_uuid(TEXT)` and `public.safe_cast_user_uuid(TEXT)`) inside bulk ingest operations:
@@ -66,6 +76,16 @@
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
+
+## 9. POS Data Architecture (Future)
+- **Outbox Reuse**: POS sales will flow through the same `graph_sync_queue` pattern. The `entity_type` CHECK constraint already accepts `'sale'`, `'menu_item'`, `'inventory_adjustment'`.
+- **Flow**: POS system writes to `pos_sales` table via RPC → RPC enqueues `entity_type='sale'` → Sync runner MATCHes purchased ingredients → menu items → sales for margin analysis.
+- **No Schema Changes Needed**: The architecture is prepared; implement the `pos_sales` table RPC when POS data integration begins.
+
+## 10. AI Insights Caching & Concurrency
+- **Session Isolation**: Never share a Neo4j session across concurrent `session.run()` calls. Use separate sessions per query when running in parallel.
+- **Caching**: Winning insight is cached in `tenants.config.ai_insight` with a 24-hour TTL. Bypass cache via `?force=1` query parameter.
+- **Fallback**: If any part of the pipeline fails (Neo4j disconnect, LLM 503, malformed data), fall back gracefully to `articulateFinding()` and never throw a 500 to the client. Return the "still syncing" status until valid data is produced.
 
 
 

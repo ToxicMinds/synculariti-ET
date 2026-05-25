@@ -6,6 +6,7 @@ import { SecureHandler } from '@/lib/types/api';
 import { createClient } from '@/lib/supabase-server';
 import { TransactionSyncPayload, ReceiptItemSyncPayload } from '@/lib/types';
 import { mapToOntologyItem } from '@/lib/neo4j-ontology';
+import { enrichDate } from '@/lib/holidays';
 
 /**
  * GET /api/debug/backfill-neo4j
@@ -33,7 +34,7 @@ const handler: SecureHandler = async (req, context) => {
     // 1. Fetch all transactions for the tenant
     const { data: transactions, error: txsError } = await supabase
       .from('transactions')
-      .select('id, amount, date, who, description, currency, tenant_id')
+      .select('id, amount, date, category, who, description, currency, tenant_id')
       .eq('tenant_id', tenantId)
       .eq('is_deleted', false)
       .order('date', { ascending: true });
@@ -76,19 +77,26 @@ const handler: SecureHandler = async (req, context) => {
       const relatedItems = itemsByTx[txRow.id] || [];
       const mappedItems: ReceiptItemSyncPayload[] = relatedItems.map(item => {
         const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
+        const itemAmount = Number(item.amount);
         return {
           ...mapped,
           itemId: item.id,
-          itemAmount: Number(item.amount),
+          itemAmount,
+          itemQuantity: 1,
+          itemUnitPrice: itemAmount,
           itemCategory: item.category || 'COGS - Dry Goods',
         };
       });
+
+      const dateEnrichment = enrichDate(txRow.date);
 
       return {
         txId: txRow.id,
         tenantId: txRow.tenant_id,
         amount: Number(txRow.amount),
         date: txRow.date,
+        category: txRow.category,
+        ...dateEnrichment,
         vendorName,
         merchantId,
         items: mappedItems,

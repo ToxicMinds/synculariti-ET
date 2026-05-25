@@ -34,13 +34,23 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
       return exp as TransactionSyncPayload;
     }
     const rawName = (exp.description || 'Unknown Merchant').trim();
-    // Deterministic Merchant ID for legacy fallback
     const merchantId = `merchant-${rawName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    const d = exp.date ? new Date(exp.date + 'T12:00:00') : new Date();
+    const dow = d.getDay();
     return {
       txId: exp.id || '',
       tenantId: exp.tenant_id || '',
       amount: Number(exp.amount),
-      date: exp.date,
+      date: exp.date || '',
+      category: exp.category,
+      dayOfWeek: dow,
+      isWeekend: dow === 0 || dow === 6,
+      month: d.getMonth() + 1,
+      quarter: Math.ceil((d.getMonth() + 1) / 3),
+      isHoliday: false,
+      holidayName: null,
+      daysToNextHoliday: 365,
+      isBeforeHoliday: false,
       vendorName: rawName,
       merchantId,
       items: []
@@ -58,8 +68,31 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
        ON CREATE SET m.name = txData.vendorName
 
        MERGE (t:Transaction {id: txData.txId})
-       ON CREATE SET t.amount = txData.amount, t.date = txData.date, t.tenant_id = txData.tenantId, t.category = txData.category
-       ON MATCH SET t.amount = txData.amount, t.date = txData.date, t.category = txData.category
+       ON CREATE SET
+         t.amount = txData.amount,
+         t.date = txData.date,
+         t.tenant_id = txData.tenantId,
+         t.category = txData.category,
+         t.day_of_week = txData.dayOfWeek,
+         t.is_weekend = txData.isWeekend,
+         t.month = txData.month,
+         t.quarter = txData.quarter,
+         t.is_holiday = txData.isHoliday,
+         t.holiday_name = txData.holidayName,
+         t.days_to_next_holiday = txData.daysToNextHoliday,
+         t.is_before_holiday = txData.isBeforeHoliday
+       ON MATCH SET
+         t.amount = txData.amount,
+         t.date = txData.date,
+         t.category = txData.category,
+         t.day_of_week = txData.dayOfWeek,
+         t.is_weekend = txData.isWeekend,
+         t.month = txData.month,
+         t.quarter = txData.quarter,
+         t.is_holiday = txData.isHoliday,
+         t.holiday_name = txData.holidayName,
+         t.days_to_next_holiday = txData.daysToNextHoliday,
+         t.is_before_holiday = txData.isBeforeHoliday
 
        MERGE (m)-[:PROCESSED]->(t)`,
       { batch: mappedPayload }
@@ -94,10 +127,13 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
        MATCH (i:Ingredient {id: item.canonicalIngredientId})
 
        MERGE (sku:MerchantSKU {id: item.skuId})
-       ON CREATE SET sku.raw_name = item.itemName, sku.currency = item.currency
+       ON CREATE SET sku.raw_name = item.itemName, sku.currency = item.currency, sku.unit_price = item.itemUnitPrice
 
        MERGE (t)-[r:CONTAINS]->(sku)
-       ON CREATE SET r.amount = item.itemAmount
+       ON CREATE SET
+         r.amount = item.itemAmount,
+         r.quantity = item.itemQuantity,
+         r.unit_price = item.itemUnitPrice
 
        MERGE (sku)-[:SUPPLIED_BY]->(m)
        MERGE (sku)-[:IS_INSTANCE_OF]->(i)`,

@@ -96,12 +96,21 @@
 - `function neo4jBulkMerge()`: High-performance utility using a 3-Phase Lock-Safe aggregation engine to merge transactions, isolated merchant SKUs, and aggregated ingredients.
 - `function processOutboxSync()`: Background runner processor that syncs ledger outbox events using a flat sliding cursor batch chunker.
 - `function neo4jDeleteTransaction()`: Removes a transaction node and its relationships from the graph.
+- `function enrichDate(date: Date): EnrichedDate`: Slovak holiday calendar enrichment returning `{dayOfWeek, isWeekend, month, quarter, isHoliday, holidayName, daysToNextHoliday, isBeforeHoliday}`. Covers 2025–2026. (lib/holidays.ts)
+- `interface EnrichedDate`: The return type of `enrichDate()` with all 8 temporal fields.
+- `interface Finding`: Structured insight finding with `type`, `title`, `description`, `impact`, and `data` fields. Returned by all 3 analytical query classes. (lib/insight-queries.ts)
+- `function queryPriceIntelligence(session, tenantId)`: Cypher query that compares avg unit price per ingredient across merchants, returns cheapest/dearest findings. (lib/insight-queries.ts)
+- `function queryTimingPatterns(session, tenantId)`: Cypher query analyzing day-of-week / weekend spend patterns, returns highest/lowest-cost timing findings. (lib/insight-queries.ts)
+- `function queryWasteRisk(session, tenantId)`: Cypher query scoring perishability × purchase day × holiday proximity for spoilage risk. (lib/insight-queries.ts)
+- `function articulateFinding(finding)`: Template fallback that programmatically generates a natural-language insight string when LLM is unavailable.
+- `function pickWinningFinding(findings)`: Scores all findings by impact and returns the highest-impact winner.
+- `function analyzeInsights(session, tenantId)`: Orchestrator that runs all 3 analytical queries, picks the winner, calls LLM as narrator, and returns the insight string (lib/insight-queries.ts)
 - `API Route: GET /api/debug/sync-neo4j`: Manually triggers outbox processing for the current authenticated tenant's pending graph sync queue.
 - `API Route: GET /api/debug/backfill-neo4j`: Manually rebuilds and backfills the entire Neo4j graph from historical Postgres ledgers for the current tenant.
 - `interface Ingredient`: Defines a canonical, deduplicated ingredient category in the restaurant graph ontology.
 - `interface MerchantSKU`: Defines a merchant-specific, compound-hashed store item linked to a parent Ingredient.
-- `interface ReceiptItemSyncPayload`: Canonical interface for receipt line items during background outbox replication.
-- `interface TransactionSyncPayload`: Canonical interface for transactional outbox replication payloads.
+- `interface ReceiptItemSyncPayload`: Canonical interface for receipt line items during background outbox replication. Now carries `itemQuantity` (default 1), `itemUnitPrice` (default total amount), and a `category` field mapped from the parent transaction.
+- `interface TransactionSyncPayload`: Canonical interface for transactional outbox replication payloads. Now carries 8 temporal enrichment fields (`dayOfWeek`, `isWeekend`, `month`, `quarter`, `isHoliday`, `holidayName`, `daysToNextHoliday`, `isBeforeHoliday`) and `category`.
 - `interface LockManager`: Definition for the Web Locks API (in v2/src/types/web-locks.d.ts).
 - `class OfflineQueue`: Core manager for PWA offline-first mutation resilience.
 - `interface QueuedMutation`: Represents a stalled mutation awaiting network recovery.

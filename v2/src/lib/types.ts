@@ -40,7 +40,9 @@ export interface MenuItem {
 export interface ReceiptItemSyncPayload {
   itemId: string;
   itemName: string;
-  itemAmount: number;     // Financial price for the quantity
+  itemAmount: number;     // Total line amount (price × quantity)
+  itemQuantity: number;   // Units purchased (default 1 if unknown)
+  itemUnitPrice: number;  // Price per unit (itemAmount / itemQuantity)
   itemCategory: string;
   skuId: string;          // Pre-calculated SKU hash
   currency: string;       // Financial currency context
@@ -56,8 +58,16 @@ export interface TransactionSyncPayload {
   amount: number;
   date: string;
   category?: string;
+  dayOfWeek: number;
+  isWeekend: boolean;
+  month: number;
+  quarter: number;
+  isHoliday: boolean;
+  holidayName: string | null;
+  daysToNextHoliday: number;
+  isBeforeHoliday: boolean;
   vendorName: string;
-  merchantId: string;     // Hash/UUID of normalized vendor name
+  merchantId: string;
   items: ReceiptItemSyncPayload[];
 }
 

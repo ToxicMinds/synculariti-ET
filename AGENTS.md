@@ -65,6 +65,35 @@ We use a deterministic AI pipeline for financial categorization:
 - **Hardware/Intelligence Decoupling (SRP)**: Complex components (like Receipt Scanners) MUST separate hardware logic (`useCamera`) from intelligence parsing (`useReceiptProcessor`).
 - **Idempotency Shield**: All intelligence parsing MUST be gated by an idempotency hash (e.g., SHA-256 of the image blob) to prevent redundant AI API calls and ensure graceful degradation timeouts.
 
+### 4.5 Analytical Insight Pipeline (Graph Intelligence)
+The AI Insights card uses a **Structured Query → LLM Narration** pipeline, NOT an open-ended LLM prompt:
+
+1. **3 Parallel Analytical Cypher Queries** (each on its own Neo4j session):
+   - **Price Intelligence**: Compares avg unit price per ingredient across merchants. Detects which vendor is cheaper for the same item.
+   - **Timing Analysis**: Day-of-week / weekend vs weekday spending patterns.
+   - **Waste Prediction**: Perishability + purchase day + holiday proximity → spoilage risk score.
+2. **Impact Scoring**: Each finding is scored by severity (price diff %, timing delta %, risk score). The highest-impact finding wins.
+3. **LLM as Narrator**: Only the winning finding's structured data is fed to `llama-3.3-70b-versatile` with a prompt to articulate naturally. The LLM does NOT guess or invent — it summarizes real numbers.
+4. **Template Fallback**: If LLM is unavailable, findings are articulated programmatically via `articulateFinding()`.
+5. **Caching**: The winning insight is cached in `tenants.config.ai_insight` with a 24h TTL.
+
+### 4.6 Enriched Graph Model (Neo4j)
+Every `:Transaction` node now stores temporal enrichment derived from its `date`:
+- `day_of_week` (0=Sun..6=Sat), `is_weekend` (boolean), `month` (1-12), `quarter` (1-4)
+- `is_holiday` (Slovak holiday), `holiday_name`, `days_to_next_holiday`, `is_before_holiday`
+
+Every `:MerchantSKU` node and `CONTAINS` relationship stores:
+- `unit_price` (price per unit), `quantity` (units purchased)
+
+A **Slovak holiday calendar** (`lib/holidays.ts`) covers 2025-2026 and provides `enrichDate()` for any transaction date.
+
+### 4.7 POS Data Architecture (Future)
+The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'menu_item'`, `'inventory_adjustment'` in addition to `'transaction'` and `'merchant'`. When POS data flows in, it will use the same outbox pattern:
+1. POS system writes to a new `pos_sales` table via RPC.
+2. RPC enqueues `entity_type = 'sale'` to `graph_sync_queue`.
+3. Sync runner processes events: MATCH purchased ingredients → menu items → sales for margin analysis.
+4. No schema changes needed — the architecture is already prepared.
+
 ### 4.4 Headless Viewport Pattern
 - All navigation, fiscal calendar generation, and module switching MUST be handled by the `useNavigation` hook.
 - UI components (e.g., `NavBar`) MUST be stateless "View" shells that consume the hook.

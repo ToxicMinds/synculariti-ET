@@ -6,6 +6,7 @@ import { SecureHandler } from '@/lib/types/api';
 import { createClient } from '@/lib/supabase-server';
 import { TransactionSyncPayload, ReceiptItemSyncPayload } from '@/lib/types';
 import { mapToOntologyItem } from '@/lib/neo4j-ontology';
+import { enrichDate } from '@/lib/holidays';
 
 /**
  * GET /api/debug/sync-neo4j
@@ -92,10 +93,13 @@ const handler: SecureHandler = async (req, context) => {
 
           const mappedItems: ReceiptItemSyncPayload[] = (itemsRows || []).map(item => {
             const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
+            const itemAmount = Number(item.amount);
             return {
               ...mapped,
               itemId: item.id,
-              itemAmount: Number(item.amount),
+              itemAmount,
+              itemQuantity: 1,
+              itemUnitPrice: itemAmount,
               itemCategory: item.category || 'COGS - Dry Goods',
             };
           });
@@ -109,12 +113,15 @@ const handler: SecureHandler = async (req, context) => {
             primaryCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
           }
 
+          const dateEnrichment = enrichDate(txRow.date);
+
           payloadsToSync.push({
             txId: txRow.id,
             tenantId: txRow.tenant_id,
             amount: Number(txRow.amount),
             date: txRow.date,
             category: primaryCategory,
+            ...dateEnrichment,
             vendorName,
             merchantId,
             items: mappedItems,

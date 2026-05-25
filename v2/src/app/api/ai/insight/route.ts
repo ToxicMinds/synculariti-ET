@@ -5,117 +5,118 @@ import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
+import { queryPriceIntelligence, queryTimingPatterns, queryWasteRisk, InsightFinding } from '@/lib/insight-queries';
 
-interface Neo4jMerchantFact {
-  merchant: string;
-  visits: number | { low: number };
-  total: number;
+function articulateFinding(f: InsightFinding): string {
+  return `${f.summary}. ${f.recommendation}.`;
 }
-
-interface Neo4jCategoryFact {
-  category: string;
-  count: number | { low: number };
-  total: number;
-}
-
-const getVisits = (v: number | { low: number }): number => {
-  return typeof v === 'object' && v !== null ? v.low : v;
-};
 
 const handler: SecureHandler = async (_req, context) => {
   const { tenantId } = context.auth || { tenantId: 'fallback' };
 
-  await ServerLogger.system('INFO', 'AI', 'Insight request started', { tenantId });
-  
+  await ServerLogger.system('INFO', 'AI', 'Analytical insight request started', { tenantId });
+
   const driver = getNeo4jDriver();
   if (!driver) {
     return apiError('Neo4j not configured', 'Sync', 'Graph driver missing', { status: 500 });
   }
 
-  const session = driver.session();
+  // Use separate sessions to allow concurrent queries
+  const session1 = driver.session();
+  const session2 = driver.session();
+  const session3 = driver.session();
+
   try {
-    const merchantResult = await session.run(`
-      MATCH (m:Merchant)-[:PROCESSED]->(t:Transaction {tenant_id: $tenantId})
-      WITH m.name AS merchant, count(t) AS visits, sum(t.amount) AS total
-      ORDER BY visits DESC
-      LIMIT 15
-      RETURN collect({merchant: merchant, visits: toInteger(visits), total: total}) AS topMerchants
-    `, { tenantId });
+    const [priceResult, timingResult, wasteResult] = await Promise.all([
+      queryPriceIntelligence(session1, tenantId),
+      queryTimingPatterns(session2, tenantId),
+      queryWasteRisk(session3, tenantId),
+    ]);
 
-    const categoryResult = await session.run(`
-      MATCH (t:Transaction {tenant_id: $tenantId})
-      WHERE t.category IS NOT NULL
-      WITH t.category AS category, count(t) AS count, sum(t.amount) AS total
-      ORDER BY total DESC
-      RETURN collect({category: category, count: toInteger(count), total: total}) AS categories
-    `, { tenantId });
-    
-    const facts = (merchantResult.records[0]?.get('topMerchants') || []) as Neo4jMerchantFact[];
-    const categories = (categoryResult.records[0]?.get('categories') || []) as Neo4jCategoryFact[];
+    const findings: InsightFinding[] = [priceResult, timingResult, wasteResult].filter(Boolean) as InsightFinding[];
 
-    const generateFallbackInsight = () => {
-      if (categories.length > 0) {
-        const topCat = categories[0];
-        const total = typeof topCat.total === 'object' ? 0 : topCat.total;
-        return `💡 Financial Insight: Your highest operating expense is ${topCat.category} at €${Number(total).toFixed(2)}. ${facts.length > 0 ? `You have high frequency with ${facts[0].merchant}.` : 'Consider auditing this category for optimization.'}`;
-      }
-      return "💡 System Intelligence: Analyzing your spending patterns. Add more transactions to unlock deeper B2B insights.";
-    };
-
-    // Build context for Groq
-    const merchantSummary = facts
-      .map((f: Neo4jMerchantFact) => `${f.merchant}: ${getVisits(f.visits)} visits, €${Number(f.total).toFixed(2)}`)
-      .join('; ');
-
-    const categorySummary = categories
-      .slice(0, 6)
-      .map((c: Neo4jCategoryFact) => `${c.category}: €${Number(c.total).toFixed(2)}`)
-      .join('; ');
-
-    try {
-      const result = await callGroq("llama-3.3-70b-versatile", [
-        {
-          role: "system",
-          content: `You are a sharp, caring financial advisor for a Slovak-based tenant.
-Give ONE focused, actionable insight in 2 sentences max. Be specific with category amounts. Avoid generic advice.`
-        },
-        {
-          role: "user",
-          content: `Category breakdown: ${categorySummary || 'No data'}. Top merchants: ${merchantSummary || 'No data'}.`
-        }
-      ], { 
-        temperature: 0.7, 
-        max_tokens: 200,
-        cacheKey: `insight-${tenantId}-${facts.length}-${categories.length}`
-      });
-
-      return NextResponse.json({ 
-        success: true, 
-        insight: result.content,
-        facts,
-        categories,
-        usage: result.usage
-      });
-    } catch (apiErr: unknown) {
-      await ServerLogger.system('WARN', 'AI', 'Groq insight call failed, using fallback', { tenantId, error: apiErr instanceof Error ? apiErr.message : String(apiErr) });
-      return NextResponse.json({ 
-        success: true, 
-        insight: generateFallbackInsight(),
-        facts,
-        categories
+    if (findings.length === 0) {
+      return NextResponse.json({
+        success: true,
+        insight: '💡 System Intelligence: Analyzing your spending patterns. Add more transactions to unlock deeper B2B insights.',
+        findings: [],
+        category: 'empty'
       });
     }
 
+    // Pick the finding with highest impact score
+    findings.sort((a, b) => b.impact - a.impact);
+    const best = findings[0];
+    const category = best.type;
+
+    // Try LLM narration; fall back to template articulation
+    try {
+      const groqKey = process.env.GROQ_API_KEY;
+      if (groqKey) {
+        const result = await callGroq('llama-3.3-70b-versatile', [
+          {
+            role: 'system',
+            content: `You are a sharp, specific financial analyst for a Slovak restaurant.
+Given ONE structured finding below, articulate it in exactly 2 sentences.
+Be specific with numbers. Do NOT add generic advice. Do NOT mention unrelated categories.
+Just state the finding naturally as if talking to the restaurant owner.`
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              type: best.type,
+              summary: best.summary,
+              detail: best.detail,
+              recommendation: best.recommendation,
+              data: best.data
+            })
+          }
+        ], {
+          temperature: 0.4,
+          max_tokens: 250,
+          cacheKey: `analytical-insight-${tenantId}-${best.type}-${Math.round(best.impact)}`
+        });
+
+        return NextResponse.json({
+          success: true,
+          insight: result.content,
+          findings: findings.map(f => ({ type: f.type, impact: f.impact, summary: f.summary })),
+          category,
+          usage: result.usage
+        });
+      }
+    } catch (apiErr: unknown) {
+      await ServerLogger.system('WARN', 'AI', 'Groq narration failed, using template', {
+        tenantId,
+        error: apiErr instanceof Error ? apiErr.message : String(apiErr)
+      });
+    }
+
+    // Fallback: template articulation
+    return NextResponse.json({
+      success: true,
+      insight: articulateFinding(best),
+      findings: findings.map(f => ({ type: f.type, impact: f.impact, summary: f.summary })),
+      category
+    });
+
   } catch (e: unknown) {
-    await ServerLogger.system('ERROR', 'AI', 'Insight route Neo4j query failed', { tenantId, error: e instanceof Error ? e.message : String(e) });
-    return NextResponse.json({ 
-      success: true, 
-      insight: "💡 Intelligence Hub: Syncing your financial graph. Insights will appear shortly.",
-      facts: [],
-      categories: []
+    await ServerLogger.system('ERROR', 'AI', 'Analytical insight Neo4j queries failed', {
+      tenantId,
+      error: e instanceof Error ? e.message : String(e)
+    });
+    return NextResponse.json({
+      success: true,
+      insight: '💡 Intelligence Hub: Syncing your financial graph. Insights will appear shortly.',
+      findings: [],
+      category: 'empty'
     });
   } finally {
-    await session.close();
+    await Promise.all([
+      session1.close(),
+      session2.close(),
+      session3.close()
+    ]);
   }
 };
 
