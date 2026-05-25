@@ -65,6 +65,7 @@
 - **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
+- **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
 
 
 

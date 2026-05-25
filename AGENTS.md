@@ -118,6 +118,7 @@ We use a deterministic AI pipeline for financial categorization:
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Shared HMAC Primitive**: All signing operations (sidecar dispatch AND server action dispatch) MUST use `signHmacPayload()` exported from `@synculariti/whatsapp-client`. Never re-implement the algorithm inline.
+- **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
 
 ### 6.6 Integrating External Applications with the WhatsApp Sidecar
 
