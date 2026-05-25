@@ -153,4 +153,8 @@
 - `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
 - `Edge Function: processOutboxEvent`: Supabase Edge Function handler that listens to database webhooks for `whatsapp_outbox` inserts and pushes them to the Sidecar VM via OpenWAClient.
+- `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks.
+- `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links.
+- `Component: ActionClient`: Client component implementing user selection buttons, loading states, and submitting decisions to the server action.
+
 
