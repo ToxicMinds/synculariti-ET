@@ -152,4 +152,5 @@
 - `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.
 - `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
+- `Edge Function: processOutboxEvent`: Supabase Edge Function handler that listens to database webhooks for `whatsapp_outbox` inserts and pushes them to the Sidecar VM via OpenWAClient.
 

@@ -37,7 +37,8 @@ module.exports = {
         "<rootDir>/src/app/api/**/*.test.ts*", 
         "<rootDir>/src/lib/**/*.test.ts*",
         "<rootDir>/src/modules/**/lib/**/*.test.ts*",
-        "<rootDir>/tests/features/**/*.test.ts*"
+        "<rootDir>/tests/features/**/*.test.ts*",
+        "<rootDir>/tests/functions/**/*.test.ts*"
       ],
       moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
       transform: { ...tsJestTransformCfg }
