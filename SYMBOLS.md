@@ -151,7 +151,7 @@
 - `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
 - `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.
 - `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.
-- `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages.
+- `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages. Resolves outbox context via `body.outboxId` (action-link bridge), `body.pollMessageId` (native WhatsApp poll), or `body.sender` (fallback). Automatically routes decisions to the correct service based on outbox payload metadata: `poId` → DefaultPOApprovalService, `transactionId` → DefaultFinanceAuditService, `amount+locationId` → DefaultPOSDiscrepancyService. Marks outbox records as `COMPLETED` after successful processing.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
 - `Edge Function: processOutboxEvent`: Supabase Edge Function handler that listens to database webhooks for `whatsapp_outbox` inserts and pushes them to the Sidecar VM via OpenWAClient.
 - `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks.
@@ -160,8 +160,7 @@
 - `interface POApprovalService`: Service contract for handling Purchase Order approval decisions from WhatsApp/web.
 - `class DefaultPOApprovalService`: Implementation of POApprovalService mapping Approve/Reject/Modify decisions to receive_purchase_order_v1 RPC and table mutations.
 - `interface FinanceAuditService`: Service contract for processing audit anomaly decisions (Approve Anyway, Request Re-upload, Reject Expense).
-- `class DefaultFinanceAuditService`: Implementation of FinanceAuditService performing transaction approval, re-upload state updates, or soft-deleting rejected transactions.
+- `class DefaultFinanceAuditService`: Implementation of FinanceAuditService. Accepts optional `supabaseClient` constructor param (defaults to browser client, pass service-role client to bypass RLS in API/script context).
 - `interface POSDiscrepancyService`: Service contract for resolving POS cash discrepancy actions (Log as Shrinkage, Recount Required, Deduct from Register).
-- `class DefaultPOSDiscrepancyService`: Implementation of POSDiscrepancyService logging ledger adjustments via add_transaction_v3 RPC, or returning recount/deduction resolutions.
-
-
+- `class DefaultPOSDiscrepancyService`: Implementation of POSDiscrepancyService logging ledger adjustments via add_transaction_v3 RPC. Accepts optional `supabaseClient` constructor param.
+- `Script: trigger_workflow.ts`: CLI development utility for queueing test WhatsApp workflows. Usage: `npx tsx src/scripts/trigger_workflow.ts <po|audit|pos> [phone_number]`. Creates real DB entities (POs, transactions, discrepancies) and inserts outbox records for end-to-end testing without a live UI flow.
