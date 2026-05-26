@@ -7,11 +7,32 @@ import { ServerLogger } from '@/lib/logger-server';
 import { createClient } from '@/lib/supabase-server';
 
 const payloadSchema = z.object({
-  locationName: z.string().optional(),
-  event: z.string(),
   recipientPhone: z.string(),
-  data: z.record(z.string(), z.any()).optional()
+  payload: z.object({
+    type: z.enum(['text', 'poll']),
+    text: z.string().optional(),
+    name: z.string().optional(),
+    options: z.array(z.string()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  }),
+  webhookUrl: z.string().url().optional(),
+  webhookSecret: z.string().optional(),
+  idempotencyKey: z.string().uuid().optional(),
 });
+
+const WashedPayload = payloadSchema.transform(w => ({
+  recipientPhone: w.recipientPhone,
+  payload: {
+    type: w.payload.type,
+    text: w.payload.text ?? null,
+    name: w.payload.name ?? null,
+    options: w.payload.options ?? null,
+    metadata: w.payload.metadata ?? {},
+  },
+  webhookUrl: w.webhookUrl ?? null,
+  webhookSecret: w.webhookSecret ?? null,
+  idempotencyKey: w.idempotencyKey ?? null,
+}));
 
 export const POST = async (req: Request) => {
   try {
@@ -21,7 +42,7 @@ export const POST = async (req: Request) => {
     }
 
     const supabase = await createClient();
-    
+
     // Verify API Key
     const { data: keyRecord, error: keyError } = await supabase
       .from('api_keys')
@@ -34,30 +55,49 @@ export const POST = async (req: Request) => {
     }
 
     const body = await req.json();
-    const parsed = payloadSchema.parse(body);
+    const parsed = WashedPayload.parse(body);
 
-    // Insert into Outbox
+    // Idempotency check before insert
+    if (parsed.idempotencyKey) {
+      const { data: existing } = await supabase
+        .from('whatsapp_outbox')
+        .select('id')
+        .eq('idempotency_key', parsed.idempotencyKey)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({ success: true, existing: true, outboxId: existing.id }, { status: 200 });
+      }
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      tenant_id: keyRecord.tenant_id,
+      api_key_id: keyRecord.id,
+      recipient_phone: parsed.recipientPhone,
+      payload: parsed.payload,
+      status: 'PENDING',
+      webhook_url: parsed.webhookUrl,
+      webhook_secret: parsed.webhookSecret,
+    };
+
+    if (parsed.idempotencyKey) {
+      insertPayload.idempotency_key = parsed.idempotencyKey;
+    }
+
     const { error: insertError } = await supabase
       .from('whatsapp_outbox')
-      .insert({
-        tenant_id: keyRecord.tenant_id,
-        api_key_id: keyRecord.id,
-        recipient_phone: parsed.recipientPhone,
-        payload: parsed,
-        status: 'PENDING'
-      });
+      .insert(insertPayload);
 
     if (insertError) throw insertError;
 
     await ServerLogger.system('INFO', 'WhatsApp', `Queued message for ${parsed.recipientPhone}`, {
-      event: parsed.event,
-      tenantId: keyRecord.tenant_id
+      type: parsed.payload.type,
+      tenantId: keyRecord.tenant_id,
     });
 
     return NextResponse.json({ success: true }, { status: 202 });
   } catch (e: unknown) {
     const errMsg = getErrorMessage(e);
-    await ServerLogger.system('ERROR', 'WhatsApp', `Validation error`, { error: errMsg });
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    await ServerLogger.system('ERROR', 'WhatsApp', 'notify handler error', { error: errMsg });
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   }
 };

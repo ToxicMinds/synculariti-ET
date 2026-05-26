@@ -164,8 +164,12 @@
 - `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.
 - `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages. Resolves outbox context via `body.outboxId` (action-link bridge), `body.pollMessageId` (native WhatsApp poll), or `body.sender` (fallback). Automatically routes decisions to the correct service based on outbox payload metadata: `poId` → DefaultPOApprovalService, `transactionId` → DefaultFinanceAuditService, `amount+locationId` → DefaultPOSDiscrepancyService. Marks outbox records as `COMPLETED` after successful processing.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
-- `Edge Function: processOutboxEvent`: Supabase Edge Function handler that listens to database webhooks for `whatsapp_outbox` inserts and pushes them to the Sidecar VM via OpenWAClient.
-- `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks.
+- `function processOutboxQueue(supabase, client, baseUrl, records?)`: Shared queue processor in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the DB webhook route and the Vercel Cron safety net. Claims PENDING/FAILED records, delivers via OpenWAClient, updates status to SENT/FAILED.
+- `API Route: POST /api/whatsapp/process-outbox`: Edge-runtime route receiving Supabase Database Webhook on INSERT to whatsapp_outbox. Calls processOutboxQueue() with the single record. Primary delivery path.
+- `API Route: GET /api/cron/process-outbox`: Edge-runtime Vercel Cron target (every 60s). Calls processOutboxQueue() with no records (claims batch via RPC). Safety net path.
+- `RPC Function: public.claim_whatsapp_outbox_batch(p_batch_size)`: Atomic batch claim with FOR UPDATE SKIP LOCKED. Transitions PENDING/FAILED → PROCESSING. Includes retry backoff (max 5 retries).
+- `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Atomic action completion. Marks COMPLETED and returns webhook_url + webhook_secret + payload in a single transaction. Fixes ACID V-49 split-brain.
+- `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks. Uses complete_whatsapp_action_v1() RPC for atomic status update.
 - `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links.
 - `Component: ActionClient`: Client component implementing user selection buttons, loading states, and submitting decisions to the server action.
 - `interface POApprovalService`: Service contract for handling Purchase Order approval decisions from WhatsApp/web.

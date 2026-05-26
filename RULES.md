@@ -80,11 +80,16 @@
 
 ## 8. WhatsApp Sidecar & Gateway Architecture
 - **Third-Party API Gateway**: External applications must NOT communicate directly with the sidecar. All external requests must route through the Next.js Shared Endpoint (`/api/whatsapp/notify`) using a Tenant API Key (`X-Api-Key` verified against `public.api_keys`).
-- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
-- **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
+- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout.
+- **Dual-Path Outbox Delivery** (`whatsapp_outbox` → delivery):
+  1. **Primary**: Database Webhook → POST to `/api/whatsapp/process-outbox` (Vercel Edge Route). Delivers within seconds.
+  2. **Safety Net**: Vercel Cron every 60s → `GET /api/cron/process-outbox` → `claim_whatsapp_outbox_batch()` (SKIP LOCKED). Catches messages the webhook missed or that need retry.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
+- **Shared Processor**: The core delivery logic lives in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the webhook route and the cron route — single code path, tested once, DRY.
+- **Atomic Completion**: The `dispatchDecision` server action MUST use `complete_whatsapp_action_v1()` RPC to atomically mark COMPLETED and return webhook config in a single transaction.
+- **Idempotency Shield**: External integrators SHOULD pass an `idempotencyKey`. The endpoint deduplicates via `whatsapp_outbox.idempotency_key`.
 
 ## 9. POS Data Architecture (Future)
 - **Outbox Reuse**: POS sales will flow through the same `graph_sync_queue` pattern. The `entity_type` CHECK constraint already accepts `'sale'`, `'menu_item'`, `'inventory_adjustment'`.

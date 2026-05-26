@@ -186,21 +186,48 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
 
 ### 6.6 WhatsApp Sidecar & Gateway Architecture
 - **Third-Party API Gateway**: External applications must NOT communicate directly with the sidecar. All external requests must route through the Next.js Shared Endpoint (`/api/whatsapp/notify`) using a Tenant API Key (`X-Api-Key` verified against `public.api_keys`).
-- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout, giving us 300s to await WhatsApp message delivery on the free tier.
-- **Outbox Delivery Pattern**: Do not call the OpenWA gateway directly from critical path mutations. Write an event to `whatsapp_outbox` in Supabase, and let a background worker pull the queue. This prevents API failure from blocking UI flow.
+- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout.
+- **Dual-Path Outbox Delivery** (`whatsapp_outbox` → delivery):
+  1. **Primary: Database Webhook → Vercel Edge Route** — On INSERT, Supabase fires an HTTP POST to `/api/whatsapp/process-outbox` (Vercel Edge Runtime). The route imports `OpenWAClient` from `@synculariti/whatsapp-client` natively and delivers within seconds.
+  2. **Safety Net: Vercel Cron → `/api/cron/process-outbox`** — Every 60 seconds, a cron sweep claims PENDING/FAILED records using `claim_whatsapp_outbox_batch()` (SKIP LOCKED). This catches messages the webhook missed or that need retry.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Shared HMAC Primitive**: All signing operations (sidecar dispatch AND server action dispatch) MUST use `signHmacPayload()` exported from `@synculariti/whatsapp-client`. Never re-implement the algorithm inline.
 - **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
+- **Atomic Action Completion**: The `dispatchDecision` server action MUST use the RPC `complete_whatsapp_action_v1()` to atomically mark the outbox COMPLETED and return webhook config in a single transaction (§4.2 ACID).
+- **Idempotency Shield**: External integrators SHOULD pass an `idempotencyKey` (UUID). The endpoint deduplicates via `whatsapp_outbox.idempotency_key` unique constraint.
+- **Shared Processor**: The core logic lives in `modules/whatsapp/lib/processOutboxQueue.ts`. This function is used by BOTH the webhook route and the cron route — single code path, tested once, DRY.
 
 ### 6.7 Integrating External Applications with the WhatsApp Sidecar
 
 Any internal module or external application (e.g., an ERP, a POS system, a third-party SaaS) can trigger a WhatsApp workflow that collects a user decision back via an Action Link. The protocol is as follows:
 
-**Step 1 — Obtain a Tenant API Key**
-Create a row in `public.api_keys` for the tenant. The `key_value` is the secret the calling system will present in `X-Api-Key`.
+**Step 0 — Provision Access**
+Contact the Synculariti admin. They create an API key for your tenant:
+```sql
+INSERT INTO public.api_keys (tenant_id, key_value, description)
+VALUES ('<your-tenant-uuid>', '<high-entropy-secret>', 'ERP Integration - ACME Corp');
+```
+You receive: a `tenant_id`, an `api_key`, and the base URL `https://synculariti-et.vercel.app`.
 
-**Step 2 — Insert into the Outbox via the Shared Endpoint**
+**Step 1 — Send a One-Way Notification (Text)**
+```bash
+curl -s -X POST https://synculariti-et.vercel.app/api/whatsapp/notify \
+  -H "X-Api-Key: <your-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipientPhone": "421901234567",
+    "payload": {
+      "type": "text",
+      "text": "🚨 Stock alert: Item #ABC-042 has fallen below reorder point (12 units remaining)."
+    }
+  }'
+```
+Response: `202 { "success": true }`
+
+The message is queued in `whatsapp_outbox` and delivered within seconds via the primary webhook path (or within 60s via the cron safety net).
+
+**Step 2 — Insert into the Outbox via the Shared Endpoint (Two-Way Poll)**
 POST to `https://<your-domain>/api/whatsapp/notify` with:
 ```json
 {
@@ -208,18 +235,28 @@ POST to `https://<your-domain>/api/whatsapp/notify` with:
   "payload": {
     "type": "poll",
     "name": "Approve Invoice #INV-042",
-    "options": ["Approve", "Reject", "Request Changes"]
+    "options": ["Approve", "Reject", "Request Changes"],
+    "metadata": {
+      "invoiceId": "a1b2c3d4-...",
+      "amount": 1250,
+      "currency": "EUR"
+    }
   },
   "webhookUrl": "https://your-app.com/api/whatsapp-callback",
-  "webhookSecret": "<a-secret-you-generate>"
+  "webhookSecret": "<a-secret-you-generate>",
+  "idempotencyKey": "a-unique-uuid-you-generate"
 }
 ```
 Header: `X-Api-Key: <your-tenant-api-key>`
 
-The endpoint atomically inserts a `whatsapp_outbox` record with `status: PENDING`. The outbox record stores your `webhookUrl` and `webhookSecret`.
+The endpoint atomically inserts a `whatsapp_outbox` record with `status: PENDING`. The outbox record stores your `webhookUrl`, `webhookSecret`, and `idempotencyKey`. If the same `idempotencyKey` is sent twice, the endpoint returns the existing outbox ID (`200 { existing: true, outboxId: "..." }`) without inserting a duplicate.
 
 **Step 3 — The Sidecar Delivers the Message (Automatic)**
-The Supabase Edge Function `process-outbox` listens on DB webhook inserts. It picks up the record and sends the poll to WhatsApp via the GCP sidecar. The user receives the message. For action-link flows, the message includes a URL of the form `https://<your-domain>/action/<outbox-id>`.
+Two delivery paths compete to serve the message:
+1. **Primary**: Supabase Database Webhook fires on INSERT → POST to `/api/whatsapp/process-outbox` (Vercel Edge Runtime) → delivers within seconds.
+2. **Safety Net**: Vercel Cron every 60s → `GET /api/cron/process-outbox` → claims and delivers any PENDING/FAILED records missed by the webhook.
+
+The user receives the WhatsApp poll with interactive buttons. For action-link flows, the message includes a URL of the form `https://<your-domain>/action/<outbox-id>`.
 
 **Step 4 — Your App Receives the Webhook**
 When the recipient responds (either via WhatsApp natively OR via the Action Link web page), Synculariti fires a POST to your `webhookUrl` with:
@@ -238,8 +275,90 @@ Header: `X-OpenWA-Signature: <hmac-sha256-hex>`
 **Step 5 — Verify the Signature**
 Use `signHmacPayload(body, webhookSecret)` and compare to the header value, or use `verifyWebhookSignature(body, signature, webhookSecret)` from `@synculariti/whatsapp-client`. Only process payloads that pass verification.
 
+```typescript
+import { verifyWebhookSignature } from '@synculariti/whatsapp-client';
+
+const signature = request.headers.get('X-OpenWA-Signature');
+const body = await request.text();
+const isValid = await verifyWebhookSignature(body, signature, '<your-webhook-secret>');
+if (!isValid) return Response.json({ error: 'Invalid signature' }, { status: 403 });
+```
+
+Or in Python:
+```python
+import hmac, hashlib
+
+def verify(payload: str, signature: str, secret: str) -> bool:
+    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+```
+
 **Step 6 — Act on the Decision (Your Module's Responsibility)**
 The WhatsApp module's responsibility ends at delivery. Your webhook handler is fully responsible for updating invoice status, triggering procurement flows, or any other business logic. This ensures strict SRP between the messaging layer and domain logic.
+
+**Step 7 — Handle Idempotency**
+Supabase webhooks are at-least-once. You may receive the same decision twice. Use the `outboxId` as your idempotency key:
+```sql
+INSERT INTO invoice_decisions (outbox_id, decision, received_at)
+VALUES ('<outboxId>', '<decision>', NOW())
+ON CONFLICT (outbox_id) DO NOTHING;
+```
+
+**Error States:**
+| HTTP Status | Meaning | What to do |
+|-------------|---------|------------|
+| `202` | Queued successfully | Wait for webhook delivery |
+| `200` | Duplicate idempotencyKey | Existing outboxId in response body |
+| `400` | Bad payload | Check Zod schema contract |
+| `401` | Invalid/missing API key | Check your `X-Api-Key` header |
+| No webhook after 5 min | Delivery delayed | Check `whatsapp_outbox` in Supabase or contact support |
+
+**Reference Implementation (Node.js/Express):**
+```javascript
+const app = require('express')();
+
+app.post('/send-approval', async (req, res) => {
+  const response = await fetch('https://synculariti-et.vercel.app/api/whatsapp/notify', {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': process.env.SYNCULARITI_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      recipientPhone: '421901234567',
+      payload: {
+        type: 'poll',
+        name: `Approve ${req.body.invoiceId}?`,
+        options: ['Approve', 'Reject'],
+        metadata: { invoiceId: req.body.invoiceId },
+      },
+      webhookUrl: 'https://my-app.com/webhook/whatsapp-decision',
+      webhookSecret: process.env.WEBHOOK_SECRET,
+      idempotencyKey: crypto.randomUUID(),
+    }),
+  });
+  res.status(response.status).json(await response.json());
+});
+
+app.post('/webhook/whatsapp-decision', async (req, res) => {
+  const signature = req.headers['x-openwa-signature'];
+  const raw = JSON.stringify(req.body);
+  const expected = crypto.createHmac('sha256', process.env.WEBHOOK_SECRET)
+    .update(raw).digest('hex');
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    return res.status(403).json({ error: 'Invalid signature' });
+  }
+  const { outboxId, decision } = req.body;
+  await pool.query(
+    `INSERT INTO decisions (outbox_id, decision) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [outboxId, decision]
+  );
+  await pool.query(`UPDATE invoices SET status = $1 WHERE id = $2`, [
+    decision === 'Approve' ? 'APPROVED' : 'REJECTED', req.body.metadata.invoiceId
+  ]);
+  res.json({ received: true });
+});
+```
 
 **Security Checklist for External Integrators:**
 - [ ] Generate a high-entropy `webhookSecret` (≥ 32 random bytes, hex-encoded)

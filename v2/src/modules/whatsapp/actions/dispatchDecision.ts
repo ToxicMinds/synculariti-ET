@@ -2,7 +2,8 @@
 
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { signHmacPayload } from '@synculariti/whatsapp-client';
+import { signHmacPayload, getErrorMessage } from '@synculariti/whatsapp-client';
+import { ServerLogger } from '@/lib/logger-server';
 
 export async function dispatchDecision(
   actionId: string,
@@ -15,88 +16,60 @@ export async function dispatchDecision(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
       {
         cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
+          get(name: string) { return cookieStore.get(name)?.value; },
           set(name: string, value: string, options: CookieOptions) {
-            try {
-              cookieStore.set({ name, value, ...options });
-            } catch (e: unknown) {
-              // Server Component context — sets are handled via middleware
-            }
+            try { cookieStore.set({ name, value, ...options }); } catch { /* Server Component */ }
           },
           remove(name: string, options: CookieOptions) {
-            try {
-              cookieStore.set({ name, value: '', ...options });
-            } catch (e: unknown) {
-              // Server Component context — removes are handled via middleware
-            }
-          }
-        }
+            try { cookieStore.set({ name, value: '', ...options }); } catch { /* Server Component */ }
+          },
+        },
       }
     );
 
-    // 1. Fetch the outbox item — verify existence and PENDING state atomically
-    const { data: record, error } = await supabase
-      .from('whatsapp_outbox')
-      .select('*')
-      .eq('id', actionId)
-      .single();
+    // Atomic: mark COMPLETED + get webhook config in one transaction
+    const { data: result, error: rpcError } = await supabase
+      .rpc('complete_whatsapp_action_v1', {
+        p_outbox_id: actionId,
+        p_decision: decision,
+      });
 
-    if (error || !record) {
-      return { success: false, error: 'Action not found or expired' };
+    if (rpcError || !result || result.status === 'NOT_FOUND') {
+      return { success: false, error: 'Action not found, already completed, or expired' };
     }
 
-    if (record.status !== 'PENDING') {
-      return { success: false, error: 'This action has already been completed or expired' };
-    }
-
-    // 2. Package the decision payload (imitates a standard poll_vote webhook event)
+    // Build and sign the webhook payload
     const payload = {
-      type: 'poll_vote',
-      outboxId: record.id,
-      recipientPhone: record.recipient_phone,
-      tenantId: record.tenant_id,
+      type: 'poll_vote' as const,
+      outboxId: actionId,
+      recipientPhone: result.payload?.recipient_phone || result.webhook_url,
+      tenantId: result.payload?.tenant_id,
       decision,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-
     const payloadString = JSON.stringify(payload);
+    const signature = await signHmacPayload(payloadString, result.webhook_secret);
 
-    // 3. Sign using shared HMAC utility (DRY: same algorithm as sidecar.ts)
-    const signature = await signHmacPayload(payloadString, record.webhook_secret);
-
-    // 4. Dispatch to the target webhook URL (the requesting module's own handler)
-    const response = await fetch(record.webhook_url, {
+    // Fire webhook (best-effort after atomic status update)
+    const response = await fetch(result.webhook_url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-OpenWA-Signature': signature
+        'X-OpenWA-Signature': signature,
       },
-      body: payloadString
+      body: payloadString,
     });
 
     if (!response.ok) {
-      return { success: false, error: `Webhook delivery failed with status ${response.status}` };
-    }
-
-    // 5. Only update the ledger to COMPLETED after confirmed delivery
-    //    ACID-W01 note: this is a best-effort update — if it fails, the link
-    //    remains PENDING and the action can be re-submitted. A future migration
-    //    should introduce a DB-side atomic RPC that marks COMPLETED + fires the
-    //    webhook in a single transaction.
-    const { error: updateError } = await supabase
-      .from('whatsapp_outbox')
-      .update({ status: 'COMPLETED' })
-      .eq('id', actionId);
-
-    if (updateError) {
-      return { success: false, error: 'Failed to update action status' };
+      await ServerLogger.system('WARN', 'WhatsApp', 'Webhook delivery failed after atomic completion', {
+        outboxId: actionId,
+        webhookStatus: response.status,
+      });
     }
 
     return { success: true };
   } catch (e: unknown) {
-    const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+    const errorMsg = getErrorMessage(e);
     return { success: false, error: `Server action crash: ${errorMsg}` };
   }
 }
