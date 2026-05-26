@@ -28,5 +28,6 @@ AS $$
   RETURNING *;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch FROM anon, public;
-REVOKE EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch FROM public;
+-- Vercel Edge routes use anon key for RPC calls
+GRANT EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch TO anon;

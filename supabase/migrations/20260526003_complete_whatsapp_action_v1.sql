@@ -38,5 +38,6 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 FROM anon, public;
-REVOKE EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 FROM public;
+-- Vercel Edge routes use anon key for RPC calls
+GRANT EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 TO anon;
