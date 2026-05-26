@@ -1,5 +1,5 @@
 import React from 'react';
-import { createClient } from '@/lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
 import { ActionClient } from './ActionClient';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -32,9 +32,13 @@ export default async function ActionPage({ params }: PageProps) {
 }
 
 async function ActionPageLoader({ actionId }: { actionId: string }) {
-  const supabase = await createClient();
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
 
-  // 1. Fetch outbox record
+  // 1. Fetch outbox record (service_role bypasses RLS — public action link, no session)
   const { data: record, error } = await supabase
     .from('whatsapp_outbox')
     .select('*')
@@ -53,7 +57,7 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
     );
   }
 
-  if (record.status !== 'PENDING') {
+  if (record.status === 'COMPLETED') {
     return (
       <div className="bento-card glass-card flex-col flex-center gap-4" style={{ padding: '40px 24px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px' }}>🔒</div>
@@ -74,12 +78,20 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
 
   const tenantName = tenant?.name || 'Synculariti Client';
 
-  // 3. Render the interactive client interface
+  // 3. Map stored payload to ActionClient interface
+  const meta = record.payload?.metadata || {};
+  const clientPayload = {
+    title: record.payload?.name || 'Action Required',
+    description: meta.description || (meta.amount ? `${meta.currency || '€'}${meta.amount}` : ''),
+    options: record.payload?.options || [],
+  };
+
+  // 4. Render the interactive client interface
   return (
     <ActionClient
       actionId={actionId}
       tenantName={tenantName}
-      payload={record.payload}
+      payload={clientPayload}
     />
   );
 }

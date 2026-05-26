@@ -49,6 +49,27 @@ export class OpenWAClient {
     }
   }
 
+  async sendImage(to: string, imageUrl: string, caption?: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.config.baseUrl}/api/sendImage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': this.config.apiKey,
+        },
+        body: JSON.stringify({
+          chatId: to,
+          image: imageUrl,
+          caption: caption || '',
+          session: this.config.sessionId
+        })
+      });
+      return response.ok;
+    } catch (e: unknown) {
+      return false;
+    }
+  }
+
   async getSessionStatus(): Promise<{ status: WhatsAppSessionStatus }> {
     const response = await fetch(`${this.config.baseUrl}/api/sessions/${this.config.sessionId}/status`, {
       headers: {

@@ -12,6 +12,7 @@ interface OutboxRecord {
     name?: string | null;
     options?: string[] | null;
     metadata?: Record<string, unknown>;
+    logoUrl?: string | null;
   };
   webhook_url?: string | null;
 }
@@ -66,6 +67,10 @@ export async function processOutboxQueue(
         const optionsText = record.payload.options.map((o, i) => `${i + 1}. ${o}`).join('\n');
         const actionUrl = `${baseUrl}/action/${record.id}`;
         const msg = `📋 ${record.payload.name}\n\n${optionsText}\n\nTap here to respond: ${actionUrl}`;
+
+        if (record.payload.logoUrl) {
+          await client.sendImage(jid, record.payload.logoUrl, record.payload.name);
+        }
         success = await client.sendText(jid, msg);
       }
 
