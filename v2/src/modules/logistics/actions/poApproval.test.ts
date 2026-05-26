@@ -50,7 +50,7 @@ describe('POApprovalService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Approve',
-      '421944539208' // Wife's phone
+      '421904855155' // Wife's phone
     );
     expect(result.success).toBe(true);
     expect(result.newStatus).toBe('APPROVED');
@@ -82,7 +82,7 @@ describe('POApprovalService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Reject',
-      '421944539208'
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.newStatus).toBe('REJECTED');
@@ -114,7 +114,7 @@ describe('POApprovalService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Modify',
-      '421944539208'
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.newStatus).toBe('MODIFIED');

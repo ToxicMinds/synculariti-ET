@@ -5,8 +5,9 @@ import { ServerLogger } from '@/lib/logger-server';
 import { processOutboxQueue } from '@/modules/whatsapp/lib/processOutboxQueue';
 
 export const GET = async (req: Request) => {
-  if (req.headers.get('x-vercel-cron') !== '1') {
-    return NextResponse.json({ error: 'Cron only' }, { status: 401 });
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || req.headers.get('x-cron-secret') !== cronSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // Use service_role to bypass RLS on whatsapp_outbox

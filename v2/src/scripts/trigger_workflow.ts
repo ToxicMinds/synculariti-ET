@@ -14,7 +14,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 const DEMO_TENANT_ID = 'f039714b-8276-4733-8172-58b049bd9163';
-const MANAGER_PHONE = '421944539208'; // Wife's phone
+const MANAGER_PHONE = '421904855155'; // Wife's phone
 const SENDER_PHONE = '421904855155';  // Husband's phone
 
 async function run() {

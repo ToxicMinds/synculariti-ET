@@ -53,7 +53,7 @@ describe('FinanceAuditService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Request Re-upload',
-      '421944539208' // Wife's phone
+      '421904855155' // Wife's phone
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('PENDING_REUPLOAD');
@@ -85,7 +85,7 @@ describe('FinanceAuditService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Approve Anyway',
-      '421944539208'
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('APPROVED');
@@ -117,7 +117,7 @@ describe('FinanceAuditService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Reject Expense',
-      '421944539208'
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('REJECTED');

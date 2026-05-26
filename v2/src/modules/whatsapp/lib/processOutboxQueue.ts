@@ -63,8 +63,10 @@ export async function processOutboxQueue(
       if (record.payload?.type === 'text' && record.payload.text) {
         success = await client.sendText(jid, record.payload.text);
       } else if (record.payload?.type === 'poll' && record.payload.name && record.payload.options) {
-        const webhookUrl = record.webhook_url || `${baseUrl}/api/whatsapp/webhook`;
-        success = await client.sendPoll(jid, record.payload.name, record.payload.options, webhookUrl);
+        const optionsText = record.payload.options.map((o, i) => `${i + 1}. ${o}`).join('\n');
+        const actionUrl = `${baseUrl}/action/${record.id}`;
+        const msg = `📋 ${record.payload.name}\n\n${optionsText}\n\nTap here to respond: ${actionUrl}`;
+        success = await client.sendText(jid, msg);
       }
 
       await supabase

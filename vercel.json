@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/process-outbox",
-      "schedule": "* * * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/ekasa-proxy/:match*",

@@ -44,7 +44,7 @@ describe('POSDiscrepancyService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Log as Shrinkage',
-      '421944539208' // Wife's phone
+      '421904855155' // Wife's phone
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('SHRINKAGE_LOGGED');
@@ -76,7 +76,7 @@ describe('POSDiscrepancyService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Recount Required',
-      '421944539208'
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('RECOUNT_REQUIRED');
@@ -101,7 +101,7 @@ describe('POSDiscrepancyService Contract', () => {
       'tenant-123',
       'outbox-123',
       'Deduct from Register',
-      '421944539208'
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('REGISTER_DEDUCTED');
