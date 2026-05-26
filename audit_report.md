@@ -1,67 +1,22 @@
-# Synculariti-ET: Current System Audit & Backlog
+# Synculariti-ET: Current Open Issues
 
-**Status:** Infrastructure hardened (partial). **37 open issues** — ordered and batched below.
-**Last Update:** 2026-05-26 (Phase 5: ACID Hardening & Production Bugfix)
-
-> **Agent Assessment:** I have reviewed the entirety of this audit report. I fully **AGREE** with the assessment of the issues and the vast majority of the proposed solutions. The focus on Test Integrity, Type Safety, and Observability aligns perfectly with the "Business-Grade Determinism" core tenet. I have noted one minor architectural adjustment for V-02 below, but otherwise endorse this roadmap completely.
+**Last Update:** 2026-05-26
 
 ---
 
-## WhatsApp Module — Phase 4 Findings (2026-05-25)
+## Project-Wide Violation Counts
 
-These issues were discovered and **resolved** during the Phase 4 cleanup of the WhatsApp Chunk 4 implementation.
-
-| ID | Principle | Location | Severity | Finding | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| W-01 | **DRY** | `dispatchDecision.ts` + `sidecar.ts::WebhookDispatcher` | 🔴 HIGH | `signPayload` was implemented verbatim in two places — identical HMAC-SHA256 algorithm with no shared source of truth. A single algorithm change would require two coordinated updates. | ✅ **Fixed** — Extracted to `signHmacPayload()` in `@synculariti/whatsapp-client/hmac.ts`. Both consumers now import from the single canonical source. |
-| W-02 | **Type Safety** | `dispatchDecision.ts` lines 41, 46 | 🔴 HIGH | `options: any` in Supabase cookie adapter callbacks — broke the zero-`:any` contract introduced in Sprint 2. | ✅ **Fixed** — Replaced with `CookieOptions` from `@supabase/ssr`. |
-| W-03 | **Type Safety** | `sidecar.ts::dispatchSecureEvent` line 85 | 🔴 HIGH | `payload: any` — the method accepted untyped payloads, defeating runtime safety. | ✅ **Fixed** — Replaced with `Record<string, unknown>`. |
-| W-04 | **Observability** | `supabase/functions/process-outbox/handler.ts` line 63 | 🟡 MEDIUM | `console.error(...)` used inside the Edge Function — violates the "Logger, not console" rule and makes failures invisible in production observability. | ✅ **Fixed** — Replaced with structured error metadata written into the `processed_at` field of the outbox update, keeping failures observable at the DB layer. |
-| W-05 | **ACID** | `dispatchDecision.ts` — webhook dispatch before DB update | 🟡 MEDIUM | Split-brain risk: if the webhook fires successfully but the subsequent `UPDATE` to set `COMPLETED` fails (network partition, timeout), the outbox record stays `PENDING` and the action link can be submitted again, causing duplicate webhook delivery. | ⚠️ **Documented / Deferred** — A comment is added in the code. Full fix requires a Postgres RPC that atomically marks `COMPLETED` and returns the payload for the caller to dispatch. Tracked as **V-49** below. |
-
-## WhatsApp Module — Phase 5 Findings (2026-05-26)
-
-Issues discovered and **resolved** during the ACID hardening and production debugging of the WhatsApp action link flow.
-
-| ID | Principle | Location | Severity | Finding | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| W-06 | **SQL Naming** | `complete_whatsapp_action_v1.sql` | 🔴 HIGH | Function declared `RETURNS TABLE (status TEXT, ...)` creating an output column named `status`. The `UPDATE ... RETURNING status` was ambiguous — PostgreSQL couldn't tell if `status` referred to `whatsapp_outbox.status` (table) or the `RETURNS TABLE` output column. Caused silent failure: RPC returned no rows, server action reported "not found". | ✅ **Fixed** — Qualified all RETURNING columns with table alias `wo.` (e.g., `RETURNING wo.status, ...`). |
-| W-07 | **DRY** | `dispatchDecision.ts` vs `supabase-server.ts` | 🟡 MEDIUM | The Supabase SSR client creation (cookie handling with `getAll`/`setAll`) was duplicated verbatim in `dispatchDecision.ts`. | ✅ **Fixed** — Now imports `createClient()` from `@/lib/supabase-server`. |
-| W-08 | **Documentation** | `AGENTS.md` §6.6 | 🟡 MEDIUM | Three documentation divergences from production reality: (1) Route runtime says "MUST enforce `runtime = 'edge'`" but process-outbox and cron routes must use Serverless (Edge blocks direct IP fetches); (2) Safety net says "Vercel Cron" but Hobby plan doesn't support it — actual deployment uses GCP crontab; (3) Cookie handling documented as `get`/`set`/`remove` but actual code uses `getAll`/`setAll`. | ✅ **Fixed** — AGENTS.md updated to match actual architecture. |
-| W-09 | **Security** | RPC grants on `complete_whatsapp_action_v1`, `claim_whatsapp_outbox_batch` | 🟡 MEDIUM | Both RPCs granted `EXECUTE TO anon` — but one is called by authenticated user sessions and the other by service_role processing routes. The `anon` role should never have access to these functions. | ✅ **Fixed** — `complete_whatsapp_action_v1` → `authenticated`, `claim_whatsapp_outbox_batch` → `service_role`. Table-level `GRANT ALL TO anon` revoked on `api_keys`, `whatsapp_outbox`, `whatsapp_inbox`. |
-
-### Fixed Backlog Item (formerly Sprint 8):
-
-| ID | Severity | Principle | Location | Issue | Solution | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| V-49 | 🟡 MEDIUM | **ACID** | `dispatchDecision.ts` | Split-brain between webhook delivery and DB status update. | Created `complete_whatsapp_action_v1()` RPC that atomically marks `COMPLETED` and returns `webhook_url` + `webhook_secret`. Server Action dispatches the webhook *after* the atomic update. | ✅ **Fixed** |
+| Principle | Current Open |
+| :--- | :--- |
+| **DRY** | 7 |
+| **ACID** | 0 ✅ |
+| **SOLID** | 8 |
+| **Type Safety (`:any`)** | 9 |
+| **Observability** | 7 |
 
 ---
 
-## Project-Wide Violation Counts (as of 2026-05-26)
-
-| Principle | Pre-WhatsApp | WhatsApp Introduced | WhatsApp Fixed | **Current Open** |
-| :--- | :--- | :--- | :--- | :--- |
-| **DRY** | 7 | 1 | 1 | **7** |
-| **ACID** | 0 | 1 | 1 | **0** ✅ |
-| **SOLID** | 8 | 0 | 0 | **8** |
-| **Type Safety (`:any`)** | 9 | 2 | 2 | **9** |
-| **Observability** | 7 | 1 | 1 | **7** |
-
-> Phase 5 introduced **4 new violations** and resolved **all 4** of them. The ACID split-brain (V-49) is fully resolved. All documentation regressions (W-08) corrected. DRY cookie duplication (W-07) fixed via shared import.
-
----
-
-## Sprint Roadmap
-
-### Sprint 1: Fix the Lies (Tests That Pass Vacuously)
-
-These are the highest priority because they provide false confidence — CI passes but the tests don't actually validate anything.
-
-| ID | Severity | Principle | Location | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-01 | 🔴 CRITICAL | Test Integrity | `groq.test.ts` | **Partially fixed** — now mocks `global.fetch` correctly (line 4). One error message still uses substring match (`'GROQ_API_KEY is not configured'` vs actual `'GROQ_API_KEY is not configured in environment'`). Works via substring but should be exact. Tighten the expected message to match the implementation. |
-| V-02 | 🔴 CRITICAL | Test Integrity | `db-security.test.ts` | Replace hardcoded mock with real queries against `information_schema.routines` via Supabase MCP or a dedicated integration test with a test DB.<br><br>**Agent Alternate Proposal:** Supabase MCP is an agent tool, not a Node package, so Jest cannot use it. Instead, the Jest test should either use the `pg` package to connect directly to the test DB, or we should create a secure Supabase RPC (e.g., `get_function_security_state`) that the test can call via the `@supabase/supabase-js` service-role client. |
+## Sprint Roadmap — Open Items
 
 ### Sprint 2: Type Safety Lockdown
 
@@ -76,7 +31,7 @@ Fix all `: any` / `z.any()` escapes. These block strict TypeScript enforcement a
 | V-07 | 🔴 HIGH | `test-utils.ts` | 17 | `as any` on mocked User | Build a proper object matching Supabase's `User` type (only ~5 required fields). |
 | V-08 | 🔴 HIGH | `db-security.test.ts` | 8 | `Record<string, any>` | Use the existing `FunctionSecurityRequirement` interface directly. |
 | V-45 | 🔴 HIGH | `groq/route.ts` | 8 | `user: { email: 'test@example.com' } as any` (auth fallback) | Replace with proper `User` object or use non-null assertion since `withAuth` guarantees auth exists. Pattern: `context.auth!`. |
-| V-46 | 🔴 HIGH | `enablebanking/route.ts` | 23 | `user: { email: 'test@example.com' } as any` (auth fallback) | Same fix as V-45. Since all routes using this pattern are wrapped in `withAuth`, use `context.auth!` instead of the `||` fallback. |
+| V-46 | 🔴 HIGH | `enablebanking/route.ts` | 23 | `user: { email: 'test@example.com' } as any` (auth fallback) | Same fix as V-45. Since all routes using this pattern are wrapped in `withAuth`, use `context.auth!` instead of the `\|\|` fallback. |
 | V-47 | 🔴 HIGH | `enablebanking/route.ts` | 97 | `(await response.json()) as any` (upstream response) | Replace with `z.unknown().parse()` or a specific Zod schema for the Enable Banking response shape. Add a `Record<string, unknown>` intermediate cast as a stepping stone. |
 | V-48 | 🔴 HIGH | `ai/parse-invoice/route.ts` | 11 | `user: { email: 'test@example.com' } as any` (auth fallback) | Same fix as V-45/V-46. Replace fallback with `context.auth!` — `withAuth` guarantees resolution. |
 
@@ -137,12 +92,6 @@ Small, targeted fixes with security impact. No architectural changes needed.
 | V-35 | 🟡 MEDIUM | `useTransactionFilter.ts` | `limit`, `offset`, `setLimit`, `setOffset` declared but never consumed | Remove dead pagination state, or implement actual pagination on the filtered results. |
 | V-44 | 🟢 LOW | `BentoCard.tsx`, `CategoryPill.tsx`, `InfoTooltip.tsx`, `BrandHeader.tsx` | Missing `React.memo` on stable presentational components; N resize listeners | Add `React.memo` to pure presentational components. Deduplicate resize listeners via shared `useWindowSize` hook. |
 
-### Sprint 8: WhatsApp ACID Hardening ✅ (Completed)
-
-| ID | Severity | Principle | Location | Issue | Solution | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| V-49 | 🟡 MEDIUM | **ACID** | `dispatchDecision.ts` | Split-brain between webhook delivery and DB status update. | Created `complete_whatsapp_action_v1()` RPC for atomic COMPLETED + webhook config return. | ✅ **Fixed** |
-
 ### Sprint 9: Cleanup
 
 | ID | Severity | Location | Issue | Solution |
@@ -157,7 +106,7 @@ Small, targeted fixes with security impact. No architectural changes needed.
 
 | ID | Severity | Location | Issue | Reasoning |
 | :--- | :--- | :--- | :--- | :--- |
-| V-28 | 🟡 MEDIUM | `logger.ts` | Direct `supabase.from('system_telemetry').insert()` | **Accepted as-is.** The Logger is fire-and-forget telemetry, not business data. Creating RPCs for every telemetry table adds maintenance burden. Document an exception in RULES.md instead. |
+| V-28 | 🟡 MEDIUM | `logger.ts` | Direct `supabase.from('system_telemetry').insert()` | **Accepted as-is.** The Logger is fire-and-forget telemetry, not business data. Creating RPCs for every telemetry table adds maintenance burden. |
 | V-29 | 🟡 MEDIUM | `logger-server.ts` | Direct `supabase.from('activity_log').insert()` via service-role key | **Same as above.** These are append-only audit tables. RPCs would add ceremony without security benefit. |
 
 ---
@@ -179,12 +128,5 @@ Small, targeted fixes with security impact. No architectural changes needed.
 | WhatsApp Notify API Gateway | `notify/route.test.ts` | ✅ |
 | WhatsApp Sidecar (SessionCache + WebhookDispatcher) | `sidecar.test.ts` | ✅ |
 | WhatsApp OpenWAClient (sendText + sendPoll) | `client.test.ts` | ✅ |
-
-## Broken Contracts (Sprint 1 Completed 🟢)
-
-All Sprint 1 test integrity issues are now fully resolved, verified, and passing!
-
-| Contract | File | Status | Description |
-| :--- | :--- | :--- | :--- |
-| DB Security | `db-security.test.ts` | ✅ **Resolved (GREEN)** | Connects to live database, calling the `get_function_security_state` catalog RPC to assert strict search_path and EXECUTE revocation. Dropped legacy landmine functions. |
-| Groq AI Client | `groq.test.ts` | ✅ **Resolved (GREEN)** | Connects exact, character-perfect string constants (`GROQ_ERRORS.MISSING_API_KEY` and `GROQ_ERRORS.EMPTY_RESPONSE`) using precise assertions. |
+| DB Security (live catalog) | `db-security.test.ts` | ✅ |
+| Groq AI Client (exact error constants) | `groq.test.ts` | ✅ |
