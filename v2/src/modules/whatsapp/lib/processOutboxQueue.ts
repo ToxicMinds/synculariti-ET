@@ -25,9 +25,15 @@ export async function processOutboxQueue(
   let recordsToProcess = records;
 
   if (!recordsToProcess) {
-    const { data: claimed } = await supabase.rpc('claim_whatsapp_outbox_batch', {
-      p_batch_size: 10,
-    }).catch(() => ({ data: null }));
+    let claimed: OutboxRecord[] | null = null;
+    try {
+      const result = await supabase.rpc('claim_whatsapp_outbox_batch', {
+        p_batch_size: 10,
+      });
+      claimed = result.data;
+    } catch {
+      claimed = null;
+    }
 
     if (claimed && claimed.length > 0) {
       recordsToProcess = claimed;

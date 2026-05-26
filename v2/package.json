@@ -20,8 +20,7 @@
     "react": "19.2.4",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.4",
-    "zod": "^4.4.3",
-    "@synculariti/whatsapp-client": "file:../packages/whatsapp-client"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",

@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@synculariti/whatsapp-client": ["./src/lib/whatsapp-client"]
     }
   },
   "include": [
