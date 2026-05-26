@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { ActionClient } from './ActionClient';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-const BASE_URL = 'https://v2-three-lime-69.vercel.app';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://synculariti-et.vercel.app';
 
 interface PageProps {
   params: Promise<{
