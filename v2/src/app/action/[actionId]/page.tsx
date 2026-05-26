@@ -1,5 +1,7 @@
 import React from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createSessionClient } from '@/lib/supabase-server';
+import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ActionClient } from './ActionClient';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -71,16 +73,18 @@ export default async function ActionPage({ params }: PageProps) {
 }
 
 async function ActionPageLoader({ actionId }: { actionId: string }) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  // Use session-based client — only logged-in users can act
+  const supabase = await createSessionClient();
 
-  // 1. Fetch outbox record (service_role bypasses RLS — public action link, no session)
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    redirect(`/login?redirect=/action/${actionId}`);
+  }
+
+  // Fetch the outbox record (RLS applies: tenant_id = get_my_tenant())
   const { data: record, error } = await supabase
     .from('whatsapp_outbox')
-    .select('*')
+    .select('*, tenants!inner(name)')
     .eq('id', actionId)
     .single();
 
@@ -88,9 +92,9 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
     return (
       <div className="bento-card glass-card flex-col flex-center gap-4" style={{ padding: '40px 24px', textAlign: 'center' }}>
         <div style={{ fontSize: '48px' }}>⚠️</div>
-        <h2 className="card-title text-gradient">Link Expired or Invalid</h2>
+        <h2 className="card-title text-gradient">Action Not Found</h2>
         <p className="card-subtitle" style={{ maxWidth: '320px' }}>
-          This action link is invalid or has expired. If you believe this is an error, please request a new link.
+          This action does not belong to your account or has expired.
         </p>
       </div>
     );
@@ -108,16 +112,7 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
     );
   }
 
-  // 2. Fetch tenant name
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('name')
-    .eq('id', record.tenant_id)
-    .single();
-
-  const tenantName = tenant?.name || 'Synculariti Client';
-
-  // 3. Map stored payload to ActionClient interface
+  const tenantName = record.tenants?.name || 'Synculariti Client';
   const meta = record.payload?.metadata || {};
   const clientPayload = {
     title: record.payload?.name || 'Action Required',
@@ -125,7 +120,6 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
     options: record.payload?.options || [],
   };
 
-  // 4. Render the interactive client interface
   return (
     <ActionClient
       actionId={actionId}
