@@ -1,12 +1,51 @@
 import React from 'react';
 import { createClient } from '@supabase/supabase-js';
+import type { Metadata } from 'next';
 import { ActionClient } from './ActionClient';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+const BASE_URL = 'https://v2-three-lime-69.vercel.app';
 
 interface PageProps {
   params: Promise<{
     actionId: string;
   }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolvedParams = await params;
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+  const { data: record } = await supabase
+    .from('whatsapp_outbox')
+    .select('payload')
+    .eq('id', resolvedParams.actionId)
+    .single();
+
+  const name = record?.payload?.name || 'Action Required';
+  const meta = record?.payload?.metadata || {};
+  const desc = meta.description || (meta.amount ? `${meta.currency || '€'}${meta.amount}` : 'Respond to this action request');
+
+  return {
+    title: `${name} - Synculariti`,
+    description: desc,
+    openGraph: {
+      title: name,
+      description: desc,
+      url: `${BASE_URL}/action/${resolvedParams.actionId}`,
+      siteName: 'Synculariti',
+      images: [{ url: `${BASE_URL}/icon.png`, width: 512, height: 512 }],
+    },
+    twitter: {
+      card: 'summary',
+      title: name,
+      description: desc,
+      images: [`${BASE_URL}/icon.png`],
+    },
+  };
 }
 
 export default async function ActionPage({ params }: PageProps) {
