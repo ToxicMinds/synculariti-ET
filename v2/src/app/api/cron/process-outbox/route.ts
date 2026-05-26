@@ -1,5 +1,3 @@
-export const runtime = 'edge';
-
 import { NextResponse } from 'next/server';
 import { OpenWAClient, getErrorMessage } from '@synculariti/whatsapp-client';
 import { createClient } from '@supabase/supabase-js';
