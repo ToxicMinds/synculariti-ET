@@ -25,7 +25,7 @@ DECLARE
 BEGIN
   UPDATE public.whatsapp_outbox
   SET status = 'COMPLETED', processed_at = NOW()
-  WHERE id = p_outbox_id AND status IN ('PENDING', 'PROCESSING')
+  WHERE id = p_outbox_id AND status IN ('PENDING', 'PROCESSING', 'SENT')
   RETURNING status, webhook_url, webhook_secret, payload
   INTO v_status, v_webhook_url, v_webhook_secret, v_payload;
 

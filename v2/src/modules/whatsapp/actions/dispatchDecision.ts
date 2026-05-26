@@ -27,12 +27,23 @@ export async function dispatchDecision(
       }
     );
 
+    type CompleteActionResult = {
+      status: string;
+      webhook_url: string | null;
+      webhook_secret: string;
+      payload: {
+        recipient_phone?: string;
+        tenant_id?: string;
+      } | null;
+    };
+
     // Atomic: mark COMPLETED + get webhook config in one transaction
     const { data: result, error: rpcError } = await supabase
       .rpc('complete_whatsapp_action_v1', {
         p_outbox_id: actionId,
         p_decision: decision,
-      });
+      })
+      .maybeSingle<CompleteActionResult>();
 
     if (rpcError || !result || result.status === 'NOT_FOUND') {
       return { success: false, error: 'Action not found, already completed, or expired' };
@@ -51,7 +62,7 @@ export async function dispatchDecision(
     const signature = await signHmacPayload(payloadString, result.webhook_secret);
 
     // Fire webhook (best-effort after atomic status update)
-    const response = await fetch(result.webhook_url, {
+    const response = await fetch(result.webhook_url || '', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
