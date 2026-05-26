@@ -372,12 +372,14 @@ app.post('/webhook/whatsapp-decision', async (req, res) => {
 
 ### 6.8 WhatsApp Test Coverage & Mock Patterns
 
-#### Coverage Map (202 tests, all green)
+#### Coverage Map (222 tests, all green)
 | Test File | Location | What It Covers |
 |-----------|----------|----------------|
 | `processOutboxQueue.test.ts` | `src/modules/whatsapp/lib/` | 12 tests: RPC claiming, direct SELECT fallback, text/poll delivery, empty queue, sendText failure (false + throw), unknown payload type, missing text/name/options, partial batch failure |
 | `hmac.test.ts` | `packages/whatsapp-client/src/` | 13 tests: real crypto round-trips for sign/verify, secret isolation, payload tamper detection, malformed sig, empty payload/secret, unicode |
-| `notify/route.test.ts` | `src/app/api/whatsapp/notify/` | 8 tests: missing key, invalid key, valid poll, valid text, bad phone, unknown type, malformed JSON, idempotency key collision |
+| `notify/route.test.ts` | `src/app/api/whatsapp/notify/` | 11 tests: missing key, invalid key, valid poll, valid text, bad phone, unknown type, malformed JSON, idempotency key collision, service key valid/invalid/missing tenant |
+| `triggerWorkflow.test.ts` | `src/modules/whatsapp/lib/` | 11 tests: bill approval (fire, below threshold, disabled, no amount), low stock (below/above), daily summary, error handling (tenant not found, missing phone, default threshold, insert errors) |
+| `workflows/route.test.ts` | `src/app/api/tenant/workflows/` | 6 tests: missing/malformed API key, per-tenant key returns config, service key missing/valid tenant_id, tenant not found |
 | `whatsapp.feature` (+ BDD) | `tests/features/` | 4 BDD scenarios: invalid sig, missing sig header, valid poll vote, unknown outbox |
 | `dispatchDecision.test.ts` | `src/modules/whatsapp/actions/` | Tests server action with RPC pattern, session-based auth |
 
@@ -406,5 +408,177 @@ beforeEach(() => {
 - WhatsApp tests run in the **backend** project — no jsdom context pollution
 - Gherkin BDD scenarios match `tests/features/*.feature` in the backend project
 - `jest.mock('@supabase/supabase-js')` targets `@supabase/supabase-js` NOT `@/lib/supabase-server` — webhook routes use `createClient()` directly, not the SSR wrapper
+
+### 6.9 Programmatic Workflow Integration (Internal & External)
+
+The platform supports configurable per-tenant WhatsApp workflows for automated notifications and approvals. Workflows are configured per tenant in `tenants.config.workflows` (JSONB) and can be read by external apps or triggered internally.
+
+#### Architecture
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **Types** | `src/modules/whatsapp/types.ts` | `WorkflowConfig`, `WorkflowKey`, `TriggerParams`, `TriggerResult`, `TenantConfig` |
+| **Trigger utility** | `src/modules/whatsapp/lib/triggerWorkflow.ts` | Reads config, checks thresholds, queues WhatsApp outbox records |
+| **Notify endpoint** | `src/app/api/whatsapp/notify/route.ts` | External API gateway — supports service-level + per-tenant keys |
+| **Workflows endpoint** | `src/app/api/tenant/workflows/route.ts` | GET endpoint for IMS to read per-tenant thresholds |
+
+#### Service-Level vs Per-Tenant API Keys
+
+**Per-Tenant Key** (`api_keys.tenant_id IS NOT NULL`):
+- The key is bound to a specific tenant. No `tenant_id` param needed.
+- Used by single-tenant apps (e.g., a specific restaurant's integration).
+
+**Service-Level Key** (`api_keys.tenant_id IS NULL`):
+- Shared across tenants. `tenant_id` + `source` must be in the request body (POST) or query params (GET).
+- Used by multi-tenant apps (IMS, central Login Service).
+- `source` field identifies the caller: `'ims'`, `'login_service'`, etc. — injected into payload metadata for audit.
+
+#### Workflow Configuration Schema (`tenants.config.workflows`)
+
+```json
+{
+  "bill_approval": {
+    "enabled": true,
+    "threshold": 150,
+    "recipients": ["owner"]
+  },
+  "low_stock_alert": {
+    "enabled": true,
+    "threshold_pct": 80,
+    "recipients": ["manager"]
+  },
+  "daily_summary": {
+    "enabled": true,
+    "time": "21:00",
+    "recipients": ["owner", "manager"]
+  }
+}
+```
+
+- `bill_approval.threshold`: Amount in EUR above which approval is required (default: 100)
+- `low_stock_alert.threshold_pct`: Stock level % below which alert fires (default: 80)
+- `daily_summary.time`: Scheduled time for summary (not yet implemented for cron)
+- `recipients`: Array of phone keys from `tenants.config.phones` (e.g., `"owner"`, `"manager"`)
+
+#### Reading Workflow Config (External App — IMS)
+
+IMS calls the read-only endpoint to display current thresholds in its settings UI:
+
+```bash
+# Per-tenant key (no tenant_id needed)
+curl -s -X GET https://synculariti-et.vercel.app/api/tenant/workflows \
+  -H "X-Api-Key: <per-tenant-api-key>"
+
+# Service-level key (tenant_id required as query param)
+curl -s -X GET "https://synculariti-et.vercel.app/api/tenant/workflows?tenant_id=<tenant-uuid>" \
+  -H "X-Api-Key: <service-api-key>"
+```
+
+Response:
+```json
+{
+  "workflows": {
+    "bill_approval": { "enabled": true, "threshold": 150, "recipients": ["owner"] },
+    "low_stock_alert": { "enabled": true, "threshold_pct": 80, "recipients": ["manager"] }
+  }
+}
+```
+
+#### Writing Workflow Config
+
+There is no custom write endpoint. The central Login Service configures workflow thresholds by calling the existing `update_tenant_config_v1` RPC with its service-role Supabase client:
+
+```sql
+SELECT public.update_tenant_config_v1(
+  p_tenant_id := '<tenant-uuid>',
+  p_config := '{
+    "phones": { "owner": "421901234567", "manager": "421909876543" },
+    "workflows": {
+      "bill_approval": { "enabled": true, "threshold": 150, "recipients": ["owner"] },
+      "low_stock_alert": { "enabled": true, "threshold_pct": 80, "recipients": ["manager"] },
+      "daily_summary": { "enabled": true, "time": "21:00", "recipients": ["owner"] }
+    }
+  }'::jsonb
+);
+```
+
+#### Triggering Workflows Programmatically (Internal)
+
+Any internal module (server action, cron, webhook, RPC trigger) can fire a workflow using the `triggerWorkflow` utility:
+
+```typescript
+import { triggerWorkflow } from '@/modules/whatsapp/lib/triggerWorkflow'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+// Bill approval — sends poll to owner if amount > threshold
+const result = await triggerWorkflow(supabase, {
+  tenantId: 'f039714b-...',
+  workflowKey: 'bill_approval',
+  amount: 1250,
+  metadata: { billId: 'bill-001', vendor: 'Bidfood' },
+})
+// result: { fired: true, outboxIds: ['uuid-1'] }
+
+// Low stock alert — sends text to manager if stock < threshold_pct
+const result2 = await triggerWorkflow(supabase, {
+  tenantId: 'f039714b-...',
+  workflowKey: 'low_stock_alert',
+  stockLevel: 65,
+  metadata: { item: 'Flour 25kg', currentStock: 16, reorderPoint: 25 },
+})
+
+// Daily summary — sends text to all recipients (no threshold check)
+const result3 = await triggerWorkflow(supabase, {
+  tenantId: 'f039714b-...',
+  workflowKey: 'daily_summary',
+  metadata: {},
+})
+```
+
+- The utility reads `tenants.config` to check thresholds and resolve recipient phone numbers.
+- Uses `service_role` Supabase client — no SSR/cookie dependency.
+- Creates `whatsapp_outbox` records that are delivered via the existing Sidecar pipeline.
+- Returns `{ fired: boolean, reason?: string, outboxIds: string[] }`.
+
+#### Sending Custom Messages from External Apps
+
+External apps (IMS, Login Service) send ad-hoc messages via the notify endpoint:
+
+```bash
+curl -s -X POST https://synculariti-et.vercel.app/api/whatsapp/notify \
+  -H "X-Api-Key: <service-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": "<tenant-uuid>",
+    "source": "ims",
+    "recipientPhone": "421901234567",
+    "payload": {
+      "type": "text",
+      "text": "🚨 Stock alert: Item #ABC-042 has fallen below reorder point (12 units remaining)."
+    }
+  }'
+```
+
+- Service-level keys require `tenant_id` + `source` in the body.
+- Standard per-tenant keys work as before (no extra params needed).
+- `source` is injected into `payload.metadata.source` for audit trail.
+
+#### Supported Workflow Types
+
+| Workflow | Payload Type | Threshold Check | Recipients |
+|----------|-------------|-----------------|------------|
+| `bill_approval` | `poll` (Approve/Reject) | `amount >= threshold` | owner |
+| `low_stock_alert` | `text` | `stockLevel <= threshold_pct` | manager |
+| `daily_summary` | `text` | None (always fires) | owner, manager |
+
+#### Test Patterns
+
+| File | Tests | What It Covers |
+|------|-------|----------------|
+| `triggerWorkflow.test.ts` | 11 | Threshold checks, recipient resolution, error handling, edge cases |
+| `notify/route.test.ts` | 11 | API key auth, body validation, service-key tenant resolution, idempotency |
+| `workflows/route.test.ts` | 6 | API key auth, per-tenant vs service-key access, missing tenant_id, 404 |
 
 

@@ -6,7 +6,25 @@ import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { ServerLogger } from '@/lib/logger-server';
 
+export interface NotifyRequestBody {
+  tenant_id?: string;
+  source?: string;
+  recipientPhone: string;
+  payload: {
+    type: 'text' | 'poll';
+    text?: string;
+    name?: string;
+    options?: string[];
+    metadata?: Record<string, unknown>;
+  };
+  webhookUrl?: string;
+  webhookSecret?: string;
+  idempotencyKey?: string;
+}
+
 const payloadSchema = z.object({
+  tenant_id: z.string().uuid().optional(),
+  source: z.string().optional(),
   recipientPhone: z.string().min(1),
   payload: z.object({
     type: z.enum(['text', 'poll']),
@@ -21,6 +39,8 @@ const payloadSchema = z.object({
 });
 
 const WashedPayload = payloadSchema.transform(w => ({
+  tenant_id: w.tenant_id ?? null,
+  source: w.source ?? null,
   recipientPhone: w.recipientPhone,
   payload: {
     type: w.payload.type,
@@ -61,6 +81,47 @@ export const POST = async (req: Request) => {
     const body = await req.json();
     const parsed = WashedPayload.parse(body);
 
+    // Resolve tenant_id: service keys (tenant_id IS NULL) read from body
+    let resolvedTenantId: string;
+    let resolvedSource: string | null = parsed.source;
+
+    if (!keyRecord.tenant_id) {
+      // Service-level key — tenant_id must be in body
+      if (!parsed.tenant_id) {
+        return NextResponse.json(
+          { error: 'tenant_id is required when using a service-level API key' },
+          { status: 400 }
+        );
+      }
+
+      // Validate the tenant exists
+      const { data: tenantExists, error: tenantCheckErr } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('id', parsed.tenant_id)
+        .single();
+
+      if (tenantCheckErr || !tenantExists) {
+        return NextResponse.json(
+          { error: 'Specified tenant does not exist' },
+          { status: 400 }
+        );
+      }
+
+      resolvedTenantId = parsed.tenant_id;
+    } else {
+      resolvedTenantId = keyRecord.tenant_id;
+    }
+
+    // Inject source into payload metadata for audit trail
+    const enrichedPayload = {
+      ...parsed.payload,
+      metadata: {
+        ...(parsed.payload.metadata as Record<string, unknown>),
+        ...(resolvedSource ? { source: resolvedSource } : {}),
+      },
+    };
+
     // Idempotency check before insert
     if (parsed.idempotencyKey) {
       const { data: existing } = await supabase
@@ -74,10 +135,10 @@ export const POST = async (req: Request) => {
     }
 
     const insertPayload: Record<string, unknown> = {
-      tenant_id: keyRecord.tenant_id,
+      tenant_id: resolvedTenantId,
       api_key_id: keyRecord.id,
       recipient_phone: parsed.recipientPhone,
-      payload: parsed.payload,
+      payload: enrichedPayload,
       status: 'PENDING',
       webhook_url: parsed.webhookUrl,
       webhook_secret: parsed.webhookSecret,
@@ -95,7 +156,8 @@ export const POST = async (req: Request) => {
 
     await ServerLogger.system('INFO', 'WhatsApp', `Queued message for ${parsed.recipientPhone}`, {
       type: parsed.payload.type,
-      tenantId: keyRecord.tenant_id,
+      tenantId: resolvedTenantId,
+      source: resolvedSource ?? 'api_key',
     });
 
     return NextResponse.json({ success: true }, { status: 202 });
