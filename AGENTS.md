@@ -370,8 +370,41 @@ app.post('/webhook/whatsapp-decision', async (req, res) => {
 - [ ] Store the `outboxId` to correlate responses to your original request
 - [ ] Handle idempotency — a network retry may deliver the same webhook twice
 
+### 6.8 WhatsApp Test Coverage & Mock Patterns
 
+#### Coverage Map (202 tests, all green)
+| Test File | Location | What It Covers |
+|-----------|----------|----------------|
+| `processOutboxQueue.test.ts` | `src/modules/whatsapp/lib/` | 12 tests: RPC claiming, direct SELECT fallback, text/poll delivery, empty queue, sendText failure (false + throw), unknown payload type, missing text/name/options, partial batch failure |
+| `hmac.test.ts` | `packages/whatsapp-client/src/` | 13 tests: real crypto round-trips for sign/verify, secret isolation, payload tamper detection, malformed sig, empty payload/secret, unicode |
+| `notify/route.test.ts` | `src/app/api/whatsapp/notify/` | 8 tests: missing key, invalid key, valid poll, valid text, bad phone, unknown type, malformed JSON, idempotency key collision |
+| `whatsapp.feature` (+ BDD) | `tests/features/` | 4 BDD scenarios: invalid sig, missing sig header, valid poll vote, unknown outbox |
+| `dispatchDecision.test.ts` | `src/modules/whatsapp/actions/` | Tests server action with RPC pattern, session-based auth |
 
+#### The `processOutboxQueue` Dual-Use Pattern
+`processOutboxQueue(supabase, client, baseUrl, records?)` accepts an OPTIONAL explicit `records` array:
+- **No records?** → Claims via RPC `claim_whatsapp_outbox_batch()` → falls back to direct SELECT
+- **Records passed?** → Processes them directly (used by webhook route pre-filtering)
+- Tests pass `makeClient()` (`{ sendText: mockSendText }`) instead of `null as any` to avoid `TypeError` calling `null.sendText()`
 
+#### Critical Mock Pattern: `mockReset()` After `jest.clearAllMocks()`
+`jest.clearAllMocks()` calls `mockClear()` which does NOT clear the persistent default implementation set by `mockResolvedValue()` or `mockResolvedValueOnce()`. This causes test pollution — a mock's return value from a previous test persists across suites.
+
+**Always add explicit `mockReset()` for mocks captured in `jest.mock()` closures:**
+```typescript
+beforeEach(() => {
+  jest.clearAllMocks();
+  // These mocks persist across clearAllMocks — must reset explicitly
+  mockMaybeSingle.mockReset();
+  mockInsert.mockReset();
+  mockSingle.mockReset();
+});
+```
+
+#### Test Runtime Architecture
+- **Two Jest projects**: `frontend` (jsdom, components/hooks) and `backend` (node, API/lib/actions)
+- WhatsApp tests run in the **backend** project — no jsdom context pollution
+- Gherkin BDD scenarios match `tests/features/*.feature` in the backend project
+- `jest.mock('@supabase/supabase-js')` targets `@supabase/supabase-js` NOT `@/lib/supabase-server` — webhook routes use `createClient()` directly, not the SSR wrapper
 
 

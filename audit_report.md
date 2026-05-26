@@ -1,121 +1,87 @@
-# Synculariti-ET: Current Open Issues
+# Synculariti-ET: Full Audit Report
 
 **Last Update:** 2026-05-26
+**Deep-dive:** Full codebase scan covering type safety, ACID, security, SOLID, DRY, observability, dead code, React hygiene.
 
 ---
 
-## Project-Wide Violation Counts
+## Fixed (W-01)
 
-| Principle | Current Open |
-| :--- | :--- |
-| **DRY** | 7 |
-| **ACID** | 0 ✅ |
-| **SOLID** | 8 |
-| **Type Safety (`:any`)** | 9 |
-| **Observability** | 7 |
+| ID | File | Issue | Fix Applied |
+| :--- | :--- | :--- | :--- |
+| W-01 | `webhook/route.ts:39` | Used session-based `createClient()` in HMAC-authenticated Edge route — no browser cookies exist in sidecar webhook POST → anon role → RLS blocked all outbox queries. `getAdminClient()` already existed but was only used post-resolution. | Replaced `createClient()` with `getAdminClient()` (service-role). Updated test mock from `@/lib/supabase-server` to `@supabase/supabase-js`. |
 
 ---
 
-## Sprint Roadmap — Open Items
+## Critical (Runtime Risk)
 
-### Sprint 2: Type Safety Lockdown
+| ID | File | Issue | Fix |
+| :--- | :--- | :--- | :--- |
+| V-34 | `MobileBottomNav.tsx` | Uses `usePathname()` without `<Suspense>` boundary — Next.js can throw on client navigation | Wrap content consuming the hook in `<Suspense>`. |
+| V-37 | `logistics/page.tsx` | "Create PO" and "View History" buttons have no `onClick` — shipped inert | Either implement navigation or remove the buttons. |
 
-Fix all `: any` / `z.any()` escapes. These block strict TypeScript enforcement and have caused prior regressions.
+## High
 
-| ID | Severity | Location | Line(s) | Current | Solution |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| V-03 | 🔴 HIGH | `ekasa-parser.ts` | 22-23, 37-39 | `receipt?: any`, `items?: any[]` | Replace with `Record<string, unknown>` as a starting point; gradually build discriminated unions for known Slovak Gov API shapes. |
-| V-04 | 🔴 HIGH | `groq.ts` | 5 | `content: string \| any[]` | Replace with `content: string \| GroqVisionContent[]` where `GroqVisionContent = { type: 'text'; text: string } \| { type: 'image_url'; image_url: { url: string } }`. |
-| V-05 | 🔴 HIGH | `withAuth.ts` | 17 | `params: Promise<any>` | Replace with `params: Promise<Record<string, string \| string[] \| undefined>>` — matches Next.js App Router convention. |
-| V-06 | 🔴 HIGH | `validations/schemas.ts` | 70, 93, 108 | `z.any()` in 3 schemas | Replace with `z.unknown()` (forces consumer-side validation) or `z.record(z.unknown())`. Add a lint rule banning `z.any()`. |
-| V-07 | 🔴 HIGH | `test-utils.ts` | 17 | `as any` on mocked User | Build a proper object matching Supabase's `User` type (only ~5 required fields). |
-| V-08 | 🔴 HIGH | `db-security.test.ts` | 8 | `Record<string, any>` | Use the existing `FunctionSecurityRequirement` interface directly. |
-| V-45 | 🔴 HIGH | `groq/route.ts` | 8 | `user: { email: 'test@example.com' } as any` (auth fallback) | Replace with proper `User` object or use non-null assertion since `withAuth` guarantees auth exists. Pattern: `context.auth!`. |
-| V-46 | 🔴 HIGH | `enablebanking/route.ts` | 23 | `user: { email: 'test@example.com' } as any` (auth fallback) | Same fix as V-45. Since all routes using this pattern are wrapped in `withAuth`, use `context.auth!` instead of the `\|\|` fallback. |
-| V-47 | 🔴 HIGH | `enablebanking/route.ts` | 97 | `(await response.json()) as any` (upstream response) | Replace with `z.unknown().parse()` or a specific Zod schema for the Enable Banking response shape. Add a `Record<string, unknown>` intermediate cast as a stepping stone. |
-| V-48 | 🔴 HIGH | `ai/parse-invoice/route.ts` | 11 | `user: { email: 'test@example.com' } as any` (auth fallback) | Same fix as V-45/V-46. Replace fallback with `context.auth!` — `withAuth` guarantees resolution. |
+| ID | File | Issue | Fix |
+| :--- | :--- | :--- | :--- |
+| W-02 | `webhook/route.ts:43` | `let outboxRecord: any = null` — only `: any` remaining in production code | Type as `whatsapp_outbox` row interface (e.g. `OutboxRecord \| null`). |
+| W-03 | `notifyLargeInvoice.ts:56` | Direct `supabase.from('whatsapp_outbox').insert({...})` instead of RPC. Also uses legacy `get(name)` cookie API without `getAll()`/`setAll()` (line 31) — breaks for chunked JWT cookies. | Use an RPC (`insert_whatsapp_outbox_v1`) for the insert. Migrate to `getAll()`/`setAll()` cookie pattern. |
+| V-18 | `page.tsx` (Dashboard) | `DashboardContent` ~215 lines handling auth, data fetching, modals, demo mode, 13+ renders | Split orchestrator, extract `DemoDataProvider`, explicit `isDemo` flag from tenant config. |
+| V-23 | `backfill-neo4j` + `sync-neo4j` | Two ~150-line files with near-identical structure | Consolidate to single param-driven route. |
+| V-21 | `enablebanking/route.ts` | 5-action switch in one handler (SRP + OCP) | Extract each action to a named function; switch dispatches. |
+| V-20 | `FinanceCharts.tsx` | "Adjustment" filtering inline in chart component | Lift filtering to hook layer. |
+| W-04 | `useStatementScanner.ts` | 251-line hook mixing file parsing, chunked AI processing, reconciliation, and state machine (SRP) | Split into `useFileParser`, `useStatementAI`, `useReconciliation`. |
+| W-05 | `InvoiceManager.tsx` | `switch (status)` at line 44 (OCP). Also `tenantId` passed as prop (same violation as V-32). | Replace switch with strategy map. Remove `tenantId` prop (RLS handles isolation). |
 
-### Sprint 3: Observability Blind Spots
+## Medium
 
-Every API route must log via ServerLogger. These are currently silent — if they fail in production, there's no trace.
+| ID | File | Issue | Fix |
+| :--- | :--- | :--- | :--- |
+| V-22 | `BentoCard.tsx` | N instances = N resize listeners (unbounded) | Shared `useWindowSize` hook. |
+| V-26 | 6+ components | `€ + Number(x).toFixed(2)` hardcoded | `formatCurrency()` utility. |
+| V-35 | `useTransactionFilter.ts` | Dead `limit`, `offset`, `setLimit`, `setOffset` | Remove or implement pagination. |
+| V-19 | `MonthlyPerformance.tsx` | Calc mixed with rendering (lines 41-56) | Extract pure function. |
+| V-44 | 4 components | Missing `React.memo` on presentational components | Add `React.memo`. |
 
-| ID | Severity | Location | Issue | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-09 | 🔴 HIGH | `export/route.ts` | Zero logging | Add `ServerLogger.system()` for request start + completion. |
-| V-10 | 🔴 HIGH | `ai/insight/route.ts` | Zero logging | Add `ServerLogger.system()` — especially important for AI API errors. |
-| V-11 | 🔴 HIGH | `ai/statement/route.ts` | Zero logging | Add `ServerLogger.system()`. |
-| V-12 | 🔴 HIGH | `ai/forecast/route.ts` | Zero logging | Add `ServerLogger.system()`. |
-| V-13 | 🔴 HIGH | `ekasa/route.ts` | Zero logging + `context` not destructured | Add `ServerLogger.system()`. Also fix the handler signature to destructure `context` so `tenantId` is available for the audit trail. |
-| V-14 | 🟡 MEDIUM | `auth/pin/route.ts` | 2 unawaited `ServerLogger` calls (lines 46, 149) | Add `await`. |
-| V-15 | 🟡 MEDIUM | `ai/parse-receipt/route.ts` | Unawaited `ServerLogger` (line 77) | Add `await`. |
-| V-17 | 🟡 MEDIUM | `settings/page.tsx` | Uses `alert()` for success/error feedback (lines 34-36) | Replace with `Logger.user()` + component-level message state (the component already has a `message` pattern). |
+## Low
 
-### Sprint 4: Security Hotfixes
+| ID | File | Issue | Fix |
+| :--- | :--- | :--- | :--- |
+| V-38 | `useTransactionSync.ts` | `typeof navigator !== 'undefined' && !navigator.onLine` repeated (lines 33, 77) | Extract `isOffline()` helper. |
+| V-39 | `ManualEntryModal.tsx` + `ReceiptScanner.tsx` | `document.getElementById` instead of React refs | Shared `useAddCategory` hook. |
 
-Small, targeted fixes with security impact. No architectural changes needed.
+## Accepted (Deferred)
 
-| ID | Severity | Location | Issue | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-30 | 🟡 MEDIUM | `health/route.ts` | Neo4j session not closed on error path (resource leak) | Wrap `session.run()` in try/catch with `finally { await session.close() }`. |
-| V-31 | 🟡 MEDIUM | `ekasa/route.ts` | `TIMEOUT_TRIGGER` magic string shipping in prod (line 31) | Gate with `if (process.env.NODE_ENV === 'test')` or remove and use jest mocking instead. |
-| V-36 | 🟡 MEDIUM | `settings/page.tsx` | Unsafe `(e as Error).message` cast (line 35) | Replace with proper `e instanceof Error` narrowing (login/page.tsx does this correctly). |
-| V-32 | 🟡 MEDIUM | `ItemAnalytics.tsx` | `tenantId` passed as prop (line 29) — violates "never passed as param" rule | Remove the prop; RLS already enforces tenant isolation on the `supabase.from().select()`. |
-
-### Sprint 5: SOLID Refactoring (Architecture Debt)
-
-| ID | Severity | Location | Issue | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-18 | 🟡 MEDIUM | `page.tsx` (Dashboard) | 251-line God Component doing auth, data, modals, demo mode, 13+ renders | Split into: (1) `DashboardContent` orchestrator (~60 lines), (2) `DemoDataProvider` extracted to `@/lib/demo-data.ts`, (3) explicit `isDemo` flag from tenant config, not inferred from empty transactions. |
-| V-19 | 🟡 MEDIUM | `MonthlyPerformance.tsx` | Category comparison calculation (lines 39-54) mixed with rendering | Extract pure function to `lib/finance.ts` for testability. |
-| V-20 | 🟡 MEDIUM | `FinanceCharts.tsx` | Business logic filtering ("Adjustment" exclusion, line 77) in a UI component | Lift filtering to the hook layer that feeds data to the chart. |
-| V-21 | 🟡 MEDIUM | `enablebanking/route.ts` | 5-action switch statement in single handler (SRP + OCP) | Keep single file but extract each action to a named function (`handleInstitutions`, `handleStartSession`, etc.). Switch dispatches to the correct one. |
-| V-22 | 🟡 MEDIUM | `BentoCard.tsx` | Each instance creates its own `resize` listener (N listeners) | Extract to shared `useWindowSize` hook with a single event listener. |
-| V-37 | 🟡 MEDIUM | `logistics/page.tsx` | "Create PO" button has no `onClick` (inert) + "View History" also inert | Either implement the onClick (navigate to a PO creation flow) or remove the buttons. |
-
-### Sprint 6: DRY Consolidation
-
-| ID | Severity | Location | Issue | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-23 | 🟡 MEDIUM | `debug/backfill-neo4j/route.ts` + `debug/sync-neo4j/route.ts` | Two near-identical files (same handler, same admin check, same TODO placeholder) | Consolidate to `debug/neo4j/route.ts?action=sync\|backfill`. |
-| V-24 | 🟡 MEDIUM | `ai/parse-invoice/route.ts` + `ai/statement/route.ts` | Markdown JSON cleanup logic duplicated verbatim | Extract `cleanMarkdownJsonBlock(input: string): string` to `@/lib/utils.ts`. |
-| V-25 | 🟡 MEDIUM | `InvoiceManager.tsx` + `ChartOfAccounts.tsx` | Near-identical fetch/render/error patterns | Extract shared fetch logic to `useTableQuery(tableName: string)` hook. Leave rendering inline (columns differ). |
-| V-26 | 🟡 MEDIUM | 6+ finance components | `€ + Number(x).toFixed(2)` hardcoded everywhere | Add `formatCurrency(amount: number, currency?: string)` to `@/lib/utils.ts`. |
-| V-38 | 🟢 LOW | `useTransactionSync.ts` | Duplicate offline check pattern (`typeof navigator !== 'undefined' && !navigator.onLine`) | Extract to `isOffline()` helper in `@/lib/utils.ts` — but borderline, 2 occurrences may not justify abstraction. |
-| V-39 | 🟢 LOW | `ManualEntryModal.tsx` + `ReceiptScanner.tsx` | `document.getElementById('scanner-new-cat')` pattern duplicated | Extract to `useAddCategory` hook using refs instead of direct DOM access. |
-
-### Sprint 7: Architecture Compliance
-
-| ID | Severity | Location | Issue | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-33 | 🟡 MEDIUM | `CalendarGrid.tsx` | Uses local `selectedDay` state instead of `useNavigation` URL params | Replace with URL-based selection via `useNavigation().setModule('/?day=...')`. |
-| V-34 | 🟡 MEDIUM | `MobileBottomNav.tsx` | Uses `usePathname()` without `<Suspense>` boundary | Wrap content consuming the hook in `<Suspense>`. |
-| V-35 | 🟡 MEDIUM | `useTransactionFilter.ts` | `limit`, `offset`, `setLimit`, `setOffset` declared but never consumed | Remove dead pagination state, or implement actual pagination on the filtered results. |
-| V-44 | 🟢 LOW | `BentoCard.tsx`, `CategoryPill.tsx`, `InfoTooltip.tsx`, `BrandHeader.tsx` | Missing `React.memo` on stable presentational components; N resize listeners | Add `React.memo` to pure presentational components. Deduplicate resize listeners via shared `useWindowSize` hook. |
-
-### Sprint 9: Cleanup
-
-| ID | Severity | Location | Issue | Solution |
-| :--- | :--- | :--- | :--- | :--- |
-| V-27 | 🟢 LOW | `page.module.css` | 142 lines of unused CSS (orphaned Next.js scaffolding) | Delete the file. It has zero references in `page.tsx`. |
-| V-40 | 🟢 LOW | `MarketTrends.tsx` | `isDemo` prop declared in types but never used in component body | Remove from type definition. |
-| V-41 | 🟢 LOW | `StatementScanner.tsx` | `AppState` import never used | Remove the import. |
-| V-42 | 🟢 LOW | `ItemCatalog.tsx` | `categories` prop declared but never referenced | Remove from props or implement showing category names in the table. |
-| V-43 | 🟢 LOW | `IdentityGate.tsx` | `supabase` import never used | Remove the import. |
-
-### Deferred (Low Priority)
-
-| ID | Severity | Location | Issue | Reasoning |
-| :--- | :--- | :--- | :--- | :--- |
-| V-28 | 🟡 MEDIUM | `logger.ts` | Direct `supabase.from('system_telemetry').insert()` | **Accepted as-is.** The Logger is fire-and-forget telemetry, not business data. Creating RPCs for every telemetry table adds maintenance burden. |
-| V-29 | 🟡 MEDIUM | `logger-server.ts` | Direct `supabase.from('activity_log').insert()` via service-role key | **Same as above.** These are append-only audit tables. RPCs would add ceremony without security benefit. |
+| ID | File | Issue | Reasoning |
+| :--- | :--- | :--- | :--- |
+| V-28 | `logger.ts` | Direct `supabase.from('system_telemetry').insert()` | Fire-and-forget; RPC overhead not worth it. |
+| V-29 | `logger-server.ts` | Direct `supabase.from('activity_log').insert()` | Append-only audit tables; no security benefit from RPC. |
 
 ---
 
-## Verified Contracts (Passing)
+## Audit Scan Results
+
+**Type Safety:** 1 `: any` remaining in production code (W-02). 0 `z.any()`. 0 `@ts-ignore`. 0 `@ts-expect-error`. Original 10 Sprint 2 violations all verified as fixed.
+
+**ACID:** W-03 is the only direct DML bypass in production code (besides deferred V-28/V-29). All ledger mutations use RPCs. No direct `update`/`delete` calls found.
+
+**Security:** All 17 API routes secured. 6 without `withAuth` have alternative auth (HMAC, API key, cron secret, service-role). W-01 (wrong client type) was the only bug — fixed.
+
+**SOLID:** 10 issues (5 original + 5 new W-02 through W-05). Switch statements found in 3 production files (`enablebanking`, `InvoiceManager`, `ekasa-protocols` — error mapper is acceptable).
+
+**DRY:** 4 issues (V-23, V-26, V-38, V-39). `formatCurrency` missing, offline check and `getElementById` duplicated, Neo4j sync routes near-identical.
+
+**Observability:** All API routes have `ServerLogger`. Health endpoint catches without logger intentionally surface errors in HTTP response — acceptable. Utility libs let errors propagate to caller — correct by design.
+
+**Dead Code / React Hygiene:** Clean. No orphaned files in `src/`. All `useEffect` hooks have cleanup returns or empty deps.
+
+---
+
+## Verified Contracts (15/15)
 
 | Contract | File | Status |
 | :--- | :--- | :--- |
-| NavBar SRP (Hollow Shell) | `NavBar.test.tsx` | ✅ |
+| NavBar SRP | `NavBar.test.tsx` | ✅ |
 | ExpenseList SRP (useSwipeable) | `useSwipeable.test.ts` | ✅ |
 | ExpenseList SRP (useCalendarGrid) | `useCalendarGrid.test.ts` | ✅ |
 | ReceiptScanner SRP (useCamera) | `useCamera.test.ts` | ✅ |
@@ -123,10 +89,10 @@ Small, targeted fixes with security impact. No architectural changes needed.
 | API Validation | `schemas.test.ts` | ✅ |
 | eKasa Timeout | `ekasa/route.test.ts` | ✅ |
 | WhatsApp Inbound Webhook | `whatsapp.test.ts` | ✅ |
-| WhatsApp Outbox Queue Processor | `processOutboxQueue` (dual-path) | ✅ |
-| WhatsApp dispatchDecision (RPC-based) | `dispatchDecision.test.ts` | ✅ |
+| WhatsApp Outbox Queue (dual-path) | `processOutboxQueue` | ✅ |
+| WhatsApp dispatchDecision (RPC) | `dispatchDecision.test.ts` | ✅ |
 | WhatsApp Notify API Gateway | `notify/route.test.ts` | ✅ |
-| WhatsApp Sidecar (SessionCache + WebhookDispatcher) | `sidecar.test.ts` | ✅ |
-| WhatsApp OpenWAClient (sendText + sendPoll) | `client.test.ts` | ✅ |
+| WhatsApp Sidecar | `sidecar.test.ts` | ✅ |
+| WhatsApp OpenWAClient | `client.test.ts` | ✅ |
 | DB Security (live catalog) | `db-security.test.ts` | ✅ |
-| Groq AI Client (exact error constants) | `groq.test.ts` | ✅ |
+| Groq AI Client | `groq.test.ts` | ✅ |

@@ -33,6 +33,10 @@ jest.mock('@supabase/supabase-js', () => ({
 describe('WhatsApp Notify API Contract', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Also reset mock implementations that persist across clearAllMocks
+    mockMaybeSingle.mockReset();
+    mockInsert.mockReset();
+    mockSingle.mockReset();
   });
 
   it('should reject requests without an API key', async () => {
@@ -70,7 +74,7 @@ describe('WhatsApp Notify API Contract', () => {
       data: { tenant_id: 'tenant-123', id: 'key-123' },
       error: null
     });
-    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
 
     const body = {
       recipientPhone: '421903123456',
@@ -116,5 +120,113 @@ describe('WhatsApp Notify API Contract', () => {
         idempotency_key: body.idempotencyKey,
       })
     );
+  });
+
+  it('should reject invalid payload with bad recipient phone', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { tenant_id: 'tenant-123', id: 'key-123' },
+      error: null
+    });
+
+    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientPhone: '', payload: { type: 'text' } }),
+    });
+
+    const response = await (POST as any)(req, { params: Promise.resolve({}) });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject payload with unknown type', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { tenant_id: 'tenant-123', id: 'key-123' },
+      error: null
+    });
+
+    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientPhone: '421901234567', payload: { type: 'fax' } }),
+    });
+
+    const response = await (POST as any)(req, { params: Promise.resolve({}) });
+    expect(response.status).toBe(400);
+  });
+
+  it('should reject malformed JSON body', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { tenant_id: 'tenant-123', id: 'key-123' },
+      error: null
+    });
+
+    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
+      body: 'not-json',
+    });
+
+    const response = await (POST as any)(req, { params: Promise.resolve({}) });
+    expect(response.status).toBe(400);
+  });
+
+  it('should process a text-type payload correctly', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { tenant_id: 'tenant-abc', id: 'key-456' },
+      error: null
+    });
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+
+    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipientPhone: '421901234567',
+        payload: { type: 'text', text: 'Hello from API' },
+      }),
+    });
+
+    const response = await (POST as any)(req, { params: Promise.resolve({}) });
+    expect(response.status).toBe(202);
+
+    expect(mockInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenant_id: 'tenant-abc',
+        recipient_phone: '421901234567',
+        payload: expect.objectContaining({
+          type: 'text',
+          text: 'Hello from API',
+        }),
+      })
+    );
+  });
+
+  it('should return existing outbox on idempotency key collision', async () => {
+    mockSingle.mockResolvedValueOnce({
+      data: { tenant_id: 'tenant-123', id: 'key-123' },
+      error: null
+    });
+    mockMaybeSingle.mockResolvedValue({
+      data: { id: 'existing-outbox-id' },
+      error: null
+    });
+
+    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+      method: 'POST',
+      headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipientPhone: '421901234567',
+        payload: { type: 'text', text: 'Duplicate' },
+        idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
+      }),
+    });
+
+    const response = await (POST as any)(req, { params: Promise.resolve({}) });
+    
+    const json = await response.json();
+    expect(mockMaybeSingle).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(json.existing).toBe(true);
+    expect(json.outboxId).toBe('existing-outbox-id');
   });
 });

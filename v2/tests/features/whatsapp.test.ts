@@ -22,18 +22,29 @@ jest.mock('next/headers', () => ({
   })),
 }));
 
-// Mock Supabase
+// Mock Supabase (service-role client for webhook route)
 const mockInsert = jest.fn();
-jest.mock('@/lib/supabase-server', () => ({
-  createClient: jest.fn(() => Promise.resolve({
+const mockOutboxSingle = jest.fn();
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: jest.fn(() => ({
     from: jest.fn((table: string) => {
+      if (table === 'whatsapp_outbox') {
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          order: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          single: mockOutboxSingle,
+          update: jest.fn().mockReturnThis(),
+        };
+      }
       if (table === 'whatsapp_inbox') {
         return {
           insert: mockInsert.mockResolvedValue({ error: null }),
         };
       }
       return {};
-    })
+    }),
   })),
 }));
 
@@ -51,6 +62,7 @@ jest.mock('@synculariti/whatsapp-client', () => {
   return {
     ...actual,
     verifyWebhookSignature: jest.fn(),
+    getErrorMessage: actual.getErrorMessage,
   };
 });
 
@@ -58,12 +70,21 @@ defineFeature(feature, (test) => {
   let payload: string = '';
   let signatureHeader: string | null = null;
   let response: Response;
-
   beforeEach(() => {
     jest.clearAllMocks();
     payload = '';
     signatureHeader = null;
+    serviceShouldFail = false;
     process.env.OPENWA_WEBHOOK_SECRET = 'test-secret';
+    // Default: outbox lookup succeeds
+    mockOutboxSingle.mockResolvedValue({
+      data: {
+        id: 'outbox-123',
+        tenant_id: 'tenant-123',
+        payload: { metadata: {} },
+      },
+      error: null,
+    });
   });
 
   test('Rejecting Webhook with Invalid Signature', ({ given, and, when, then }) => {
@@ -91,7 +112,30 @@ defineFeature(feature, (test) => {
     });
 
     then(/^it should reject the request with a (\d+) Forbidden status$/, (statusStr) => {
-      // The current route returns 403 on invalid signature, which is appropriate.
+      expect(response.status).toBe(parseInt(statusStr, 10));
+    });
+  });
+
+  test('Rejecting Webhook with Missing Signature Header', ({ given, and, when, then }) => {
+    given(/^a webhook request with payload '(.*)'$/, (p) => {
+      payload = p;
+    });
+
+    and('no signature header', () => {
+      signatureHeader = null;
+    });
+
+    when('the webhook route processes the request', async () => {
+      const req = new NextRequest('http://localhost/api/whatsapp/webhook', {
+        method: 'POST',
+        headers: {},
+        body: payload,
+      });
+
+      response = await POST(req);
+    });
+
+    then(/^it should reject the request with a (\d+) Unauthorized status$/, (statusStr) => {
       expect(response.status).toBe(parseInt(statusStr, 10));
     });
   });
@@ -137,4 +181,40 @@ defineFeature(feature, (test) => {
       );
     });
   });
+
+  test('Processing Webhook with Unknown Outbox', ({ given, and, when, then }) => {
+    given(/^a webhook request with payload '(.*)'$/, (p) => {
+      payload = p;
+    });
+
+    and(/^a valid signature header computed with secret "(.*)"$/, (secret) => {
+      signatureHeader = 'valid-sig-hash';
+      (verifyWebhookSignature as jest.Mock).mockResolvedValue(true);
+    });
+
+    when('the webhook route processes the request', async () => {
+      mockOutboxSingle.mockResolvedValue({
+        data: null,
+        error: { message: 'Not found' },
+      });
+
+      const headers: Record<string, string> = {};
+      if (signatureHeader) {
+        headers['X-OpenWA-Signature'] = signatureHeader;
+      }
+      const req = new NextRequest('http://localhost/api/whatsapp/webhook', {
+        method: 'POST',
+        headers,
+        body: payload,
+      });
+
+      response = await POST(req);
+    });
+
+    then(/^it should reject the request with a (\d+) Tenant Not Found status$/, (statusStr) => {
+      expect(response.status).toBe(parseInt(statusStr, 10));
+    });
+  });
+
+
 });

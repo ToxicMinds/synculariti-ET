@@ -7,7 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ServerLogger } from '@/lib/logger-server';
 
 const payloadSchema = z.object({
-  recipientPhone: z.string(),
+  recipientPhone: z.string().min(1),
   payload: z.object({
     type: z.enum(['text', 'poll']),
     text: z.string().optional(),

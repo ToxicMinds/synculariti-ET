@@ -3,7 +3,6 @@ export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { verifyWebhookSignature, getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
-import { createClient } from '@/lib/supabase-server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 import { DefaultPOApprovalService } from '@/modules/logistics/actions/poApproval';
@@ -36,7 +35,7 @@ export async function POST(req: Request) {
     }
 
     const body = JSON.parse(bodyText);
-    const supabase = await createClient();
+    const supabase = getAdminClient();
 
     let tenantId = '';
     let outboxId: string | null = null;
