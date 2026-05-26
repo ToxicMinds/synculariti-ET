@@ -3,8 +3,8 @@ export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { getErrorMessage } from '@synculariti/whatsapp-client';
 import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
 import { ServerLogger } from '@/lib/logger-server';
-import { createClient } from '@/lib/supabase-server';
 
 const payloadSchema = z.object({
   recipientPhone: z.string(),
@@ -41,9 +41,13 @@ export const POST = async (req: Request) => {
       return NextResponse.json({ error: 'Missing X-Api-Key header' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    // Use service_role for API key verification (this is an API gateway, not a user session)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
 
-    // Verify API Key
     const { data: keyRecord, error: keyError } = await supabase
       .from('api_keys')
       .select('id, tenant_id')
