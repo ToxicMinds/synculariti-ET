@@ -186,10 +186,12 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
 
 ### 6.6 WhatsApp Sidecar & Gateway Architecture
 - **Third-Party API Gateway**: External applications must NOT communicate directly with the sidecar. All external requests must route through the Next.js Shared Endpoint (`/api/whatsapp/notify`) using a Tenant API Key (`X-Api-Key` verified against `public.api_keys`).
-- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout.
+- **Runtime Selection**: The `/api/whatsapp/notify` route and `/api/whatsapp/webhook` route use Edge Runtime (`export const runtime = 'edge'`). The `/api/whatsapp/process-outbox` and `/api/cron/process-outbox` routes use Serverless (Node.js) runtime because Edge blocks direct IP `fetch()` calls to the GCP sidecar at `http://34.66.35.89:2785`. Serverless routes bypass the 10s timeout and support raw TCP/IP outbound connections.
 - **Dual-Path Outbox Delivery** (`whatsapp_outbox` → delivery):
-  1. **Primary: Database Webhook → Vercel Edge Route** — On INSERT, Supabase fires an HTTP POST to `/api/whatsapp/process-outbox` (Vercel Edge Runtime). The route imports `OpenWAClient` from `@synculariti/whatsapp-client` natively and delivers within seconds.
-  2. **Safety Net: Vercel Cron → `/api/cron/process-outbox`** — Every 60 seconds, a cron sweep claims PENDING/FAILED records using `claim_whatsapp_outbox_batch()` (SKIP LOCKED). This catches messages the webhook missed or that need retry.
+  1. **Primary: Database Webhook → Serverless Route** — On INSERT, Supabase fires an HTTP POST to `/api/whatsapp/process-outbox` (Node.js Serverless runtime). Delivers within seconds.
+  2. **Safety Net: GCP Crontab → `/api/cron/process-outbox`** — Vercel Hobby plan does not support CRON jobs. Instead, a GCP VM (`openwa-gateway`) runs a crontab that `GET`s `/api/cron/process-outbox` every 60 seconds. The route authenticates via `x-cron-secret` header matching the `CRON_SECRET` env var (not the spoofable `x-vercel-cron` header). It claims PENDING/FAILED records using `claim_whatsapp_outbox_batch()` (SKIP LOCKED, max 5 retries). This catches messages the webhook missed or that need retry.
+- **Supabase SSR Cookie Handling**: All server-side Supabase clients (`dispatchDecision` server action, `supabase-server.ts` page loader) MUST use the `getAll()`/`setAll()` API from `@supabase/ssr`. The legacy `get()`/`set()`/`remove()` API does not handle chunked JWT cookies (Supabase splits large JWTs across `.0`, `.1` suffixes). Using the batch API is **required** for server actions to correctly parse the user's session and call RPCs with the `authenticated` role.
+- **SQL RETURNS TABLE Naming**: When writing Postgres functions with `RETURNS TABLE (col_name TYPE, ...)`, the output column names MUST NOT collide with table column names used in `UPDATE ... RETURNING` or `SELECT ... INTO` statements. Always qualify column references with a table alias (e.g., `RETURNING wo.status` not `RETURNING status`) to avoid ambiguous column reference errors.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Shared HMAC Primitive**: All signing operations (sidecar dispatch AND server action dispatch) MUST use `signHmacPayload()` exported from `@synculariti/whatsapp-client`. Never re-implement the algorithm inline.
@@ -197,6 +199,7 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
 - **Atomic Action Completion**: The `dispatchDecision` server action MUST use the RPC `complete_whatsapp_action_v1()` to atomically mark the outbox COMPLETED and return webhook config in a single transaction (§4.2 ACID).
 - **Idempotency Shield**: External integrators SHOULD pass an `idempotencyKey` (UUID). The endpoint deduplicates via `whatsapp_outbox.idempotency_key` unique constraint.
 - **Shared Processor**: The core logic lives in `modules/whatsapp/lib/processOutboxQueue.ts`. This function is used by BOTH the webhook route and the cron route — single code path, tested once, DRY.
+- **Security by Role**: External gateway routes (notify, process-outbox, cron, webhook) use `service_role` Supabase client (server-to-server, no user session). User-facing routes (action page, `dispatchDecision` server action) use session-based Supabase SSR client with `authenticated` role. RPCs MUST only grant `EXECUTE` to the minimum required role — never `anon`.
 
 ### 6.7 Integrating External Applications with the WhatsApp Sidecar
 
@@ -253,8 +256,8 @@ The endpoint atomically inserts a `whatsapp_outbox` record with `status: PENDING
 
 **Step 3 — The Sidecar Delivers the Message (Automatic)**
 Two delivery paths compete to serve the message:
-1. **Primary**: Supabase Database Webhook fires on INSERT → POST to `/api/whatsapp/process-outbox` (Vercel Edge Runtime) → delivers within seconds.
-2. **Safety Net**: Vercel Cron every 60s → `GET /api/cron/process-outbox` → claims and delivers any PENDING/FAILED records missed by the webhook.
+1. **Primary**: Supabase Database Webhook fires on INSERT → POST to `/api/whatsapp/process-outbox` (Vercel Serverless Runtime) → delivers within seconds.
+2. **Safety Net**: GCP Crontab every 60s → `GET /api/cron/process-outbox` → claims and delivers any PENDING/FAILED records missed by the webhook.
 
 The user receives the WhatsApp poll with interactive buttons. For action-link flows, the message includes a URL of the form `https://<your-domain>/action/<outbox-id>`.
 

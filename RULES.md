@@ -80,16 +80,19 @@
 
 ## 8. WhatsApp Sidecar & Gateway Architecture
 - **Third-Party API Gateway**: External applications must NOT communicate directly with the sidecar. All external requests must route through the Next.js Shared Endpoint (`/api/whatsapp/notify`) using a Tenant API Key (`X-Api-Key` verified against `public.api_keys`).
-- **Edge Runtime Isolation**: Any API route interacting with the OpenWA gateway MUST enforce `export const runtime = 'edge'`. This bypasses the Vercel 10s Serverless timeout.
+- **Runtime Selection**: The `/api/whatsapp/notify` route and `/api/whatsapp/webhook` route use Edge Runtime. The `/api/whatsapp/process-outbox` and `/api/cron/process-outbox` routes use Serverless (Node.js) runtime — Edge blocks direct IP `fetch()` calls to the GCP sidecar.
 - **Dual-Path Outbox Delivery** (`whatsapp_outbox` → delivery):
-  1. **Primary**: Database Webhook → POST to `/api/whatsapp/process-outbox` (Vercel Edge Route). Delivers within seconds.
-  2. **Safety Net**: Vercel Cron every 60s → `GET /api/cron/process-outbox` → `claim_whatsapp_outbox_batch()` (SKIP LOCKED). Catches messages the webhook missed or that need retry.
+  1. **Primary**: Database Webhook → POST to `/api/whatsapp/process-outbox` (Serverless Runtime). Delivers within seconds.
+  2. **Safety Net**: GCP Crontab every 60s → `GET /api/cron/process-outbox` → `claim_whatsapp_outbox_batch()` (SKIP LOCKED, max 5 retries). Auth via `x-cron-secret` header (not spoofable `x-vercel-cron`).
+- **Supabase SSR Cookie Handling**: Always use `getAll()`/`setAll()` from `@supabase/ssr`. The legacy `get()`/`set()`/`remove()` API does not handle chunked JWT cookies and will cause auth failures in server actions.
+- **SQL RETURNS TABLE Naming**: Function output column names MUST NOT collide with table column names used in `UPDATE ... RETURNING` or `SELECT ... INTO`. Always qualify with a table alias.
 - **Stateless Verification**: Webhooks from the gateway must use native Web Crypto API (`globalThis.crypto.subtle`) to verify HMAC-SHA256 signatures before processing.
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
 - **Shared Processor**: The core delivery logic lives in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the webhook route and the cron route — single code path, tested once, DRY.
 - **Atomic Completion**: The `dispatchDecision` server action MUST use `complete_whatsapp_action_v1()` RPC to atomically mark COMPLETED and return webhook config in a single transaction.
 - **Idempotency Shield**: External integrators SHOULD pass an `idempotencyKey`. The endpoint deduplicates via `whatsapp_outbox.idempotency_key`.
+- **Security by Role**: Gateway routes use `service_role` Supabase client (server-to-server). User-facing routes use session-based Supabase SSR client (`authenticated` role). RPCs MUST only grant `EXECUTE` to the minimum required role — never `anon`.
 
 ## 9. POS Data Architecture (Future)
 - **Outbox Reuse**: POS sales will flow through the same `graph_sync_queue` pattern. The `entity_type` CHECK constraint already accepts `'sale'`, `'menu_item'`, `'inventory_adjustment'`.

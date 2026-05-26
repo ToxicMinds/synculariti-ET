@@ -23,10 +23,10 @@ DECLARE
   v_webhook_secret TEXT;
   v_payload JSONB;
 BEGIN
-  UPDATE public.whatsapp_outbox
+  UPDATE public.whatsapp_outbox AS wo
   SET status = 'COMPLETED', processed_at = NOW()
-  WHERE id = p_outbox_id AND status IN ('PENDING', 'PROCESSING', 'SENT')
-  RETURNING status, webhook_url, webhook_secret, payload
+  WHERE wo.id = p_outbox_id AND wo.status IN ('PENDING', 'PROCESSING', 'SENT')
+  RETURNING wo.status, wo.webhook_url, wo.webhook_secret, wo.payload
   INTO v_status, v_webhook_url, v_webhook_secret, v_payload;
 
   IF NOT FOUND THEN
@@ -39,5 +39,5 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 FROM public;
--- Vercel Edge routes use anon key for RPC calls
-GRANT EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 TO anon;
+-- Server actions use session-based anon key (authenticated role)
+GRANT EXECUTE ON FUNCTION public.complete_whatsapp_action_v1 TO authenticated;

@@ -29,5 +29,5 @@ AS $$
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch FROM public;
--- Vercel Edge routes use anon key for RPC calls
-GRANT EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch TO anon;
+-- Processing routes use service_role (server-to-server, no session)
+GRANT EXECUTE ON FUNCTION public.claim_whatsapp_outbox_batch TO service_role;

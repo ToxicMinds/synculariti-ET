@@ -146,7 +146,7 @@
 
 ## WhatsApp & Sidecar
 - `Table: public.api_keys`: Secure storage for third-party integration tokens mapped to tenants.
-- `Table: public.whatsapp_outbox`: Audit ledger (Who, What, When) for outbound messaging events.
+- `Table: public.whatsapp_outbox`: Audit ledger (Who, What, When) for outbound messaging events. Carries `idempotency_key` for deduplication, `webhook_url` / `webhook_secret` for two-way flow callbacks.
 - `Table: public.whatsapp_inbox`: Secure storage for HMAC-verified inbound messages mapped to tenants and outbox items.
 - `RPC Function: public.purge_expired_whatsapp_logs(days_to_keep INT)`: Revoked-execution routine that deletes both outbox and inbox records older than 30 days.
 - `type InboundWhatsAppEvent`: Discriminated union for incoming webhook events (text vs. poll_vote).
@@ -161,16 +161,17 @@
 - `function getErrorMessage()`: Type-safe utility to parse and format unknown caught errors safely without using `any`.
 - `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
 - `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.
-- `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp.
+- `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp. Uses `WashedPayload` Zod transform for nullable metadata normalization. Authenticates via `X-Api-Key` against `api_keys` table (service-role client).
 - `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages. Resolves outbox context via `body.outboxId` (action-link bridge), `body.pollMessageId` (native WhatsApp poll), or `body.sender` (fallback). Automatically routes decisions to the correct service based on outbox payload metadata: `poId` → DefaultPOApprovalService, `transactionId` → DefaultFinanceAuditService, `amount+locationId` → DefaultPOSDiscrepancyService. Marks outbox records as `COMPLETED` after successful processing.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
-- `function processOutboxQueue(supabase, client, baseUrl, records?)`: Shared queue processor in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the DB webhook route and the Vercel Cron safety net. Claims PENDING/FAILED records, delivers via OpenWAClient, updates status to SENT/FAILED.
-- `API Route: POST /api/whatsapp/process-outbox`: Edge-runtime route receiving Supabase Database Webhook on INSERT to whatsapp_outbox. Calls processOutboxQueue() with the single record. Primary delivery path.
-- `API Route: GET /api/cron/process-outbox`: Edge-runtime Vercel Cron target (every 60s). Calls processOutboxQueue() with no records (claims batch via RPC). Safety net path.
-- `RPC Function: public.claim_whatsapp_outbox_batch(p_batch_size)`: Atomic batch claim with FOR UPDATE SKIP LOCKED. Transitions PENDING/FAILED → PROCESSING. Includes retry backoff (max 5 retries).
-- `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Atomic action completion. Marks COMPLETED and returns webhook_url + webhook_secret + payload in a single transaction. Fixes ACID V-49 split-brain.
-- `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks. Uses complete_whatsapp_action_v1() RPC for atomic status update.
-- `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links.
+- `function processOutboxQueue(supabase, client, baseUrl, records?)`: Shared queue processor in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the DB webhook route and the GCP crontab safety net. Claims PENDING/FAILED records, delivers via OpenWAClient (fallback: action link text message for poll payloads since sidecar lacks `/api/sendPoll`), updates status to SENT/FAILED.
+- `API Route: POST /api/whatsapp/process-outbox`: **Serverless** (Node.js) runtime — receives Supabase Database Webhook on INSERT to whatsapp_outbox. Calls processOutboxQueue() with the single record. Primary delivery path. Must NOT be Edge runtime because it `fetch()`s the sidecar at a raw IP address.
+- `API Route: GET /api/cron/process-outbox`: **Serverless** (Node.js) runtime — GCP Crontab target (every 60s). Authenticates via `x-cron-secret` header matching `CRON_SECRET` env var (not spoofable `x-vercel-cron`). Calls processOutboxQueue() with no records (claims batch via `claim_whatsapp_outbox_batch` RPC). Safety net path.
+- `RPC Function: public.claim_whatsapp_outbox_batch(p_batch_size)`: Atomic batch claim with `FOR UPDATE SKIP LOCKED`. Transitions PENDING/FAILED → PROCESSING. Includes retry backoff (max 5 retries). Granted `EXECUTE TO service_role` only.
+- `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Atomic action completion. Marks COMPLETED and returns webhook_url + webhook_secret + payload in a single transaction. Fixes ACID V-49 split-brain. **Uses table alias `wo.` in RETURNING clause to avoid ambiguity with RETURNS TABLE output column `status`.** Granted `EXECUTE TO authenticated` only.
+- `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks. Uses `complete_whatsapp_action_v1()` RPC for atomic status update. Uses `getAll()`/`setAll()` Supabase SSR cookie API (NOT legacy `get()`/`set()`/`remove()`).
+- `Server Action: notifyLargeInvoice()`: Triggers WhatsApp notification for invoices exceeding configurable threshold. Writes to `whatsapp_outbox` directly rather than calling the sidecar directly.
+- `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links. Generates OG meta tags for WhatsApp link previews.
 - `Component: ActionClient`: Client component implementing user selection buttons, loading states, and submitting decisions to the server action.
 - `interface POApprovalService`: Service contract for handling Purchase Order approval decisions from WhatsApp/web.
 - `class DefaultPOApprovalService`: Implementation of POApprovalService mapping Approve/Reject/Modify decisions to receive_purchase_order_v1 RPC and table mutations.

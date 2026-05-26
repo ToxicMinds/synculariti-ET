@@ -1,31 +1,15 @@
 'use server';
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { signHmacPayload, getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
+import { createClient } from '@/lib/supabase-server';
 
 export async function dispatchDecision(
   actionId: string,
   decision: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-      {
-        cookies: {
-          get(name: string) { return cookieStore.get(name)?.value; },
-          set(name: string, value: string, options: CookieOptions) {
-            try { cookieStore.set({ name, value, ...options }); } catch { /* Server Component */ }
-          },
-          remove(name: string, options: CookieOptions) {
-            try { cookieStore.set({ name, value: '', ...options }); } catch { /* Server Component */ }
-          },
-        },
-      }
-    );
+    const supabase = await createClient();
 
     type CompleteActionResult = {
       status: string;
@@ -45,7 +29,14 @@ export async function dispatchDecision(
       })
       .maybeSingle<CompleteActionResult>();
 
-    if (rpcError || !result || result.status === 'NOT_FOUND') {
+    if (rpcError) {
+      await ServerLogger.system('ERROR', 'WhatsApp', 'RPC call failed', {
+        outboxId: actionId, error: rpcError.message, hints: rpcError.hint,
+      });
+      return { success: false, error: `Action failed: ${rpcError.message}` };
+    }
+
+    if (!result || result.status === 'NOT_FOUND') {
       return { success: false, error: 'Action not found, already completed, or expired' };
     }
 

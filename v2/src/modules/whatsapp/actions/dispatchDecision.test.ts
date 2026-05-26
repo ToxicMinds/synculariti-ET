@@ -1,121 +1,104 @@
 import { dispatchDecision } from './dispatchDecision';
-import { createServerClient } from '@supabase/ssr';
-import { verifyWebhookSignature } from '@synculariti/whatsapp-client';
+import { createClient } from '@/lib/supabase-server';
+import { signHmacPayload } from '@synculariti/whatsapp-client';
 
-// Mock Supabase SSR client
-jest.mock('@supabase/ssr', () => ({
-  createServerClient: jest.fn()
+jest.mock('@/lib/supabase-server', () => ({
+  createClient: jest.fn(),
 }));
 
-// Mock next/headers for server contexts
-jest.mock('next/headers', () => ({
-  cookies: jest.fn().mockResolvedValue({
-    get: jest.fn(),
-    set: jest.fn(),
-    delete: jest.fn()
-  })
-}));
+const mockRpc = jest.fn();
+const mockMaybeSingle = jest.fn();
 
-// Mock native fetch
 global.fetch = jest.fn();
 
+function mockSupabaseClient() {
+  mockRpc.mockReturnValue({ maybeSingle: mockMaybeSingle });
+  (createClient as jest.Mock).mockResolvedValue({
+    rpc: mockRpc,
+  });
+}
+
 describe('Server Action: dispatchDecision', () => {
-  let mockSingle: jest.Mock;
-  let mockEq: jest.Mock;
-  let mockUpdate: jest.Mock;
-  let mockSelect: jest.Mock;
-  let mockFrom: jest.Mock;
-
   beforeEach(() => {
-    mockSingle = jest.fn();
-    mockEq = jest.fn();
-    mockUpdate = jest.fn();
-    mockSelect = jest.fn();
-    mockFrom = jest.fn();
-
-    const mockQueryBuilder = {
-      select: mockSelect.mockReturnThis(),
-      update: mockUpdate.mockReturnThis(),
-      eq: mockEq.mockReturnThis(),
-      single: mockSingle
-    };
-
-    mockFrom.mockReturnValue(mockQueryBuilder);
-    
-    // Setup Supabase mock
-    (createServerClient as jest.Mock).mockReturnValue({
-      from: mockFrom
-    });
+    jest.clearAllMocks();
+    mockSupabaseClient();
   });
 
-  it('should return error if the outbox item does not exist or is not PENDING', async () => {
-    mockEq.mockReturnValueOnce({ single: mockSingle.mockResolvedValueOnce({ data: null, error: new Error('Not found') }) });
+  it('should return error if the RPC returns NOT_FOUND', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { status: 'NOT_FOUND', webhook_url: null, webhook_secret: null, payload: null },
+      error: null,
+    });
 
     const result = await dispatchDecision('invalid-id', 'Approve');
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Action not found');
+    expect(mockRpc).toHaveBeenCalledWith('complete_whatsapp_action_v1', {
+      p_outbox_id: 'invalid-id',
+      p_decision: 'Approve',
+    });
   });
 
-  it('should correctly sign and dispatch the decision to the webhook url, then update status', async () => {
-    const mockOutboxRecord = {
-      id: 'valid-id',
-      status: 'PENDING',
-      webhook_url: 'https://finance.synculariti.local/webhook',
-      webhook_secret: 'test-secret-123',
-      tenant_id: 'tenant-1',
-      payload: {
-        type: 'action_link',
-        title: 'Approve Invoice',
-        options: ['Approve', 'Reject']
-      }
-    };
+  it('should return error if the RPC throws a permission/network error', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'permission denied for function', hint: null },
+    });
 
-    mockEq.mockReturnValueOnce({ single: mockSingle.mockResolvedValueOnce({ data: mockOutboxRecord, error: null }) });
-    mockEq.mockReturnValueOnce({ data: null, error: null }); // for the update
+    const result = await dispatchDecision('valid-id', 'Approve');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('permission denied');
+  });
+
+  it('should correctly sign and dispatch the decision via webhook after atomic completion', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        status: 'COMPLETED',
+        webhook_url: 'https://finance.synculariti.local/webhook',
+        webhook_secret: 'test-secret-123',
+        payload: { recipient_phone: '421900123456', tenant_id: 'tenant-1' },
+      },
+      error: null,
+    });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
 
     const result = await dispatchDecision('valid-id', 'Approve');
 
     expect(result.success).toBe(true);
-    
-    // Verify it called fetch
+
     expect(global.fetch).toHaveBeenCalledTimes(1);
     const fetchArgs = (global.fetch as jest.Mock).mock.calls[0];
     expect(fetchArgs[0]).toBe('https://finance.synculariti.local/webhook');
     expect(fetchArgs[1].method).toBe('POST');
-    
-    // Verify the body format is standard inbound event
+
     const body = JSON.parse(fetchArgs[1].body);
     expect(body.type).toBe('poll_vote');
     expect(body.outboxId).toBe('valid-id');
     expect(body.decision).toBe('Approve');
+    expect(body.recipientPhone).toBe('421900123456');
+    expect(body.tenantId).toBe('tenant-1');
 
-    // Verify it updated the database to COMPLETED
-    expect(mockUpdate).toHaveBeenCalledWith({ status: 'COMPLETED' });
-    expect(mockEq).toHaveBeenCalledWith('id', 'valid-id');
+    expect(fetchArgs[1].headers['X-OpenWA-Signature']).toBeTruthy();
   });
 
-  it('should fail gracefully if the webhook target returns a 500', async () => {
-    const mockOutboxRecord = {
-      id: 'valid-id',
-      status: 'PENDING',
-      webhook_url: 'https://finance.synculariti.local/webhook',
-      webhook_secret: 'test-secret-123'
-    };
+  it('should still succeed even if the webhook target returns a 500 (best-effort)', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        status: 'COMPLETED',
+        webhook_url: 'https://finance.synculariti.local/webhook',
+        webhook_secret: 'test-secret-123',
+        payload: null,
+      },
+      error: null,
+    });
 
-    mockEq.mockReturnValueOnce({ single: mockSingle.mockResolvedValueOnce({ data: mockOutboxRecord, error: null }) });
-
-    // Force fetch to fail
     (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 500 });
 
     const result = await dispatchDecision('valid-id', 'Approve');
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Webhook delivery failed');
-    
-    // Database should NOT be updated to COMPLETED if delivery failed
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
   });
 });
