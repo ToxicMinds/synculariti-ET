@@ -134,17 +134,32 @@ async function seed() {
     if (transactionsBatch.length === BATCH_SIZE || i === TOTAL_TRANSACTIONS) {
       console.log(`Inserting batch up to ${i}...`);
       
-      // Insert Transactions
-      const { error: txErr } = await supabase
+      // Insert Transactions (with select to capture IDs for rollback)
+      const { data: insertedTxs, error: txErr } = await supabase
         .from('transactions')
-        .insert(transactionsBatch);
-      if (txErr) console.error('Transactions Error:', txErr);
+        .insert(transactionsBatch)
+        .select('id');
+      if (txErr) {
+        console.error('Transactions Error:', txErr);
+        transactionsBatch = [];
+        itemsBatch = [];
+        continue;
+      }
 
-      // Insert Items
+      // Insert Items (atomic with transactions via rollback)
       const { error: itemsErr } = await supabase
         .from('receipt_items')
         .insert(itemsBatch);
-      if (itemsErr) console.error('Items Error:', itemsErr);
+      if (itemsErr) {
+        console.error('Items Error:', itemsErr, '- Rolling back transactions');
+        await supabase
+          .from('transactions')
+          .delete()
+          .in('id', insertedTxs.map(t => t.id));
+        transactionsBatch = [];
+        itemsBatch = [];
+        continue;
+      }
 
       // Neo4j Merge
       try {

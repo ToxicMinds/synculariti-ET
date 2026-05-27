@@ -29,9 +29,8 @@ export async function notifyLargeInvoice(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
       {
         cookies: {
-          get(name: string) { return cookieStore.get(name)?.value; },
-          set() {},
-          remove() {}
+          getAll() { return cookieStore.getAll(); },
+          setAll(cookies) { cookies.forEach((c) => cookieStore.set(c.name, c.value)); },
         }
       }
     );
@@ -54,15 +53,14 @@ export async function notifyLargeInvoice(
 
     const messageText = `🚨 Large invoice alert!\n\n${lines}\n\nTap to review → https://synculariti-et.vercel.app`;
 
-    await supabase.from('whatsapp_outbox').insert({
-      tenant_id: tenantId,
-      recipient_phone: ownerPhone,
-      payload: {
+    await supabase.rpc('insert_whatsapp_outbox_v1', {
+      p_tenant_id: tenantId,
+      p_recipient_phone: ownerPhone,
+      p_payload: {
         type: 'text',
         text: messageText,
         source: 'large_invoice_auto',
       },
-      status: 'PENDING',
     });
 
     Logger.system('INFO', 'WhatsApp', 'Large invoice notification queued', {

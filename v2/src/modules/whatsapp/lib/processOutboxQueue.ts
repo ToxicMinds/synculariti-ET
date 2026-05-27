@@ -56,13 +56,10 @@ export async function processOutboxQueue(
         success = await client.sendText(jid, msg);
       }
 
-      await supabase
-        .from('whatsapp_outbox')
-        .update({
-          status: success ? 'SENT' : 'FAILED',
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', record.id);
+      await supabase.rpc('set_outbox_delivery_result_v1', {
+        p_outbox_id: record.id,
+        p_success: success,
+      });
 
       if (success) {
         processed++;
@@ -80,12 +77,10 @@ export async function processOutboxQueue(
     } catch (err) {
       failed++;
       await supabase
-        .from('whatsapp_outbox')
-        .update({
-          status: 'FAILED',
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', record.id);
+        .rpc('set_outbox_delivery_result_v1', {
+          p_outbox_id: record.id,
+          p_success: false,
+        });
     }
   }
 

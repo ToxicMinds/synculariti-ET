@@ -228,3 +228,14 @@
 - `function generateFoodCostVarianceReport(tenantId, startDate, endDate)`: Generates the Food Cost Variance Report by querying Neo4j for Revenue (Sale), Theoretical COGS (ConsumptionEstimate × cost), and Actual Spend (Transaction). Returns `FoodCostVarianceReport` interface. (lib/food-cost-variance.ts, to be built)
 - `interface FoodCostVarianceReport`: Full report shape: `{ period, dataCoverage, headline: { totalRevenue, theoreticalCOGS, actualSpend, gap, gapPct, confidenceBands, direction }, topIngredients, weeklyTrend, varianceSpikes, recommendation }`.
 - `API Route: GET /api/analytics/food-cost-variance`: Returns the Food Cost Variance Report for the authenticated tenant's selected period. Cached server-side for 1 hour.
+
+## Shared Utilities
+- `function getErrorMessage(e: unknown): string`: Single error-to-string function used across the entire codebase. Defined in `src/lib/utils.ts`. Replaces 30+ inline `e instanceof Error ? e.message : String(e)` duplications. Also exported from `@synculariti/whatsapp-client` but ET-internal code must use `@/lib/utils`.
+- `function formatCurrency(amount: number, currency = 'EUR'): string`: Locale-aware currency formatting (`sk-SK` locale, EUR default). Defined in `src/lib/utils.ts`.
+
+## WhatsApp Types
+- `interface OutboxRecord`: Full type for `whatsapp_outbox` rows. Properties: `id`, `tenant_id`, `recipient_phone`, `payload` (`{ type: 'text' | 'poll', text?, name?, options?, metadata? }`), `webhook_url?`. Exported from `src/modules/whatsapp/types.ts`.
+
+## Database RPCs
+- `RPC Function: public.insert_whatsapp_inbox_v1(p_tenant_id, p_outbox_id, p_sender_phone, p_message_id, p_message_type, p_content)`: ACID-compliant inbox insert with `updated_at` propagation. Replaces direct `whatsapp_inbox.insert()` in webhook/route.ts (V-71 fix). SQL in `sql/b2b_evolution/32_insert_whatsapp_inbox_v1.sql`.
+- `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Existing ACID-compliant RPC that atomically marks an outbox record COMPLETED and returns webhook config. Used by webhook/route.ts (V-71 fix).

@@ -1,8 +1,6 @@
 import { processOutboxQueue } from './processOutboxQueue';
 
 const mockSendText = jest.fn();
-const mockEq = jest.fn();
-const mockUpdate = jest.fn(() => ({ eq: mockEq }));
 const mockFrom = jest.fn();
 const mockRpc = jest.fn();
 const mockOrder = jest.fn();
@@ -31,7 +29,6 @@ function makeSupabase() {
       if (table === 'whatsapp_outbox') {
         return {
           select: mockSelect,
-          update: mockUpdate,
           in: mockIn,
           order: mockOrder,
           limit: mockLimit,
@@ -77,14 +74,13 @@ describe('processOutboxQueue', () => {
       const supabase = makeSupabase() as unknown as ReturnType<typeof makeSupabase>;
       mockRpc.mockResolvedValue({ data: [makeTextRecord()], error: null });
       mockSendText.mockResolvedValue(true);
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(supabase as any, makeClient(), 'https://app.com');
 
       expect(result).toEqual({ processed: 1, failed: 0 });
       expect(mockRpc).toHaveBeenCalledWith('claim_whatsapp_outbox_batch', { p_batch_size: 10 });
       expect(mockSendText).toHaveBeenCalledWith('421901234567@c.us', 'Hello from test');
-      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'SENT' }));
+      expect(mockRpc).toHaveBeenCalledWith('set_outbox_delivery_result_v1', { p_outbox_id: 'outbox-text-1', p_success: true });
     });
 
     it('should fall back to direct SELECT when RPC returns no data', async () => {
@@ -121,7 +117,6 @@ describe('processOutboxQueue', () => {
     it('should process records passed explicitly (bypass claiming)', async () => {
       const supabase = makeSupabase() as unknown as ReturnType<typeof makeSupabase>;
       mockSendText.mockResolvedValue(true);
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(
         supabase as any, makeClient(), 'https://app.com',
@@ -129,13 +124,13 @@ describe('processOutboxQueue', () => {
       );
 
       expect(result).toEqual({ processed: 1, failed: 0 });
-      expect(mockRpc).not.toHaveBeenCalled();
+      // Claiming is skipped for explicit records, but delivery result RPC is called
+      expect(mockRpc).toHaveBeenCalledWith('set_outbox_delivery_result_v1', { p_outbox_id: 'outbox-text-1', p_success: true });
     });
 
     it('should process poll records as action-link text fallback', async () => {
       const supabase = makeSupabase() as unknown as ReturnType<typeof makeSupabase>;
       mockSendText.mockResolvedValue(true);
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(
         supabase as any, makeClient(), 'https://app.com',
@@ -155,7 +150,6 @@ describe('processOutboxQueue', () => {
     it('should mark as FAILED when sendText returns false', async () => {
       const supabase = makeSupabase() as unknown as ReturnType<typeof makeSupabase>;
       mockSendText.mockResolvedValue(false);
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(
         supabase as any, makeClient(), 'https://app.com',
@@ -163,13 +157,12 @@ describe('processOutboxQueue', () => {
       );
 
       expect(result).toEqual({ processed: 0, failed: 1 });
-      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'FAILED' }));
+      expect(mockRpc).toHaveBeenCalledWith('set_outbox_delivery_result_v1', { p_outbox_id: 'outbox-text-1', p_success: false });
     });
 
     it('should mark as FAILED when sendText throws', async () => {
       const supabase = makeSupabase() as unknown as ReturnType<typeof makeSupabase>;
       mockSendText.mockRejectedValue(new Error('Network error'));
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(
         supabase as any, makeClient(), 'https://app.com',
@@ -177,12 +170,11 @@ describe('processOutboxQueue', () => {
       );
 
       expect(result).toEqual({ processed: 0, failed: 1 });
-      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'FAILED' }));
+      expect(mockRpc).toHaveBeenCalledWith('set_outbox_delivery_result_v1', { p_outbox_id: 'outbox-text-1', p_success: false });
     });
 
     it('should handle unknown payload type gracefully (no-op)', async () => {
       const supabase = makeSupabase() as unknown as ReturnType<typeof makeSupabase>;
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(
         supabase as any, makeClient(), 'https://app.com',
@@ -219,7 +211,6 @@ describe('processOutboxQueue', () => {
       mockSendText
         .mockRejectedValueOnce(new Error('First fails'))
         .mockResolvedValueOnce(true);
-      mockEq.mockResolvedValue({ error: null });
 
       const result = await processOutboxQueue(
         supabase as any, makeClient(), 'https://app.com',

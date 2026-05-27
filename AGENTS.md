@@ -629,4 +629,17 @@ curl -s -X POST https://synculariti-et.vercel.app/api/whatsapp/notify \
 | `notify/route.test.ts` | 11 | API key auth, body validation, service-key tenant resolution, idempotency |
 | `workflows/route.test.ts` | 6 | API key auth, per-tenant vs service-key access, missing tenant_id, 404 |
 
+### 6.10 Unified Error Message Extraction
+
+- **One function, zero duplication**: All error-to-string conversions MUST use `getErrorMessage(e)` from `@/lib/utils`. No inline `e instanceof Error ? e.message : String(e)` anywhere.
+- **Definition** (`src/lib/utils.ts`):
+  ```typescript
+  export function getErrorMessage(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
+  }
+  ```
+- **Import**: `import { getErrorMessage } from '@/lib/utils'`
+- **Coverage**: The entire codebase (lib/, API routes, modules, actions) uses this single function. Any new code must follow suit.
+- **Why not `@synculariti/whatsapp-client`**: `getErrorMessage` also exists in the shared package, but ET-internal code must use `@/lib/utils` to avoid cross-package dependency chains during test resolution.
+
 

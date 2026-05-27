@@ -5,13 +5,19 @@
 
 ---
 
-## Fixed (W-01, V-34, V-38)
+## Fixed (W-01, V-34, V-38, V-45, V-71, W-02, V-70, W-03, V-72)
 
 | ID | File | Issue | Fix Applied |
 | :--- | :--- | :--- | :--- |
 | W-01 | `webhook/route.ts:39` | Used session-based `createClient()` in HMAC-authenticated Edge route — no browser cookies exist in sidecar webhook POST → anon role → RLS blocked all outbox queries | Replaced with `getAdminClient()` (service-role) |
 | V-34 | `MobileBottomNav.tsx` | `usePathname()` without `<Suspense>` boundary — crashes client navigation | Split into `MobileBottomNavContent` + Suspense-wrapped shell |
 | V-38 | `useTransactionSync.ts`, `scanner-client.ts` | `typeof navigator !== 'undefined' && !navigator.onLine` repeated 3x | Extracted `OfflineQueue.isOffline()` static method |
+| V-45 | 31 occurrences in 21 files | `e instanceof Error ? e.message : String(e)` repeated everywhere | Exported `getErrorMessage()` to `@/lib/utils`, replaced all 31+ inline checks across 22 files |
+| V-71 | `webhook/route.ts:95-134` | 3-step non-atomic: inserts `whatsapp_inbox`, updates `whatsapp_outbox`, processes business logic. If step 2/3 fails, inbox record is orphaned | Replaced with `insert_whatsapp_inbox_v1` + `complete_whatsapp_action_v1` RPCs |
+| W-02 | `webhook/route.ts:43` | `let outboxRecord: any = null` — last `:any` in production code | Typed as `OutboxRecord \| null` |
+| V-70 | `processOutboxQueue.ts:59-88` | Direct `supabase.from('whatsapp_outbox').update()` — bypasses RPC. Send + status update not atomic: if `.update()` fails after successful send, outbox shows wrong status | Replaced with `set_outbox_delivery_result_v1` RPC (migration 33). Status + processed_at + retry_count set atomically |
+| W-03 | `notifyLargeInvoice.ts:32-66` | Legacy `get(name)` cookie API breaks chunked JWTs + direct `whatsapp_outbox.insert()` bypasses RPC | Fixed: `getAll()/setAll()` cookie API + replaced insert with `insert_whatsapp_outbox_v1` RPC (migration 34) |
+| V-72 | `seed_demo_2026.ts:138-147` | Direct `.insert()` on `transactions` + `receipt_items` with no rollback. Items insert failure orphans transactions | Wrapped in rollback — items fail → transactions deleted. Batches skip on error |
 
 ---
 
@@ -20,8 +26,6 @@
 | ID | File | Issue | Fix |
 | :--- | :--- | :--- | :--- |
 | V-37 | `logistics/page.tsx` | "Create PO" and "View History" buttons have no `onClick` — shipped inert | Implement navigation or remove buttons |
-| V-71 | `webhook/route.ts:95-134` | 3-step non-atomic: inserts `whatsapp_inbox`, updates `whatsapp_outbox`, processes business logic. If step 2/3 fails, inbox record is orphaned | Wrap in single RPC |
-| V-70 | `processOutboxQueue.ts:72-101` | Direct `supabase.from('whatsapp_outbox').update()` — bypasses RPC. Send + status update not atomic: if `.update()` fails after successful send, outbox shows wrong status | Use `claim_whatsapp_outbox_batch` RPC |
 
 ---
 
@@ -29,15 +33,11 @@
 
 | ID | File | Issue | Fix |
 | :--- | :--- | :--- | :--- |
-| W-02 | `webhook/route.ts:43` | `let outboxRecord: any = null` — last `:any` in production code | Type as `OutboxRecord \| null` |
-| W-03 | `notifyLargeInvoice.ts:56` | Direct `supabase.from('whatsapp_outbox').insert()` instead of RPC. Legacy `get(name)` cookie API breaks chunked JWTs | Use `insert_whatsapp_outbox_v1` RPC + `getAll()/setAll()` |
 | V-73 | 44 matches across 18 files | `€{Number(x).toFixed(2)}` — hardcoded currency format. Extends V-26 to 44 occurrences | Shared `formatCurrency(amount, currency?)` utility |
-| V-45 | 31 occurrences in 21 files | `e instanceof Error ? e.message : String(e)` repeated everywhere. `getErrorMessage()` exists in `@synculariti/whatsapp-client` but unused outside WhatsApp | Export to `@/lib/utils`, replace all 31 inline checks |
 | V-46 | 4 occurrences | `merchant-${name.toLowerCase().replace(...)}` merchant ID construction in `neo4j.ts:37`, `rebuild-neo4j-graph.ts:165`, `sync-neo4j:91`, `backfill-neo4j:74` | Extract `buildMerchantId(name): string` |
 | V-47 | 3 blocks, 3 files | `ReceiptItemSyncPayload` + `TransactionSyncPayload` construction duplicated across `sync-neo4j`, `backfill-neo4j`, `rebuild-neo4j-graph` | Extract `buildSyncPayload(tx, items)` shared function |
 | V-48 | 3 files | Near-identical `{ type, outboxId, recipientPhone, tenantId, decision, timestamp }` interfaces in `poApproval.ts`, `financeAudit.ts`, `posDiscrepancy.ts` | Extract shared `WebhookDecisionPayload` type |
 | V-49 | 12 occurrences | `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` — identical guard pattern in every API route | Extract `withTestHandler(handler)` helper |
-| V-72 | `seed_demo_2026.ts:138-147` | Direct `.insert()` on `transactions` + `receipt_items` with no rollback. Items insert failure orphans transactions | Use `save_receipt_v4` RPC or wrap in transaction |
 | V-54 | `webhook/route.ts` (159 lines) | 4 concerns in one handler: signature verification, outbox resolution (3 strategies), inbox insertion, business action routing | Split into `verifySignature`, `resolveOutbox`, `routeDecision` |
 
 ---
@@ -93,15 +93,15 @@
 
 ## Audit Scan Results
 
-**Type Safety:** 1 `:any` remaining in production code (W-02). 0 `z.any()`. 0 `@ts-ignore`. 0 `@ts-expect-error`. 61 `as any` casts in test files only.
+**Type Safety:** 0 `:any` remaining in production code. 0 `z.any()`. 0 `@ts-ignore`. 0 `@ts-expect-error`. 61 `as any` casts in test files only.
 
-**ACID:** 4 direct DML bypasses in production code (W-03, V-70, V-71, V-72) beyond the 2 deferred (V-28, V-29). W-03 is the only one affecting ledger data. V-71 is highest risk — 3-step non-atomic webhook handler that can orphan records.
+**ACID:** 0 direct DML bypasses remain in production code (V-70, W-03, V-72 fixed). 2 deferred (V-28, V-29).
 
 **Security:** All 17 API routes secured. 6 without `withAuth` use documented alternative auth (HMAC, API key, cron secret). No `localStorage` outside OfflineQueue.
 
 **SOLID:** 18 issues (7 SRP, 8 OCP, 3 LSP, 3 ISP, 5 DIP). Top SRP: `scanner-client.ts` (317 lines, 7 concerns), `finance.ts` (289 lines, 12 functions). Top OCP: `webhook/route.ts` decision routing chain, `enablebanking` 5-action switch, `triggerWorkflow.ts` dual chains.
 
-**DRY:** 12 issues. Top: `getErrorMessage` pattern (31 occurrences in 21 files), `process.env.NODE_ENV === 'test'` guard (12 occurrences), merchant ID construction (4 occurrences), sync payload construction (3 near-identical blocks).
+**DRY:** 11 issues. Top: `process.env.NODE_ENV === 'test'` guard (12 occurrences), merchant ID construction (4 occurrences), sync payload construction (3 near-identical blocks).
 
 **Observability:** All API routes have `ServerLogger`. Health endpoint intentionally surfaces errors in HTTP response — acceptable.
 
