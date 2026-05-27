@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Suspense } from 'react';
 
-export function MobileBottomNav() {
+function MobileBottomNavContent() {
   const pathname = usePathname();
 
   return (
@@ -21,5 +22,13 @@ export function MobileBottomNav() {
         Settings
       </Link>
     </nav>
+  );
+}
+
+export function MobileBottomNav() {
+  return (
+    <Suspense fallback={<nav className="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation" />}>
+      <MobileBottomNavContent />
+    </Suspense>
   );
 }

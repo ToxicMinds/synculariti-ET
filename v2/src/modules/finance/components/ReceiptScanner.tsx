@@ -15,7 +15,7 @@ interface ReceiptScannerProps {
   names?: Record<string, string>;
 }
 
-export function ReceiptScanner({ 
+export function ReceiptScanner({
   onSave,
   onAddCategory,
   categories = DEFAULT_CATEGORIES,
@@ -29,19 +29,17 @@ export function ReceiptScanner({
 
   if (scanner.step === 'review' && scanner.receipt) {
     return (
-      <ReviewStep 
-        scanner={scanner} 
-        names={names} 
-        categories={categories} 
-        onAddCategory={onAddCategory} 
+      <ReviewStep
+        scanner={scanner}
+        names={names}
+        categories={categories}
+        onAddCategory={onAddCategory}
       />
     );
   }
 
   return <ScanStep scanner={scanner} />;
 }
-
-// --- SUB-COMPONENTS ---
 
 function ProcessingStep({ isSaving }: { isSaving: boolean }) {
   return (
@@ -64,23 +62,22 @@ function ScanStep({ scanner }: { scanner: UseScannerStateReturn }) {
 
     html5Scanner.render(
       (decodedText) => {
-        // Clear the scanner instance quickly to avoid duplicate scanning
         html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed', { error: String(e) }));
-        scanner.processEkasaQr(decodedText);
+        scanner.process(decodedText);
       },
-      () => {} // Ignore continuous scan failures
+      () => {}
     );
 
     return () => {
       html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed on unmount', { error: String(e) }));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      scanner.processInvoiceFile(file);
+      scanner.process(file);
     }
   };
 
@@ -91,43 +88,35 @@ function ScanStep({ scanner }: { scanner: UseScannerStateReturn }) {
           {scanner.error}
         </div>
       )}
-      
+
       <div className="flex-col gap-4">
         <div id="qr-reader" className={styles.qrContainer}></div>
-        
-        <div className={styles.dividerContainer}>
-          <div className={styles.dividerLine} />
-          <span className={styles.dividerText}>OR SCAN INVOICE</span>
-          <div className={styles.dividerLine} />
-        </div>
 
-        <label className={`btn btn-primary flex-center gap-2 ${styles.captureLabel}`}>
-          <span className={styles.captureIcon}>📷</span>
-          <span className={styles.captureText}>Capture B2B Invoice</span>
-          <input 
-            type="file" 
-            accept="image/*" 
-            capture="environment" 
+        <label className={`btn btn-primary ${styles.scanButton}`}>
+          📄 Scan Document
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
             onChange={onFileChange}
             style={{ display: 'none' }}
           />
         </label>
 
         <p className={styles.helpText}>
-          Point camera at an **eKasa QR** code for instant deterministic sync, <br />
-          or **capture a full invoice** for AI-powered multi-stage extraction.
+          Point camera at any receipt or invoice — the system auto-detects the type.
         </p>
       </div>
     </BentoCard>
   );
 }
 
-function ReviewStep({ 
-  scanner, 
-  names, 
-  categories, 
-  onAddCategory 
-}: { 
+function ReviewStep({
+  scanner,
+  names,
+  categories,
+  onAddCategory
+}: {
   scanner: UseScannerStateReturn;
   names: Record<string, string>;
   categories: string[];
@@ -148,7 +137,7 @@ function ReviewStep({
             <span className="status-badge status-warning" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Estimated (AI)</span>
           )}
         </div>
-        
+
         <div style={{ marginTop: 12 }}>
           <p className={styles.whoPaidLabel}>Who paid?</p>
           <div className={styles.whoPaidContainer}>
@@ -169,15 +158,25 @@ function ReviewStep({
         {receipt.items.map((item, i) => (
           <div key={i} className={styles.itemRow}>
             <div className={styles.itemLeft}>
-              <input 
-                type="checkbox" 
-                checked={item.selected} 
+              <input
+                type="checkbox"
+                checked={item.selected}
                 onChange={() => updateReceiptItem(i, { selected: !item.selected })}
               />
               <div>
-                <div className={styles.itemName}>{item.name}</div>
-                <select 
-                  value={item.category || ''} 
+                <div className={styles.itemName}>
+                  {item.name}
+                  {item.confidence && item.confidence !== 'high' && (
+                    <span
+                      className={`status-badge ${item.confidence === 'medium' ? 'status-warning' : 'status-danger'}`}
+                      style={{ marginLeft: 8, padding: '2px 6px', fontSize: '0.65rem', verticalAlign: 'middle' }}
+                    >
+                      {item.confidence}
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={item.category || ''}
                   onChange={(e) => updateReceiptItem(i, { category: e.target.value })}
                   className={styles.itemCategorySelect}
                 >
@@ -201,12 +200,12 @@ function ReviewStep({
         <div className={styles.missingCategoryContainer}>
           <p className={styles.missingCategoryLabel}>Missing a category?</p>
           <div className={styles.missingCategoryInputContainer}>
-            <input 
+            <input
               id="scanner-new-cat"
               placeholder="New category name..."
               className={styles.missingCategoryInput}
             />
-            <button 
+            <button
               className={`btn btn-primary ${styles.missingCategoryBtn}`}
               onClick={async () => {
                 const el = document.getElementById('scanner-new-cat') as HTMLInputElement;

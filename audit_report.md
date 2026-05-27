@@ -1,15 +1,17 @@
 # Synculariti-ET: Full Audit Report
 
-**Last Update:** 2026-05-26
+**Last Update:** 2026-05-27
 **Deep-dive:** Full codebase scan covering type safety, ACID, security, SOLID, DRY, observability, dead code, React hygiene.
 
 ---
 
-## Fixed (W-01)
+## Fixed (W-01, V-34, V-38)
 
 | ID | File | Issue | Fix Applied |
 | :--- | :--- | :--- | :--- |
 | W-01 | `webhook/route.ts:39` | Used session-based `createClient()` in HMAC-authenticated Edge route — no browser cookies exist in sidecar webhook POST → anon role → RLS blocked all outbox queries. `getAdminClient()` already existed but was only used post-resolution. | Replaced `createClient()` with `getAdminClient()` (service-role). Updated test mock from `@/lib/supabase-server` to `@supabase/supabase-js`. |
+| V-34 | `MobileBottomNav.tsx` | Uses `usePathname()` without `<Suspense>` boundary — Next.js can throw on client navigation | Split into `MobileBottomNavContent` (consumes hook) wrapped in `<Suspense>` by `MobileBottomNav` shell. |
+| V-38 | `useTransactionSync.ts:36,80` + `scanner-client.ts:276` | `typeof navigator !== 'undefined' && !navigator.onLine` repeated 3x across 2 files | Extracted `OfflineQueue.isOffline()` static method. All 3 call sites updated. |
 
 ---
 
@@ -17,7 +19,6 @@
 
 | ID | File | Issue | Fix |
 | :--- | :--- | :--- | :--- |
-| V-34 | `MobileBottomNav.tsx` | Uses `usePathname()` without `<Suspense>` boundary — Next.js can throw on client navigation | Wrap content consuming the hook in `<Suspense>`. |
 | V-37 | `logistics/page.tsx` | "Create PO" and "View History" buttons have no `onClick` — shipped inert | Either implement navigation or remove the buttons. |
 
 ## High
@@ -47,7 +48,6 @@
 
 | ID | File | Issue | Fix |
 | :--- | :--- | :--- | :--- |
-| V-38 | `useTransactionSync.ts` | `typeof navigator !== 'undefined' && !navigator.onLine` repeated (lines 33, 77) | Extract `isOffline()` helper. |
 | V-39 | `ManualEntryModal.tsx` + `ReceiptScanner.tsx` | `document.getElementById` instead of React refs | Shared `useAddCategory` hook. |
 
 ## Accepted (Deferred)
@@ -61,7 +61,7 @@
 
 ## Audit Scan Results
 
-**Type Safety:** 1 `: any` remaining in production code (W-02). 0 `z.any()`. 0 `@ts-ignore`. 0 `@ts-expect-error`. Original 10 Sprint 2 violations all verified as fixed.
+**Type Safety:** 1 `: any` remaining in production code (W-02). 0 `z.any()`. 0 `@ts-ignore`. 0 `@ts-expect-error`. Original 10 Sprint 2 violations all verified as fixed. V-34 (Runtime) fixed via Suspense wrapper.
 
 **ACID:** W-03 is the only direct DML bypass in production code (besides deferred V-28/V-29). All ledger mutations use RPCs. No direct `update`/`delete` calls found.
 
@@ -69,7 +69,7 @@
 
 **SOLID:** 10 issues (5 original + 5 new W-02 through W-05). Switch statements found in 3 production files (`enablebanking`, `InvoiceManager`, `ekasa-protocols` — error mapper is acceptable).
 
-**DRY:** 4 issues (V-23, V-26, V-38, V-39). `formatCurrency` missing, offline check and `getElementById` duplicated, Neo4j sync routes near-identical.
+**DRY:** 3 issues (V-23, V-26, V-39). `formatCurrency` missing, `getElementById` duplicated, Neo4j sync routes near-identical. V-38 (offline check) fixed via `OfflineQueue.isOffline()`.
 
 **Observability:** All API routes have `ServerLogger`. Health endpoint catches without logger intentionally surface errors in HTTP response — acceptable. Utility libs let errors propagate to caller — correct by design.
 

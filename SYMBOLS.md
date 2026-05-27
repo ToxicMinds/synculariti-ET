@@ -24,7 +24,6 @@
 - `interface UseManualEntryFormReturn`: Contract for the useManualEntryForm hook state and actions.
 - `interface FieldErrors`: Field-level validation error map for form hooks.
 - `function useOfflineQueue()`: Hook for queuing financial mutations when offline.
-- `function useReceiptProcessor()`: Headless intelligence pipeline for receipt parsing (eKasa + AI). Enforces offline resilience and idempotency.
 - `function useCamera()`: Hardware-isolated headless hook managing MediaStream lifecycle, client-side compression, and idempotency hashing.
 - `function useSync()`: Facade hook for delegating financial mutations to transaction and offline queues.
 - `function useTransactions()`: Read-only hook for fetching and subscribing to the transactions ledger.
@@ -40,7 +39,19 @@
 - `interface OperatingMarginMetrics`: Professional B2B operating margin tracking payload.
 - `interface TimeBoundForecast`: Struct containing daily spend velocities, EOM projections, variance, and warning levels.
 - `interface ReceiptData`: Canonical payload for scanned receipt data (in useTransactionSync). Extended by useScannerState with a `source` field.
-- `interface ReceiptItem`: Canonical line item for a receipt (in useTransactionSync). Optional category during scan, required at save time.
+- `interface ReceiptItem`: Canonical line item for a receipt (in useTransactionSync). Carries `confidence?: 'high'|'medium'|'low'` from AI extraction or 'high' for eKasa Gov items. Optional category during scan, required at save time.
+- `type ItemConfidence`: `'high' | 'medium' | 'low'` — confidence rating per receipt line item. Auto-downgraded to `'low'` if name < 3 chars or amount === 0.
+- `function processScannerInput(input, categories?, timeoutMs?)`: Unified entry point in `scanner-client.ts`. Routes string → eKasa QR, File → AI Vision. Returns `ScannerResult`. Manages idempotency (SHA-256 cache), timeout (15s AbortController), offline queue fallback, image preprocessing, eKasa enrichment, and confidence scoring.
+- `type ScannerResult`: `{ status: 'SUCCESS' | 'ERROR' | 'QUEUED', source: 'EKASA' | 'AI_VISION' | 'MANUAL' | 'OFFLINE_QUEUE', cacheKey?: string, data?: ReceiptData, error?: string }`. Returned by `processScannerInput()`.
+- `function clearScannerCache()`: Clears the in-memory idempotency `resultCache` map (used in tests).
+- `function preprocessImage(imageDataUrl, signal)`: Client-side call to `POST /api/ai/preprocess-image`. Returns preprocessed WebP data URL, falls back to original on failure. (scanner-client.ts)
+- `Scanner service: src/lib/scanner-client.ts`: Stateless service with SHA-256 idempotency cache, AbortController 15s timeout, offline queue integration, eKasa→parse-receipt enrichment wiring, and two-button→one-pipeline UI architecture.
+- `function preprocessImageWithSharp(imageDataUrl)`: Server-side sharp pipeline in `image-preprocessor.ts`. Resizes to max 2000px, transcodes to WebP quality 80. Returns `{ image, width, height, originalSize, compressedSize, originalFormat }`.
+- `API Route: POST /api/ai/preprocess-image`: Serverless endpoint accepting `{ image: dataUrl }`, runs `preprocessImageWithSharp()`, returns compressed WebP data URL. Logs compression ratio via ServerLogger.
+- `interface ReceiptScannerProps`: Props interface for the `ReceiptScanner` component: `{ onSave, onAddCategory?, categories?, names? }`.
+- `type ScannerStep`: `'scan' | 'processing' | 'review'` — step state for `useScannerState`.
+- `interface UseScannerStateReturn`: Contract for useScannerState: `{ step, receipt, payerId, isProcessing, isSaving, isVerified, error, setPayerId, updateReceiptItem, process, confirmAndSave, reset }`.
+- `function useScannerState()`: Simplified hook in `modules/finance/hooks/useScannerState.ts`. Single `process(input: string | File)` method routes internally via `processScannerInput()`. State-only — no intelligence logic.
 - `function calcBudgetStatus()`: Calculates budget vs. actual spend variance.
 - `function calcCategoryTotals()`: Aggregates transaction totals grouped by category.
 - `function calcForecast()`: Predicts end-of-month spend based on current burn rate.

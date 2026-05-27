@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { Logger } from '@/lib/logger';
-import { extractUniversal, parseEkasaError } from '@/lib/ekasa-protocols';
-import { fetchWithRetry } from '@/lib/utils';
-
+import { processScannerInput } from '@/lib/scanner-client';
+import type { ScannerResult } from '@/lib/scanner-client';
 import { ReceiptItem, ReceiptData as BaseReceiptData } from './useTransactionSync';
 
 export type { ReceiptItem };
 export type ScannerStep = 'scan' | 'processing' | 'review';
 
-// Extends the canonical ReceiptData from useTransactionSync with scanner-specific source tracking
 export interface ReceiptData extends BaseReceiptData {
   source: 'ekasa' | 'ai' | 'manual';
 }
@@ -27,12 +25,10 @@ export interface UseScannerStateReturn {
   isSaving: boolean;
   isVerified: boolean;
   error: string;
-  
+
   setPayerId: (id: string) => void;
-  setStep: (step: ScannerStep) => void;
   updateReceiptItem: (index: number, updates: Partial<ReceiptItem>) => void;
-  processInvoiceFile: (file: File) => Promise<void>;
-  processEkasaQr: (decodedText: string) => Promise<void>;
+  process: (input: string | File) => Promise<void>;
   confirmAndSave: () => Promise<void>;
   reset: () => void;
 }
@@ -55,102 +51,45 @@ export function useScannerState({ categories = [], names = {}, onSave }: UseScan
     setError('');
   };
 
-  const processEkasaQr = async (decodedText: string) => {
+  const process = async (input: string | File) => {
     setStep('processing');
     setIsProcessing(true);
     setError('');
 
     try {
-      const receiptId = extractUniversal(decodedText);
-      if (!receiptId) throw new Error("Could not find a valid eKasa ID in this QR code.");
+      const result: ScannerResult = await processScannerInput(input, categories);
 
-      const payload = typeof receiptId === 'string' ? { receiptId } : { okpData: receiptId };
-
-      const response = await fetchWithRetry(`/api/ekasa`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as { detail?: string };
-        const humanMessage = parseEkasaError(response.status, errorData.detail);
-        throw new Error(humanMessage);
+      if (result.status === 'QUEUED') {
+        setStep('scan');
+        setError('Network offline — receipt queued for later processing.');
+        return;
       }
-      
-      const parsed = await response.json() as Partial<ReceiptData>;
+
+      if (result.status === 'ERROR' || !result.data) {
+        throw new Error(result.error || 'Processing failed');
+      }
+
+      const sourceMap = { EKASA: 'ekasa' as const, AI_VISION: 'ai' as const, MANUAL: 'manual' as const, OFFLINE_QUEUE: 'manual' as const };
+      const mappedSource = sourceMap[result.source] || 'manual';
 
       setReceipt({
-        source: 'ekasa',
-        store: parsed.store || 'Unknown Store',
-        date: parsed.date || new Date().toISOString().split('T')[0],
-        total: parsed.total || 0,
-        items: (parsed.items || []).map(it => ({ ...it, selected: true })),
-        ico: parsed.ico,
-        receiptNumber: parsed.receiptNumber,
-        transactedAt: parsed.transactedAt,
-        vatDetail: parsed.vatDetail
+        source: mappedSource,
+        store: result.data.store,
+        date: result.data.date,
+        total: result.data.total,
+        items: result.data.items.map(it => ({ ...it, selected: true })),
+        ico: result.data.ico,
+        receiptNumber: result.data.receiptNumber,
+        transactedAt: result.data.transactedAt,
+        vatDetail: result.data.vatDetail,
       });
-      setIsVerified(true);
+      setIsVerified(result.source === 'EKASA');
       setStep('review');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Scan failed';
       setError(msg);
       setStep('scan');
-      Logger.system('ERROR', 'Scanner', 'eKasa scan failure', { error: msg });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const processInvoiceFile = async (file: File) => {
-    setStep('processing');
-    setIsProcessing(true);
-    setError('');
-
-    try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const base64 = await base64Promise;
-
-      const response = await fetch('/api/ai/parse-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, categories })
-      });
-
-      const result = await response.json() as { success: boolean; data?: Partial<ReceiptData>; triage?: string; message?: string; error?: string };
-
-      if (!result.success || !result.data) {
-        if (result.triage === 'REJECTED') {
-          throw new Error(`Invalid Document: ${result.message}`);
-        }
-        throw new Error(result.error || 'Failed to parse invoice');
-      }
-
-      const parsed = result.data;
-      setReceipt({
-        source: 'ai',
-        store: parsed.store || 'Unknown Store',
-        date: parsed.date || new Date().toISOString().split('T')[0],
-        total: parsed.total || 0,
-        items: (parsed.items || []).map(it => ({ ...it, selected: true })),
-        ico: parsed.ico,
-        receiptNumber: parsed.receiptNumber,
-        transactedAt: parsed.transactedAt,
-        vatDetail: parsed.vatDetail
-      });
-      setIsVerified(false);
-      setStep('review');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Scan failed';
-      setError(msg);
-      setStep('scan');
-      Logger.system('ERROR', 'Scanner', 'AI Invoice scan failure', { error: msg });
+      Logger.system('ERROR', 'Scanner', 'Scan failure', { error: msg });
     } finally {
       setIsProcessing(false);
     }
@@ -188,11 +127,9 @@ export function useScannerState({ categories = [], names = {}, onSave }: UseScan
     isVerified,
     error,
     setPayerId,
-    setStep,
     updateReceiptItem,
-    processInvoiceFile,
-    processEkasaQr,
+    process,
     confirmAndSave,
-    reset
+    reset,
   };
 }

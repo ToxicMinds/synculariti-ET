@@ -1,188 +1,177 @@
 import { renderHook, act } from '@testing-library/react';
 import { useScannerState, ReceiptData, ReceiptItem } from './useScannerState';
 
-// Mock the global fetch
-global.fetch = jest.fn();
+jest.mock('@/lib/scanner-client', () => ({
+  processScannerInput: jest.fn(),
+  clearScannerCache: jest.fn(),
+}));
 
-// Mock the logger
 jest.mock('@/lib/logger', () => ({
-    Logger: {
-        system: jest.fn(),
-        user: jest.fn()
-    }
+  Logger: { system: jest.fn(), user: jest.fn() },
 }));
 
-// Mock eKasa protocols
-jest.mock('@/lib/ekasa-protocols', () => ({
-    extractUniversal: jest.fn(),
-    parseEkasaError: jest.fn((status, detail) => `eKasa Error (${status}): ${detail || 'Unknown'}`)
-}));
+import { processScannerInput } from '@/lib/scanner-client';
 
-import { extractUniversal } from '@/lib/ekasa-protocols';
+const mockScannerResult = (overrides: Partial<ReturnType<typeof processScannerInput extends (...args: any[]) => infer R ? R : never>> = {}) => ({
+  status: 'SUCCESS' as const,
+  source: 'EKASA' as const,
+  cacheKey: 'test-key',
+  data: {
+    store: 'Billa',
+    date: '2026-05-14',
+    total: 10.50,
+    items: [{ name: 'Bread', amount: 10.50, category: 'Food', selected: true }],
+  },
+  ...overrides,
+});
 
-describe('useScannerState (Phase 2: Contract Revision 3 - Dual Path + Mocks)', () => {
-    const mockOnSave = jest.fn();
-    const mockProps = {
-        categories: ['Food', 'Transport'],
-        names: { 'user1': 'Nik', 'user2': 'Alex' },
-        onSave: mockOnSave
-    };
+describe('useScannerState (Phase 1 — Unified process())', () => {
+  const mockOnSave = jest.fn();
+  const mockProps = {
+    categories: ['Food', 'Transport'],
+    names: { 'user1': 'Nik', 'user2': 'Alex' },
+    onSave: mockOnSave,
+  };
 
-    beforeEach(() => {
-        jest.clearAllMocks();
-        
-        // Setup FileReader mock to instantly trigger onload with dummy base64
-        const mockFileReader = {
-            readAsDataURL: jest.fn(function(this: any) {
-                this.result = 'data:image/png;base64,dummy';
-                this.onload();
-            }),
-            onload: jest.fn(),
-            onerror: jest.fn()
-        };
-        (global as any).FileReader = jest.fn(() => mockFileReader);
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('1. Initial State: starts on the scan step with no error', () => {
+    const { result } = renderHook(() => useScannerState(mockProps));
+
+    expect(result.current.step).toBe('scan');
+    expect(result.current.error).toBe('');
+    expect(result.current.receipt).toBeNull();
+    expect(result.current.isProcessing).toBe(false);
+    expect(result.current.isSaving).toBe(false);
+    expect(result.current.isVerified).toBe(false);
+    expect(result.current.payerId).toBe('user1');
+  });
+
+  it('2. QR string input → EKASA path → Verified', async () => {
+    (processScannerInput as jest.Mock).mockResolvedValueOnce(
+      mockScannerResult({ source: 'EKASA' })
+    );
+
+    const { result } = renderHook(() => useScannerState(mockProps));
+
+    let promise: Promise<void>;
+    act(() => {
+      promise = result.current.process('raw-qr-string');
     });
 
-    it('1. Initial State: starts on the scan step with no error', () => {
-        const { result } = renderHook(() => useScannerState(mockProps));
-        
-        expect(result.current.step).toBe('scan');
-        expect(result.current.error).toBe('');
-        expect(result.current.receipt).toBeNull();
-        expect(result.current.isProcessing).toBe(false);
-        expect(result.current.isSaving).toBe(false);
-        expect(result.current.isVerified).toBe(false);
-        expect(result.current.payerId).toBe('user1');
+    expect(result.current.step).toBe('processing');
+
+    await act(async () => {
+      await promise;
     });
 
-    it('2. Path A (eKasa): processEkasaQr skips AI call and populates directly (Verified)', async () => {
-        (extractUniversal as jest.Mock).mockReturnValue('O-12345678901234567890123456789012');
-        
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: async () => ({ 
-                receiptId: 'O-12345678901234567890123456789012',
-                store: 'Billa',
-                date: '2026-05-14',
-                total: 10.50,
-                items: [{ name: 'Bread', amount: 10.50 }]
-            })
-        });
+    expect(processScannerInput).toHaveBeenCalledWith('raw-qr-string', ['Food', 'Transport']);
+    expect(result.current.step).toBe('review');
+    expect(result.current.isVerified).toBe(true);
+    expect(result.current.receipt).toMatchObject({
+      source: 'ekasa',
+      store: 'Billa',
+      total: 10.50,
+    });
+  });
 
-        const { result } = renderHook(() => useScannerState(mockProps));
+  it('3. File input → AI path → Estimated', async () => {
+    (processScannerInput as jest.Mock).mockResolvedValueOnce(
+      mockScannerResult({
+        source: 'AI_VISION',
+        data: {
+          store: 'Office Supplies Inc',
+          date: '2026-05-14',
+          total: 50.00,
+          items: [{ name: 'Paper', amount: 50.00, category: 'Office', selected: true }],
+        },
+      })
+    );
 
-        let promise: Promise<void>;
-        act(() => {
-            promise = result.current.processEkasaQr('raw-qr-string');
-        });
+    const file = new File(['dummy content'], 'invoice.png', { type: 'image/png' });
+    const { result } = renderHook(() => useScannerState(mockProps));
 
-        expect(result.current.step).toBe('processing');
-
-        await act(async () => {
-            await promise;
-        });
-
-        expect(global.fetch).toHaveBeenCalledTimes(1);
-        expect(global.fetch).toHaveBeenCalledWith('/api/ekasa', expect.any(Object));
-
-        expect(result.current.step).toBe('review');
-        expect(result.current.isVerified).toBe(true);
-        expect(result.current.receipt).toMatchObject({
-            source: 'ekasa',
-            store: 'Billa',
-            total: 10.50
-        });
+    let promise: Promise<void>;
+    act(() => {
+      promise = result.current.process(file);
     });
 
-    it('3. Path B (Invoice): processInvoiceFile uses AI and marks as Estimated', async () => {
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: async () => ({
-                success: true,
-                data: {
-                    store: 'Office Supplies Inc',
-                    date: '2026-05-14',
-                    total: 50.00,
-                    source: 'ai',
-                    items: []
-                }
-            })
-        });
+    expect(result.current.step).toBe('processing');
 
-        const file = new File(['dummy content'], 'invoice.png', { type: 'image/png' });
-        const { result } = renderHook(() => useScannerState(mockProps));
-
-        let promise: Promise<void>;
-        act(() => {
-            promise = result.current.processInvoiceFile(file);
-        });
-
-        expect(result.current.step).toBe('processing');
-
-        await act(async () => {
-            await promise;
-        });
-
-        expect(global.fetch).toHaveBeenCalledTimes(1);
-        expect(global.fetch).toHaveBeenCalledWith('/api/ai/parse-invoice', expect.any(Object));
-        
-        expect(result.current.step).toBe('review');
-        expect(result.current.isVerified).toBe(false); 
-        expect(result.current.receipt?.source).toBe('ai');
+    await act(async () => {
+      await promise;
     });
 
-    it('4. Error Handling: handles failed extraction and returns to scan', async () => {
-        (extractUniversal as jest.Mock).mockReturnValue('O-BAD');
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: false,
-            status: 400,
-            json: async () => ({ detail: 'Invalid QR code signature' })
-        });
+    expect(processScannerInput).toHaveBeenCalledWith(file, ['Food', 'Transport']);
+    expect(result.current.step).toBe('review');
+    expect(result.current.isVerified).toBe(false);
+    expect(result.current.receipt?.source).toBe('ai');
+  });
 
-        const { result } = renderHook(() => useScannerState(mockProps));
-
-        await act(async () => {
-            await result.current.processEkasaQr('bad-qr');
-        });
-
-        expect(result.current.step).toBe('scan');
-        expect(result.current.error).toContain('eKasa Error (400)');
-        expect(result.current.isProcessing).toBe(false);
+  it('4. Error Handling: service returns ERROR → back to scan', async () => {
+    (processScannerInput as jest.Mock).mockResolvedValueOnce({
+      status: 'ERROR',
+      source: 'MANUAL',
+      cacheKey: 'bad-key',
+      error: 'eKasa Error (400): Invalid QR code signature',
     });
 
-    it('5. Mutation Safety: confirmAndSave calls onSave with correct data', async () => {
-        (extractUniversal as jest.Mock).mockReturnValue('O-123');
-        (global.fetch as jest.Mock).mockResolvedValueOnce({
-            ok: true,
-            json: async () => ({
-                store: 'Billa',
-                date: '2026-05-14',
-                total: 5.00,
-                items: [{ name: 'Bread', amount: 5.00, category: 'Food', selected: true }],
-            })
-        });
+    const { result } = renderHook(() => useScannerState(mockProps));
 
-        const { result } = renderHook(() => useScannerState(mockProps));
-
-        await act(async () => {
-            await result.current.processEkasaQr('valid-qr');
-        });
-
-        let savePromise: Promise<void>;
-        act(() => {
-            savePromise = result.current.confirmAndSave();
-        });
-
-        expect(result.current.isSaving).toBe(true);
-
-        await act(async () => {
-            await savePromise;
-        });
-
-        expect(mockOnSave).toHaveBeenCalledWith(
-            expect.objectContaining({ store: 'Billa', source: 'ekasa' }),
-            'user1'
-        );
-        expect(result.current.isSaving).toBe(false);
+    await act(async () => {
+      await result.current.process('bad-qr');
     });
+
+    expect(result.current.step).toBe('scan');
+    expect(result.current.error).toContain('eKasa Error (400)');
+    expect(result.current.isProcessing).toBe(false);
+  });
+
+  it('5. Offline handling: service returns QUEUED → back to scan with message', async () => {
+    (processScannerInput as jest.Mock).mockResolvedValueOnce({
+      status: 'QUEUED',
+      source: 'OFFLINE_QUEUE',
+      cacheKey: 'offline-key',
+    });
+
+    const { result } = renderHook(() => useScannerState(mockProps));
+
+    await act(async () => {
+      await result.current.process('qr-while-offline');
+    });
+
+    expect(result.current.step).toBe('scan');
+    expect(result.current.error).toContain('Network offline');
+  });
+
+  it('6. Mutation Safety: confirmAndSave calls onSave with correct data', async () => {
+    (processScannerInput as jest.Mock).mockResolvedValueOnce(
+      mockScannerResult({ source: 'EKASA' })
+    );
+
+    const { result } = renderHook(() => useScannerState(mockProps));
+
+    await act(async () => {
+      await result.current.process('valid-qr');
+    });
+
+    let savePromise: Promise<void>;
+    act(() => {
+      savePromise = result.current.confirmAndSave();
+    });
+
+    expect(result.current.isSaving).toBe(true);
+
+    await act(async () => {
+      await savePromise;
+    });
+
+    expect(mockOnSave).toHaveBeenCalledWith(
+      expect.objectContaining({ store: 'Billa', source: 'ekasa' }),
+      'user1'
+    );
+    expect(result.current.isSaving).toBe(false);
+  });
 });

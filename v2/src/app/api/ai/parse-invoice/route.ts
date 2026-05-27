@@ -58,10 +58,12 @@ const handler: SecureHandler = async (req, context) => {
   "date": "YYYY-MM-DD",
   "total": 0.00,
   "ico": "Issuer ID (IČO)",
-  "items": [{ "name": "...", "amount": 0.00, "category": "..." }],
+  "items": [{ "name": "...", "amount": 0.00, "category": "...", "confidence": "high|medium|low" }],
   "currency": "EUR",
   "vatDetail": {}
 }
+Confidence rules: "high" for clearly legible items, "medium" for partially obscured,
+"low" for items you are guessing. Default to "high".
 ${getCategoryPrompt(categories)}` 
           },
           { type: 'image_url', image_url: { url: image } }

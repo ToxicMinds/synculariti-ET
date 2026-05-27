@@ -14,6 +14,10 @@ const LOCK_KEY = 'et_offline_lock';
 export class OfflineQueue {
   static readonly MAX_RETRY = 5;
 
+  static isOffline(): boolean {
+    return typeof navigator !== 'undefined' && !navigator.onLine;
+  }
+
   /**
    * Public helper to ensure mutual exclusion across tabs for complex sequences
    */

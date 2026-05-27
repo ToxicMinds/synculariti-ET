@@ -88,8 +88,22 @@ Synculariti consists of two separate applications. They do NOT share a database.
 We use a deterministic AI pipeline for financial categorization:
 1. **Stage 1 (Vision)**: LLM-based spatial transcription.
 2. **Stage 2 (Reasoning)**: Llama 3.3 70B mapping to injected Tenant category contexts.
-- **Hardware/Intelligence Decoupling (SRP)**: Complex components (like Receipt Scanners) MUST separate hardware logic (`useCamera`) from intelligence parsing (`useReceiptProcessor`).
+- **Hardware/Intelligence Decoupling (SRP)**: Complex components (like Receipt Scanners) MUST separate hardware logic (`useCamera`) from intelligence parsing (delegated to `scanner-client.ts`).
 - **Idempotency Shield**: All intelligence parsing MUST be gated by an idempotency hash (e.g., SHA-256 of the image blob) to prevent redundant AI API calls and ensure graceful degradation timeouts.
+
+### 4.4 Unified Scanner Pipeline
+Receipt/invoice scanning uses a **single `process(input)` entry point** with internal routing:
+
+1. **Input routing**: String → eKasa QR pathway (`/api/ekasa` + enrichment via `parse-receipt`). File → AI Vision pathway (`/api/ai/preprocess-image` + `/api/ai/parse-invoice`).
+2. **Idempotency**: `processScannerInput()` computes SHA-256 of the input and caches the result in a `Map<string, ScannerResult>` (`resultCache`). Duplicate scans return immediately without network calls.
+3. **Timeout**: All `fetch()` calls use `AbortController` with a 15s default timeout. Aborted requests return an error suggesting manual entry.
+4. **Offline resilience**: When `navigator.onLine === false`, the input is queued to `OfflineQueue.enqueue('SAVE_RECEIPT', ...)` and returns status `QUEUED`.
+5. **Image preprocessing**: Before sending to `/api/ai/parse-invoice`, the image is resized to max 2000px and transcoded to WebP quality 80 via `GET /api/ai/preprocess-image` using `sharp`. If preprocessing fails, the original image is used (graceful degradation).
+6. **eKasa enrichment**: After fetching raw Gov data from `/api/ekasa`, the scanner calls `/api/ai/parse-receipt` to add AI-assigned categories. If enrichment fails, raw Gov data is returned (graceful degradation).
+7. **Confidence scoring**: AI-extracted items carry a `confidence` field (`'high' | 'medium' | 'low'`) from the LLM response. Items with name < 3 characters or amount === 0 are auto-downgraded to `'low'`. eKasa Gov items are always `'high'`.
+8. **UI badges**: Low/medium confidence items display a colored badge (`status-danger` / `status-warning`) in the review step. Verified eKasa receipts show a `Verified eKasa` green badge.
+
+**Key files**: `src/lib/scanner-client.ts` (service), `src/modules/finance/hooks/useScannerState.ts` (simplified hook — single `process()` method, state-only), `src/modules/finance/components/ReceiptScanner.tsx` (two buttons, one pipeline), `src/lib/image-preprocessor.ts` (sharp resize→WebP), `src/app/api/ai/preprocess-image/route.ts` (POST endpoint).
 
 ### 4.5 Analytical Insight Pipeline (Graph Intelligence)
 The AI Insights card uses a **Structured Query → LLM Narration** pipeline, NOT an open-ended LLM prompt:

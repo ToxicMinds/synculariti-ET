@@ -5,12 +5,15 @@ import { useTenantContext } from '@/context/TenantContext';
 import { OfflineQueue } from '@/lib/offlineQueue';
 import { notifyLargeInvoice } from '@/actions/notifyLargeInvoice';
 
+export type ItemConfidence = 'high' | 'medium' | 'low';
+
 export interface ReceiptItem {
   id?: string;
   name: string;
   amount: number;
   category: string;
   selected: boolean;
+  confidence?: ItemConfidence;
 }
 
 export interface ReceiptData {
@@ -30,7 +33,7 @@ export function useTransactionSync(tenantId: string | undefined) {
   const addTransaction = async (transaction: Partial<Transaction> | Partial<Transaction>[]) => {
     if (!tenantId) return;
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (OfflineQueue.isOffline()) {
       await OfflineQueue.enqueue('ADD_TRANSACTION', transaction);
       triggerRefresh();
       return;
@@ -74,7 +77,7 @@ export function useTransactionSync(tenantId: string | undefined) {
     const selectedItems = receipt.items.filter(i => i.selected);
     if (selectedItems.length === 0) throw new Error('No items selected');
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (OfflineQueue.isOffline()) {
       await OfflineQueue.enqueue('SAVE_RECEIPT', { receipt, whoId, whoName, locationId, currency });
       triggerRefresh();
       return;
