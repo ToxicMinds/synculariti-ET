@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
+import { getErrorMessage } from '@/lib/utils';
 import { SecureHandler } from './types/api';
 
 /**
@@ -49,7 +50,7 @@ export function withAuth(handler: SecureHandler) {
 
       return await handler(req, secureContext);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       await ServerLogger.system('ERROR', 'API', 'Unhandled error in withAuth wrapper', { error: msg });
       return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }

@@ -3,6 +3,7 @@ import { getNeo4jDriver, processOutboxSync, neo4jDeleteTransaction } from '@/lib
 import { ServerLogger } from '@/lib/logger-server';
 import { withAuth } from '@/lib/withAuth';
 import { SecureHandler } from '@/lib/types/api';
+import { getErrorMessage } from '@/lib/utils';
 import { createClient } from '@/lib/supabase-server';
 import { TransactionSyncPayload, ReceiptItemSyncPayload } from '@/lib/types';
 import { mapToOntologyItem } from '@/lib/neo4j-ontology';
@@ -130,7 +131,7 @@ const handler: SecureHandler = async (req, context) => {
           eventsToComplete.push(event.id);
         }
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : 'Unknown outbox sync error';
+        const errorMsg = getErrorMessage(err);
         const retryCount = (event.retry_count || 0) + 1;
         const maxRetries = event.max_retries || 3;
         const finalStatus = retryCount >= maxRetries ? 'FAILED' : 'PENDING';
@@ -170,7 +171,7 @@ const handler: SecureHandler = async (req, context) => {
     });
 
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Sync exception';
+    const msg = getErrorMessage(e);
     await ServerLogger.system('ERROR', 'Debug', 'Manual sync process failed', { error: msg, tenantId });
     return NextResponse.json({ error: msg }, { status: 500 });
   } finally {

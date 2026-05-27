@@ -2,6 +2,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { getErrorMessage } from '@/lib/utils';
 
 /** Shape expected by the create_inventory_item_v1 RPC */
 export interface InventoryItemInput {
@@ -36,7 +37,7 @@ export function useLogisticsSync(tenantId: string | undefined, onRefresh?: () =>
       if (onRefresh) onRefresh();
       return { success: true, data };
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      const message = getErrorMessage(err);
       Logger.system('ERROR', 'Logistics', 'receivePO RPC failed', { poId, error: message });
       return { success: false, error: message };
     }
@@ -57,7 +58,7 @@ export function useLogisticsSync(tenantId: string | undefined, onRefresh?: () =>
       if (onRefresh) onRefresh();
       return { success: true, data };
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      const message = getErrorMessage(err);
       Logger.system('ERROR', 'Logistics', 'addItem RPC failed', { error: message });
       return { success: false, error: message };
     }

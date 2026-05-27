@@ -3,6 +3,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Logger } from '@/lib/logger';
+import { getErrorMessage } from '@/lib/utils';
 
 interface InvoiceItem {
   id?: string;
@@ -70,7 +71,7 @@ export async function notifyLargeInvoice(
 
     return { success: true, sent: true };
   } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e);
+    const errMsg = getErrorMessage(e);
     Logger.system('ERROR', 'WhatsApp', 'notifyLargeInvoice crashed', { error: errMsg });
     return { success: false, sent: false, error: errMsg };
   }

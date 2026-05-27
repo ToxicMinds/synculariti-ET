@@ -3,6 +3,7 @@ import { getNeo4jDriver, processOutboxSync } from '@/lib/neo4j';
 import { ServerLogger } from '@/lib/logger-server';
 import { withAuth } from '@/lib/withAuth';
 import { SecureHandler } from '@/lib/types/api';
+import { getErrorMessage } from '@/lib/utils';
 import { createClient } from '@/lib/supabase-server';
 import { TransactionSyncPayload, ReceiptItemSyncPayload } from '@/lib/types';
 import { mapToOntologyItem } from '@/lib/neo4j-ontology';
@@ -113,7 +114,7 @@ const handler: SecureHandler = async (req, context) => {
     });
 
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Backfill exception';
+    const msg = getErrorMessage(e);
     await ServerLogger.system('ERROR', 'Debug', 'Manual backfill process failed', { error: msg, tenantId });
     return NextResponse.json({ error: msg }, { status: 500 });
   } finally {

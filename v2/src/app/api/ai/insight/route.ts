@@ -6,6 +6,7 @@ import { callGroq } from '@/lib/groq';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 import { queryPriceIntelligence, queryTimingPatterns, queryWasteRisk, InsightFinding } from '@/lib/insight-queries';
+import { getErrorMessage } from '@/lib/utils';
 
 function articulateFinding(f: InsightFinding): string {
   return `${f.summary}. ${f.recommendation}.`;
@@ -88,7 +89,7 @@ Just state the finding naturally as if talking to the restaurant owner.`
     } catch (apiErr: unknown) {
       await ServerLogger.system('WARN', 'AI', 'Groq narration failed, using template', {
         tenantId,
-        error: apiErr instanceof Error ? apiErr.message : String(apiErr)
+        error: getErrorMessage(apiErr)
       });
     }
 
@@ -103,7 +104,7 @@ Just state the finding naturally as if talking to the restaurant owner.`
   } catch (e: unknown) {
     await ServerLogger.system('ERROR', 'AI', 'Analytical insight Neo4j queries failed', {
       tenantId,
-      error: e instanceof Error ? e.message : String(e)
+      error: getErrorMessage(e)
     });
     return NextResponse.json({
       success: true,

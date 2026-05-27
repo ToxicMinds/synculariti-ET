@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { getNeo4jDriver } from '@/lib/neo4j';
+import { getErrorMessage } from '@/lib/utils';
 
 export async function GET() {
   const checks: Record<string, string> = {
@@ -20,7 +21,7 @@ export async function GET() {
       status = 503;
     }
   } catch (e: unknown) {
-    checks.supabase = `error: ${e instanceof Error ? e.message : String(e)}`;
+    checks.supabase = `error: ${getErrorMessage(e)}`;
     status = 503;
   }
 
@@ -32,7 +33,7 @@ export async function GET() {
       await session.run('RETURN 1');
       checks.neo4j = 'ok';
     } catch (e: unknown) {
-      checks.neo4j = `error: ${e instanceof Error ? e.message : String(e)}`;
+      checks.neo4j = `error: ${getErrorMessage(e)}`;
       status = 503;
     } finally {
       await session.close();

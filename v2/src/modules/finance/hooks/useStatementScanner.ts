@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Logger } from '@/lib/logger';
+import { getErrorMessage } from '@/lib/utils';
 
 export type StatementStep = 'upload' | 'processing' | 'review' | 'reconciling';
 
@@ -157,7 +158,7 @@ export function useStatementScanner({
       transactionsRef.current = merged;
       setStep('review');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'An error occurred while processing.';
+      const msg = getErrorMessage(err);
       setError(msg);
       setStep('upload');
       Logger.system('ERROR', 'Scanner', 'Chunk processing failed', { error: msg });
@@ -214,7 +215,7 @@ export function useStatementScanner({
       await onSave(selectedTxs, whoId, names[whoId] ?? '');
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to save.';
+      const msg = getErrorMessage(err);
       setError(msg);
     } finally {
       setIsSaving(false);

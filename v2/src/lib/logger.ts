@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/lib/utils';
 
 import { LogLevel, LogComponent } from './types/logging';
 
@@ -38,7 +39,7 @@ export class Logger {
         tenant_id: tenantId || null
       });
     } catch (e: unknown) {
-      console.error('CRITICAL: Failed to write system telemetry:', e instanceof Error ? e.message : String(e));
+      console.error('CRITICAL: Failed to write system telemetry:', getErrorMessage(e));
     }
   }
 
@@ -62,7 +63,7 @@ export class Logger {
         metadata
       });
     } catch (e: unknown) {
-      this.system('ERROR', 'Sync', 'Failed to write user activity log', { error: e instanceof Error ? e.message : String(e) }, tenantId);
+      this.system('ERROR', 'Sync', 'Failed to write user activity log', { error: getErrorMessage(e) }, tenantId);
     }
   }
 }

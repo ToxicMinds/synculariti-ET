@@ -2,6 +2,7 @@ import { Logger } from './logger';
 import { OfflineQueue } from './offlineQueue';
 import { extractUniversal } from './ekasa-protocols';
 import { ReceiptData, ReceiptItem, ItemConfidence } from '@/modules/finance/hooks/useTransactionSync';
+import { getErrorMessage } from './utils';
 
 export type ScannerSource = 'EKASA' | 'AI_VISION' | 'MANUAL' | 'OFFLINE_QUEUE';
 
@@ -301,7 +302,7 @@ export async function processScannerInput(
     const isAbort = e instanceof Error && e.name === 'AbortError';
     const errorMsg = isAbort
       ? 'Receipt processing timed out'
-      : (e instanceof Error ? e.message : 'Unknown error');
+      : getErrorMessage(e);
 
     Logger.system('ERROR', 'Scanner', errorMsg, { cacheKey });
 

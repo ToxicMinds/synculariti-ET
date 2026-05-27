@@ -1,5 +1,6 @@
 import { useTenantContext } from '@/context/TenantContext';
 import { Logger } from '@/lib/logger';
+import { getErrorMessage } from '@/lib/utils';
 
 export function useCategories() {
   const { tenant, updateState } = useTenantContext();
@@ -29,7 +30,7 @@ export function useCategories() {
       });
       Logger.user(tenant.tenant_id, 'CATEGORY_ADDED', `Added new category: ${cleanName}`, 'System');
     } catch (e: unknown) {
-      Logger.system('ERROR', 'Finance', 'Failed to add category', { error: e instanceof Error ? e.message : String(e) });
+      Logger.system('ERROR', 'Finance', 'Failed to add category', { error: getErrorMessage(e) });
       throw e;
     }
   };

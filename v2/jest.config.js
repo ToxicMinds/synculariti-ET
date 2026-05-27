@@ -41,6 +41,7 @@ module.exports = {
         "<rootDir>/tests/features/**/*.test.ts*",
         "<rootDir>/tests/functions/**/*.test.ts*"
       ],
+      setupFiles: ["<rootDir>/src/lib/mocks/envSetup.js"],
       moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
       transform: { ...tsJestTransformCfg }
     }

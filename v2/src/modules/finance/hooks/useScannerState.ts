@@ -3,6 +3,7 @@ import { Logger } from '@/lib/logger';
 import { processScannerInput } from '@/lib/scanner-client';
 import type { ScannerResult } from '@/lib/scanner-client';
 import { ReceiptItem, ReceiptData as BaseReceiptData } from './useTransactionSync';
+import { getErrorMessage } from '@/lib/utils';
 
 export type { ReceiptItem };
 export type ScannerStep = 'scan' | 'processing' | 'review';
@@ -86,7 +87,7 @@ export function useScannerState({ categories = [], names = {}, onSave }: UseScan
       setIsVerified(result.source === 'EKASA');
       setStep('review');
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Scan failed';
+      const msg = getErrorMessage(e);
       setError(msg);
       setStep('scan');
       Logger.system('ERROR', 'Scanner', 'Scan failure', { error: msg });
@@ -111,7 +112,7 @@ export function useScannerState({ categories = [], names = {}, onSave }: UseScan
     try {
       await onSave(receipt, payerId);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to save receipt';
+      const msg = getErrorMessage(e);
       setError(msg);
     } finally {
       setIsSaving(false);

@@ -8,6 +8,7 @@ import {
   CurrentInventory 
 } from '../types';
 import { Logger } from '@/lib/logger';
+import { getErrorMessage } from '@/lib/utils';
 
 /**
  * useInventory Hook
@@ -37,7 +38,7 @@ export function useInventory(tenantId: string | undefined) {
 
     } catch (err: unknown) {
       Logger.system('ERROR', 'Logistics', 'Failed to fetch inventory state', { 
-        error: err instanceof Error ? err.message : String(err) 
+        error: getErrorMessage(err) 
       });
     } finally {
       setLoading(false);

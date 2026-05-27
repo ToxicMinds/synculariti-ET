@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ManualEntryPayload } from '../components/ManualEntryModal';
+import { getErrorMessage } from '@/lib/utils';
 
 export interface UseManualEntryFormProps {
   prefill?: Partial<ManualEntryPayload>;
@@ -105,7 +106,7 @@ export function useManualEntryForm({
       await onSave(payload);
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to save';
+      const msg = getErrorMessage(err);
       setError(msg);
     } finally {
       setIsSaving(false);

@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/withAuth';
 import { z } from 'zod';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
+import { getErrorMessage } from '@/lib/utils';
 
 // 1. Validation Schema
 const EnableBankingSchema = z.object({
@@ -106,7 +107,7 @@ const handler: SecureHandler = async (req, context) => {
     return NextResponse.json(data);
 
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Enable Banking exception';
+    const msg = getErrorMessage(e);
     await ServerLogger.system('ERROR', 'API', 'Enable Banking route exception', { error: msg, tenantId });
     return NextResponse.json({ error: msg }, { status: 500 });
   }

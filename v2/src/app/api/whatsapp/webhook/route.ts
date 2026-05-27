@@ -8,6 +8,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { DefaultPOApprovalService } from '@/modules/logistics/actions/poApproval';
 import { DefaultFinanceAuditService } from '@/modules/finance/actions/financeAudit';
 import { DefaultPOSDiscrepancyService } from '@/modules/operations/actions/posDiscrepancy';
+import type { OutboxRecord } from '@/modules/whatsapp/types';
 
 // Helper to get service role client for processing backend actions
 function getAdminClient() {
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
 
     let tenantId = '';
     let outboxId: string | null = null;
-    let outboxRecord: any = null;
+    let outboxRecord: OutboxRecord | null = null;
 
     // Resolve tenant and outbox context
     const outboxQuery = supabase.from('whatsapp_outbox');
@@ -91,16 +92,15 @@ export async function POST(req: Request) {
     const decision = body.selectedOption || body.decision || body.content || '';
     const senderPhone = body.sender || body.recipientPhone || 'unknown';
 
-    // Insert into inbox ledger for auditing
+    // Insert into inbox ledger for auditing (atomic via RPC)
     const { error: insertError } = await supabase
-      .from('whatsapp_inbox')
-      .insert({
-        tenant_id: tenantId,
-        outbox_id: outboxId,
-        sender_phone: senderPhone,
-        message_id: body.pollMessageId || body.messageId || 'unknown',
-        message_type: body.type,
-        content: decision
+      .rpc('insert_whatsapp_inbox_v1', {
+        p_tenant_id: tenantId,
+        p_outbox_id: outboxId,
+        p_sender_phone: senderPhone,
+        p_message_id: body.pollMessageId || body.messageId || 'unknown',
+        p_message_type: body.type,
+        p_content: decision,
       });
 
     if (insertError) throw insertError;
@@ -128,11 +128,12 @@ export async function POST(req: Request) {
           await posService.processDecision(tenantId, outboxId, decision, senderPhone);
         }
 
-        // Mark the outbox as COMPLETED since the workflow processed successfully
+        // Mark the outbox as COMPLETED via existing atomic RPC
         await adminClient
-          .from('whatsapp_outbox')
-          .update({ status: 'COMPLETED', processed_at: new Date().toISOString() })
-          .eq('id', outboxId);
+          .rpc('complete_whatsapp_action_v1', {
+            p_outbox_id: outboxId,
+            p_decision: decision,
+          });
 
       } catch (err: unknown) {
         const errorMsg = getErrorMessage(err);

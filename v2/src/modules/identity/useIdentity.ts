@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 
+import { getErrorMessage } from '@/lib/utils';
 import type { Session } from '@supabase/supabase-js';
 
 export interface AvailableTenant {
@@ -28,7 +29,7 @@ export function useIdentity(session: Session | null) {
       setTenants(data || []);
       return (data as AvailableTenant[]) || [];
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       Logger.system('ERROR', 'Auth', 'Tenant discovery failed', { error: msg });
       setError(msg);
       return [];
@@ -47,7 +48,7 @@ export function useIdentity(session: Session | null) {
       // Force a full reload to re-initialize the App with the new tenant_id context
       window.location.reload();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Switch failed');
+      setError(getErrorMessage(e));
       setLoading(false);
     }
   };

@@ -1,20 +1,7 @@
 import { OpenWAClient } from '@synculariti/whatsapp-client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ServerLogger } from '@/lib/logger-server';
-
-interface OutboxRecord {
-  id: string;
-  tenant_id: string;
-  recipient_phone: string;
-  payload: {
-    type: 'text' | 'poll';
-    text?: string | null;
-    name?: string | null;
-    options?: string[] | null;
-    metadata?: Record<string, unknown>;
-  };
-  webhook_url?: string | null;
-}
+import type { OutboxRecord } from '../types';
 
 export async function processOutboxQueue(
   supabase: SupabaseClient,

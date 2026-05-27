@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/withAuth';
 import { callGroq } from '@/lib/groq';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
+import { getErrorMessage } from '@/lib/utils';
 
 const handler: SecureHandler = async (req, context) => {
   const { tenantId, user } = context.auth!;
@@ -26,7 +27,7 @@ const handler: SecureHandler = async (req, context) => {
     return NextResponse.json(result);
 
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Groq API Exception';
+    const msg = getErrorMessage(e);
     await ServerLogger.system('ERROR', 'AI', 'Groq route error', { error: msg, tenantId });
     return NextResponse.json({ error: msg }, { status: 500 });
   }

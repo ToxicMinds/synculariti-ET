@@ -1,4 +1,5 @@
 import { ServerLogger } from '@/lib/logger-server';
+import { getErrorMessage } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -145,7 +146,7 @@ export async function POST(req: Request) {
     });
 
   } catch (e: unknown) {
-    const errorMsg = e instanceof Error ? e.message : 'Unknown auth error';
+    const errorMsg = getErrorMessage(e);
     await ServerLogger.system('ERROR', 'Auth', 'PIN Auth Exception', { error: errorMsg });
     return NextResponse.json({ error: 'Authentication processing error' }, { status: 500 });
   }

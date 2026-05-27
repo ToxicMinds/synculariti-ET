@@ -23,10 +23,11 @@ jest.mock('next/headers', () => ({
 }));
 
 // Mock Supabase (service-role client for webhook route)
-const mockInsert = jest.fn();
+const mockRpc = jest.fn();
 const mockOutboxSingle = jest.fn();
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
+    rpc: mockRpc.mockResolvedValue({ data: null, error: null }),
     from: jest.fn((table: string) => {
       if (table === 'whatsapp_outbox') {
         return {
@@ -35,12 +36,6 @@ jest.mock('@supabase/supabase-js', () => ({
           order: jest.fn().mockReturnThis(),
           limit: jest.fn().mockReturnThis(),
           single: mockOutboxSingle,
-          update: jest.fn().mockReturnThis(),
-        };
-      }
-      if (table === 'whatsapp_inbox') {
-        return {
-          insert: mockInsert.mockResolvedValue({ error: null }),
         };
       }
       return {};
@@ -169,14 +164,15 @@ defineFeature(feature, (test) => {
     });
 
     and(/^the event must be stored in the database inbox under tenant "(.*)" linked to outbox "(.*)"$/, (tenantId, outboxId) => {
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockRpc).toHaveBeenCalledWith(
+        'insert_whatsapp_inbox_v1',
         expect.objectContaining({
-          tenant_id: tenantId,
-          outbox_id: outboxId,
-          sender_phone: '421951153761',
-          message_id: 'msg-123',
-          message_type: 'poll_vote',
-          content: 'Approve'
+          p_tenant_id: tenantId,
+          p_outbox_id: outboxId,
+          p_sender_phone: '421951153761',
+          p_message_id: 'msg-123',
+          p_message_type: 'poll_vote',
+          p_content: 'Approve'
         })
       );
     });

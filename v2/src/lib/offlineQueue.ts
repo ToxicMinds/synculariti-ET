@@ -1,4 +1,5 @@
 import { Logger } from './logger';
+import { getErrorMessage } from './utils';
 
 export interface QueuedMutation {
   id: string;
@@ -37,7 +38,7 @@ export class OfflineQueue {
       return q ? JSON.parse(q) : [];
     } catch (e: unknown) {
       Logger.system('ERROR', 'OfflineQueue', 'Failed to read queue', { 
-        error: e instanceof Error ? e.message : String(e) 
+        error: getErrorMessage(e) 
       });
       return [];
     }
@@ -66,7 +67,7 @@ export class OfflineQueue {
       } catch (e: unknown) {
         Logger.system('ERROR', 'OfflineQueue', 'Failed to enqueue mutation', { 
           type, 
-          error: e instanceof Error ? e.message : String(e) 
+          error: getErrorMessage(e) 
         });
         return undefined;
       }

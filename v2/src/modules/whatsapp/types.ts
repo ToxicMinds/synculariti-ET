@@ -32,3 +32,17 @@ export interface TenantConfig {
   phones?: Record<string, string>
   workflows?: WorkflowsConfig
 }
+
+export interface OutboxRecord {
+  id: string;
+  tenant_id: string;
+  recipient_phone: string;
+  payload: {
+    type: 'text' | 'poll';
+    text?: string | null;
+    name?: string | null;
+    options?: string[] | null;
+    metadata?: Record<string, unknown>;
+  };
+  webhook_url?: string | null;
+}

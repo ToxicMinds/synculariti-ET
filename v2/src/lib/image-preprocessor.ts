@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { getErrorMessage } from './utils';
 
 export interface PreprocessResult {
   success: boolean;
@@ -63,7 +64,7 @@ export async function preprocessImage(dataUrl: string): Promise<PreprocessResult
       originalFormat,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Image processing failed';
+    const msg = getErrorMessage(err);
     return { success: false, error: msg };
   }
 }

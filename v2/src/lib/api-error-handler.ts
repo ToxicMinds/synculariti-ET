@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ServerLogger } from './logger-server';
 import { ZodIssue } from 'zod';
+import { getErrorMessage } from './utils';
 
 import { LogComponent } from './types/logging';
 
@@ -22,7 +23,7 @@ export function apiError(
   options: ApiErrorOptions = {}
 ): NextResponse {
   const status = options.status || 500;
-  const msg = error instanceof Error ? error.message : String(error);
+  const msg = getErrorMessage(error);
   
   // Logic for retryable hint: 
   // 1. Explicitly passed in options

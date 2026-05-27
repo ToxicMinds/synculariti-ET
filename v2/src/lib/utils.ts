@@ -1,5 +1,9 @@
 import { Logger } from './logger';
 
+export function getErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 /**
  * Executes a fetch request with exponential backoff retries.
  */
@@ -14,7 +18,7 @@ export async function fetchWithRetry(url: string, options: RequestInit = {}, ret
     return response;
   } catch (error: unknown) {
     if (retries > 0) {
-      Logger.system('WARN', 'Utils', `Fetch threw error, retrying in ${backoff}ms...`, { url, error: error instanceof Error ? error.message : String(error) });
+      Logger.system('WARN', 'Utils', `Fetch threw error, retrying in ${backoff}ms...`, { url, error: getErrorMessage(error) });
       await new Promise(res => setTimeout(res, backoff));
       return fetchWithRetry(url, options, retries - 1, backoff * 2);
     }
