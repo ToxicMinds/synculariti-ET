@@ -1,5 +1,6 @@
 import neo4j, { Driver, Session, ManagedTransaction } from 'neo4j-driver';
 import { Logger } from './logger';
+import { buildMerchantId } from './neo4j-ontology';
 import { Transaction } from '@/modules/finance/lib/finance';
 import { TransactionSyncPayload } from './types';
 
@@ -34,7 +35,7 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
       return exp as TransactionSyncPayload;
     }
     const rawName = (exp.description || 'Unknown Merchant').trim();
-    const merchantId = `merchant-${rawName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    const merchantId = buildMerchantId(rawName);
     const d = exp.date ? new Date(exp.date + 'T12:00:00') : new Date();
     const dow = d.getDay();
     return {

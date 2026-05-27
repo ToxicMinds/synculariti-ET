@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useStatementScanner, ParsedTransaction } from '../hooks/useStatementScanner';
+import { formatCurrency } from '@/lib/utils';
 
 interface StatementScannerProps {
   names: Record<string, string>;
@@ -95,7 +96,7 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
                       <span>{tx.category}</span>
                     </div>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>€{Number(tx.amount).toFixed(2)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{formatCurrency(Number(tx.amount))}</div>
                 </div>
               ))}
             </div>
@@ -142,7 +143,7 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
                 }}>
                   <div>
                     <span style={{ display: 'block', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Extracted</span>
-                    <span style={{ fontSize: 15, fontWeight: 700 }}>€{scanner.reconciliation.extractedTotal.toFixed(2)}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700 }}>{formatCurrency(scanner.reconciliation.extractedTotal)}</span>
                   </div>
                   <div>
                     <span style={{ display: 'block', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Difference</span>
@@ -150,7 +151,7 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
                       fontSize: 15, fontWeight: 700, 
                       color: scanner.reconciliation.isBalanced ? '#10b981' : '#ef4444' 
                     }}>
-                      €{scanner.reconciliation.delta.toFixed(2)}
+                      {formatCurrency(scanner.reconciliation.delta)}
                     </span>
                   </div>
                   <div>

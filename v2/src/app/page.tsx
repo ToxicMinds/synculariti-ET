@@ -13,6 +13,7 @@ import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
 import { StatementScanner } from '@/modules/finance/components/StatementScanner';
 import { ItemAnalytics } from '@/modules/finance/components/ItemAnalytics';
 import { SpendingBreakdown, DailyTrend } from '@/modules/finance/components/FinanceCharts';
+import { formatCurrency } from '@/lib/utils';
 import { AIInsights } from '@/modules/finance/components/AIInsights';
 import { OperatingMargin } from '@/modules/finance/components/OperatingMargin';
 import { BudgetHealth } from '@/modules/finance/components/BudgetHealth';
@@ -195,7 +196,7 @@ function DashboardContent() {
               }}
             >
               <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em' }}>
-                €{totals.spent.toFixed(2)}
+                {formatCurrency(totals.spent)}
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Spending for {selectedMonth}</p>
               <div style={{ marginTop: 20 }}><DailyTrend transactions={displayTransactions} /></div>

@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver } from '@/lib/neo4j';
-import { withAuth } from '@/lib/withAuth';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
-import { queryPriceIntelligence, queryTimingPatterns, queryWasteRisk, InsightFinding } from '@/lib/insight-queries';
 import { getErrorMessage } from '@/lib/utils';
+import { queryPriceIntelligence, queryTimingPatterns, queryWasteRisk, InsightFinding } from '@/lib/insight-queries';
 
 function articulateFinding(f: InsightFinding): string {
   return `${f.summary}. ${f.recommendation}.`;
@@ -121,4 +121,4 @@ Just state the finding naturally as if talking to the restaurant owner.`
   }
 };
 
-export const GET = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+export const GET = withTestHandler(handler);

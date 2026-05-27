@@ -231,11 +231,18 @@
 
 ## Shared Utilities
 - `function getErrorMessage(e: unknown): string`: Single error-to-string function used across the entire codebase. Defined in `src/lib/utils.ts`. Replaces 30+ inline `e instanceof Error ? e.message : String(e)` duplications. Also exported from `@synculariti/whatsapp-client` but ET-internal code must use `@/lib/utils`.
-- `function formatCurrency(amount: number, currency = 'EUR'): string`: Locale-aware currency formatting (`sk-SK` locale, EUR default). Defined in `src/lib/utils.ts`.
+- `function formatCurrency(amount: number, currency = 'EUR'): string`: Locale-aware currency formatting (`sk-SK` locale, EUR default). Defined in `src/lib/utils.ts`. Used across 17+ components and modules — single source of truth for all monetary display.
+- `function withTestHandler(handler: SecureHandler)`: Extracts the `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` guard pattern. Defined in `src/lib/withTestHandler.ts`. Used by all 12 internal API routes. (V-49 fix)
+- `function buildMerchantId(name: string): string`: Slugifies a merchant name into a Neo4j-safe merchant ID (`merchant-{lowercase-hyphenated}`). Defined in `src/lib/neo4j-ontology.ts`. Eliminates 4 inline duplications. (V-46 fix)
+- `function buildSyncPayload(txRow, items, options?): TransactionSyncPayload`: Constructs a `TransactionSyncPayload` from a database transaction row and its receipt items. Handles vendor name extraction, merchant ID building, item mapping via `mapToOntologyItem()`, date enrichment via `enrichDate()`, and optional category inference. Defined in `src/lib/neo4j-ontology.ts`. Eliminates 3 near-identical blocks. (V-47 fix)
+- `Zod Schema: BaseDecisionSchema`: Shared base Zod schema for webhook callback payloads (`type`, `outboxId`, `recipientPhone`, `tenantId`, `timestamp`). Extended by `POApprovalWebhookSchema`, `AuditWebhookSchema`, `POSDiscrepancyWebhookSchema` with domain-specific `decision` enums. Defined in `src/modules/whatsapp/lib/webhook-payloads.ts`. (V-48 fix)
+- `interface BaseDecisionPayload`: Inferred type from `BaseDecisionSchema`. Used by `dispatchDecision` server action for its constructed payload. (V-48 fix)
 
 ## WhatsApp Types
 - `interface OutboxRecord`: Full type for `whatsapp_outbox` rows. Properties: `id`, `tenant_id`, `recipient_phone`, `payload` (`{ type: 'text' | 'poll', text?, name?, options?, metadata? }`), `webhook_url?`. Exported from `src/modules/whatsapp/types.ts`.
 
 ## Database RPCs
 - `RPC Function: public.insert_whatsapp_inbox_v1(p_tenant_id, p_outbox_id, p_sender_phone, p_message_id, p_message_type, p_content)`: ACID-compliant inbox insert with `updated_at` propagation. Replaces direct `whatsapp_inbox.insert()` in webhook/route.ts (V-71 fix). SQL in `sql/b2b_evolution/32_insert_whatsapp_inbox_v1.sql`.
+- `RPC Function: public.set_outbox_delivery_result_v1(p_outbox_id, p_success, p_error_message)`: ACID-compliant outbox delivery result update. Atomically sets `status = SENT/FAILED`, `processed_at`, and increments `retry_count`. Replaces direct `whatsapp_outbox.update()` in processOutboxQueue.ts (V-70 fix). SQL in `sql/b2b_evolution/33_set_outbox_delivery_result_v1.sql`.
+- `RPC Function: public.insert_whatsapp_outbox_v1(p_tenant_id, p_recipient_phone, p_payload, p_webhook_url, p_webhook_secret, p_idempotency_key)`: ACID-compliant outbox insert. Replaces direct `whatsapp_outbox.insert()` in notifyLargeInvoice.ts (W-03 fix). SQL in `sql/b2b_evolution/34_insert_whatsapp_outbox_v1.sql`.
 - `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Existing ACID-compliant RPC that atomically marks an outbox record COMPLETED and returns webhook config. Used by webhook/route.ts (V-71 fix).

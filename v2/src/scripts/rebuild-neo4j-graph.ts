@@ -1,9 +1,8 @@
 import './load-env';
 import { createClient } from '@supabase/supabase-js';
 import { getNeo4jDriver, neo4jBulkMerge } from '../lib/neo4j';
-import { mapToOntologyItem } from '../lib/neo4j-ontology';
-import { enrichDate } from '../lib/holidays';
-import { TransactionSyncPayload, ReceiptItemSyncPayload } from '../lib/types';
+import { buildSyncPayload } from '../lib/neo4j-ontology';
+import { TransactionSyncPayload } from '../lib/types';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -160,19 +159,9 @@ async function main() {
 
   console.log(`Items: ${itemsRows?.length || 0} across ${Object.keys(itemsByTx).length} transactions`);
 
-  const payloads: TransactionSyncPayload[] = transactions.map(tx => {
-    const vendorName = (tx.description || tx.who || 'Unknown Merchant').trim();
-    const merchantId = `merchant-${vendorName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-    const currency = tx.currency || 'EUR';
-    const relatedItems = itemsByTx[tx.id] || [];
-    const mappedItems: ReceiptItemSyncPayload[] = relatedItems.map(item => {
-      const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
-      const itemAmount = Number(item.amount);
-      return { ...mapped, itemId: item.id, itemAmount, itemQuantity: 1, itemUnitPrice: itemAmount, itemCategory: item.category || 'COGS - Dry Goods' };
-    });
-    const enrichment = enrichDate(tx.date);
-    return { txId: tx.id, tenantId: tx.tenant_id, amount: Number(tx.amount), date: tx.date, category: tx.category, ...enrichment, vendorName, merchantId, items: mappedItems };
-  });
+  const payloads: TransactionSyncPayload[] = transactions.map(tx =>
+    buildSyncPayload(tx, itemsByTx[tx.id] || [])
+  );
 
   // Custom small-batch loop (AuraDB free tier has limited memory)
   const SMALL_BATCH = 100;

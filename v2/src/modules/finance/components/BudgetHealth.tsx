@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { BentoCard } from '@/components/BentoCard';
 import { calcTimeBoundForecast, Transaction } from '../lib/finance';
+import { formatCurrency } from '@/lib/utils';
 
 interface BudgetHealthProps {
   spent: number;
@@ -89,7 +90,7 @@ export function BudgetHealth({ spent, totalBudget, transactions = [], colSpan = 
               color: isOver ? 'var(--accent-danger)' : 'var(--text-primary)',
               letterSpacing: '-0.02em'
             }}>
-              €{remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(remaining)}
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4, margin: 0 }}>
               {isOver ? 'Over target budget' : 'Remaining budget limit'}
@@ -124,12 +125,12 @@ export function BudgetHealth({ spent, totalBudget, transactions = [], colSpan = 
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Daily velocity:</span>
-            <span style={{ fontWeight: 600 }}>€{dailySpendRate.toFixed(2)}/day</span>
+            <span style={{ fontWeight: 600 }}>{formatCurrency(dailySpendRate)}/day</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-secondary)' }}>Projected end of month:</span>
             <span style={{ fontWeight: 600, color: status === 'IN_DANGER' ? 'var(--accent-danger)' : 'var(--text-primary)' }}>
-              €{projectedSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(projectedSpend)}
             </span>
           </div>
         </div>

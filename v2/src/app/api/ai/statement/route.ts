@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/withAuth';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { apiError } from '@/lib/api-error-handler';
 import { callGroq } from '@/lib/groq';
 import { getCategoryPrompt } from '@/lib/ai-categories';
@@ -65,4 +65,4 @@ Only output the JSON object.`
   }
 };
 
-export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+export const POST = withTestHandler(handler);

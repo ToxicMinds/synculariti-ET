@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver, processOutboxSync, neo4jDeleteTransaction } from '@/lib/neo4j';
 import { ServerLogger } from '@/lib/logger-server';
-import { withAuth } from '@/lib/withAuth';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { SecureHandler } from '@/lib/types/api';
 import { getErrorMessage } from '@/lib/utils';
 import { createClient } from '@/lib/supabase-server';
-import { TransactionSyncPayload, ReceiptItemSyncPayload } from '@/lib/types';
-import { mapToOntologyItem } from '@/lib/neo4j-ontology';
-import { enrichDate } from '@/lib/holidays';
+import { TransactionSyncPayload } from '@/lib/types';
+import { buildSyncPayload } from '@/lib/neo4j-ontology';
 
 /**
  * GET /api/debug/sync-neo4j
@@ -88,45 +87,7 @@ const handler: SecureHandler = async (req, context) => {
             throw new Error(`Failed to fetch receipt items: ${itemsError.message}`);
           }
 
-          const vendorName = (txRow.description || txRow.who || 'Unknown Merchant').trim();
-          const merchantId = `merchant-${vendorName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-          const currency = txRow.currency || 'EUR';
-
-          const mappedItems: ReceiptItemSyncPayload[] = (itemsRows || []).map(item => {
-            const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
-            const itemAmount = Number(item.amount);
-            return {
-              ...mapped,
-              itemId: item.id,
-              itemAmount,
-              itemQuantity: 1,
-              itemUnitPrice: itemAmount,
-              itemCategory: item.category || 'COGS - Dry Goods',
-            };
-          });
-
-          let primaryCategory = txRow.category;
-          if (!primaryCategory && mappedItems.length > 0) {
-            const catCounts: Record<string, number> = {};
-            for (const item of mappedItems) {
-              catCounts[item.itemCategory] = (catCounts[item.itemCategory] || 0) + 1;
-            }
-            primaryCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0][0];
-          }
-
-          const dateEnrichment = enrichDate(txRow.date);
-
-          payloadsToSync.push({
-            txId: txRow.id,
-            tenantId: txRow.tenant_id,
-            amount: Number(txRow.amount),
-            date: txRow.date,
-            category: primaryCategory,
-            ...dateEnrichment,
-            vendorName,
-            merchantId,
-            items: mappedItems,
-          });
+          payloadsToSync.push(buildSyncPayload(txRow, itemsRows || [], { inferCategory: true }));
 
           eventsToComplete.push(event.id);
         }
@@ -179,4 +140,4 @@ const handler: SecureHandler = async (req, context) => {
   }
 };
 
-export const GET = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+export const GET = withTestHandler(handler);

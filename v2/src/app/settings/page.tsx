@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
+import { formatCurrency } from '@/lib/utils';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -103,7 +104,7 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
             <div>
               <p className="card-subtitle" style={{ fontSize: 13, marginBottom: 4 }}>Total Monthly Spending Cap</p>
-              <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>€{totalMonthlyLimit.toFixed(2)}</div>
+              <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>{formatCurrency(totalMonthlyLimit)}</div>
             </div>
             <div className="glass-card" style={{ padding: '12px 20px', borderRadius: 16, textAlign: 'center' }}>
               <div className="card-subtitle" style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', marginBottom: 2 }}>Expense Lines</div>

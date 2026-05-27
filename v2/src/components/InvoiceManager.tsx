@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BentoCard } from './BentoCard';
 import { Logger } from '@/lib/logger';
+import { formatCurrency } from '@/lib/utils';
 
 interface Invoice {
   id: string;
@@ -73,7 +74,7 @@ export function InvoiceManager({ tenantId }: { tenantId: string }) {
                 return (
                   <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color-subtle)' }}>
                     <td style={{ padding: '12px 8px' }} className="card-title">{inv.invoice_number || 'INV-UNKN'}</td>
-                    <td style={{ padding: '12px 8px' }} className="card-title">{inv.currency} {inv.total_amount.toFixed(2)}</td>
+                    <td style={{ padding: '12px 8px' }} className="card-title">{formatCurrency(inv.total_amount, inv.currency)}</td>
                     <td style={{ padding: '12px 8px' }} className="card-subtitle">{inv.due_date || 'N/A'}</td>
                     <td style={{ padding: '12px 8px' }}>
                       <span className="status-badge" style={{ 

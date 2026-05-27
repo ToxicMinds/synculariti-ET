@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/withAuth';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { callGroq } from '@/lib/groq';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
@@ -33,4 +33,4 @@ const handler: SecureHandler = async (req, context) => {
   }
 };
 
-export const POST = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+export const POST = withTestHandler(handler);

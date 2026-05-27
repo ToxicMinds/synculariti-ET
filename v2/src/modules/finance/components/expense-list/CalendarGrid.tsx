@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Transaction } from '../../lib/finance';
 import { useCalendarGrid } from '../../hooks/useCalendarGrid';
+import { formatCurrency } from '@/lib/utils';
 
 interface CalendarGridProps {
   transactions: Transaction[];
@@ -53,7 +54,7 @@ export function CalendarGrid({ transactions, baseDate = new Date() }: CalendarGr
               </div>
               {hasSpend && (
                 <div style={{ fontSize: 9, color: dayData.intensity > 0.5 ? '#fff' : 'var(--text-secondary)', marginTop: 2 }}>
-                  €{Math.round(dayData.total)}
+                  {formatCurrency(dayData.total)}
                 </div>
               )}
             </div>
@@ -70,7 +71,7 @@ export function CalendarGrid({ transactions, baseDate = new Date() }: CalendarGr
             <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0' }}>
               <span style={{ color: 'var(--text-primary)' }}>{t.description || t.category}</span>
               <span style={{ fontWeight: 600 }}>
-                {t.currency === 'EUR' || !t.currency ? '€' : t.currency}{Number(t.amount).toFixed(2)}
+                {formatCurrency(Number(t.amount), t.currency)}
               </span>
             </div>
           ))}

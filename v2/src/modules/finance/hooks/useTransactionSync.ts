@@ -3,6 +3,7 @@ import { Transaction } from '../lib/finance';
 import { Logger } from '@/lib/logger';
 import { useTenantContext } from '@/context/TenantContext';
 import { OfflineQueue } from '@/lib/offlineQueue';
+import { formatCurrency } from '@/lib/utils';
 import { notifyLargeInvoice } from '@/actions/notifyLargeInvoice';
 
 export type ItemConfidence = 'high' | 'medium' | 'low';
@@ -129,7 +130,7 @@ export function useTransactionSync(tenantId: string | undefined) {
 
         if (error) throw error;
 
-        Logger.user(tenantId, 'TRANSACTION_ADDED', `Scanned receipt from ${receipt.store} (€${totalAmount.toFixed(2)})`, whoName);
+        Logger.user(tenantId, 'TRANSACTION_ADDED', `Scanned receipt from ${receipt.store} (${formatCurrency(totalAmount)})`, whoName);
         triggerRefresh();
 
         return data;

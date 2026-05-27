@@ -1,4 +1,5 @@
 import { OperatingMarginMetrics, TimeBoundForecast } from '../../../lib/types';
+import { formatCurrency } from '../../../lib/utils';
 
 export interface Transaction {
   id?: string;
@@ -165,7 +166,7 @@ export function calcMonthDelta(
   }, 0);
 
   const delta = currentSpent - prevTotal;
-  const deltaStr = (delta >= 0 ? '+' : '-') + currencySymbol + Math.abs(delta).toFixed(2);
+  const deltaStr = (delta >= 0 ? '+' : '-') + formatCurrency(Math.abs(delta));
   const deltaColor = delta > 0 ? 'var(--accent-danger)' : 'var(--accent-success)';
   return { delta, deltaStr, deltaColor };
 }

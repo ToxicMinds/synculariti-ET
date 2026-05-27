@@ -6,6 +6,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { useScannerState, UseScannerStateReturn, ReceiptData } from '../hooks/useScannerState';
+import { formatCurrency } from '@/lib/utils';
 import styles from './ReceiptScanner.module.css';
 
 interface ReceiptScannerProps {
@@ -190,7 +191,7 @@ function ReviewStep({
               </div>
             </div>
             <div className={item.amount < 0 ? styles.itemAmountNegative : styles.itemAmount}>
-              €{item.amount.toFixed(2)}
+              {formatCurrency(item.amount)}
             </div>
           </div>
         ))}
@@ -224,7 +225,7 @@ function ReviewStep({
       <div className={styles.totalContainer}>
         <span className={styles.totalLabel}>Total selected:</span>
         <span className={styles.totalAmount}>
-          €{receipt.items.filter(i => i.selected).reduce((acc, curr) => acc + curr.amount, 0).toFixed(2)}
+          {formatCurrency(receipt.items.filter(i => i.selected).reduce((acc, curr) => acc + curr.amount, 0))}
         </span>
       </div>
 

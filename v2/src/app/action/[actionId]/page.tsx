@@ -4,6 +4,7 @@ import { createClient as createSessionClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ActionClient } from './ActionClient';
+import { formatCurrency } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://synculariti-et.vercel.app';
@@ -29,7 +30,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const name = record?.payload?.name || 'Action Required';
   const meta = record?.payload?.metadata || {};
-  const desc = meta.description || (meta.amount ? `${meta.currency || '€'}${meta.amount}` : 'Respond to this action request');
+  const desc = meta.description || (meta.amount ? formatCurrency(Number(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : 'Respond to this action request');
 
   return {
     title: `${name} - Synculariti`,
@@ -116,7 +117,7 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
   const meta = record.payload?.metadata || {};
   const clientPayload = {
     title: record.payload?.name || 'Action Required',
-    description: meta.description || (meta.amount ? `${meta.currency || '€'}${meta.amount}` : ''),
+    description: meta.description || (meta.amount ? formatCurrency(Number(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : ''),
     options: record.payload?.options || [],
   };
 

@@ -1,15 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { BaseDecisionSchema } from '@/modules/whatsapp/lib/webhook-payloads';
 
 export type DiscrepancyDecision = 'Log as Shrinkage' | 'Recount Required' | 'Deduct from Register';
 
-export const POSDiscrepancyWebhookSchema = z.object({
-  type: z.literal('poll_vote'),
-  outboxId: z.string().uuid(),
-  recipientPhone: z.string(),
-  tenantId: z.string().uuid(),
+export const POSDiscrepancyWebhookSchema = BaseDecisionSchema.extend({
   decision: z.enum(['Log as Shrinkage', 'Recount Required', 'Deduct from Register']),
-  timestamp: z.number()
 });
 
 export type POSDiscrepancyWebhookPayload = z.infer<typeof POSDiscrepancyWebhookSchema>;

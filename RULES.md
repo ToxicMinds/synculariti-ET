@@ -16,6 +16,10 @@
 - **TypeScript Only**: No `.js` files. **Zero** `: any` usages allowed. Use explicit return types for all functions.
 - **No Direct DML**: Never use `supabase.from('transactions').insert(...)`. Use the canonical RPC `save_receipt_v4`.
 - **One Error-to-String Function**: Always use `getErrorMessage(e)` from `@/lib/utils`. Never write `e instanceof Error ? e.message : String(e)` inline. This function is used across the entire codebase — new code must follow suit. `@synculariti/whatsapp-client` also exports it, but ET-internal code must use `@/lib/utils` to avoid cross-package chain issues during test resolution.
+- **One Currency Format**: Always use `formatCurrency(amount, currency?)` from `@/lib/utils` for all monetary display. Never use `€{x.toFixed(2)}` or `x.toLocaleString('en-US', ...)` inline.
+- **Route Auth Helper**: Always use `withTestHandler(handler)` from `@/lib/withTestHandler` in API route exports. Never write `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` inline.
+- **Neo4j Ontology Helpers**: Use `buildMerchantId(name)` from `@/lib/neo4j-ontology` for merchant ID construction and `buildSyncPayload(txRow, items, opts?)` for sync payload building. Never inline the slug pattern or the mapping logic.
+- **Shared Webhook Schemas**: Extend `BaseDecisionSchema` from `@/modules/whatsapp/lib/webhook-payloads` for all webhook callback payload schemas instead of writing `{ type, outboxId, recipientPhone, tenantId, timestamp }` from scratch.
 - **Data Integrity Contracts**: All ledger mutations MUST maintain strict compliance with schema contracts, including propagating `updated_at` timestamps to prevent `42703 undefined_column` crashes.
 - **Logger, not console**: NEVER use `console.log`, `console.warn`, or `console.error` in production code. Use `Logger.system()` for technical events and `Logger.user()` for business events. Use centralized `LogComponent` types.
 - **User Activity**: EVERY mutation MUST call `Logger.user(tenantId, action, description, actorName)`.

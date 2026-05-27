@@ -1,15 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
+import { BaseDecisionSchema } from '@/modules/whatsapp/lib/webhook-payloads';
 
 export type AuditDecision = 'Approve Anyway' | 'Request Re-upload' | 'Reject Expense';
 
-export const AuditWebhookSchema = z.object({
-  type: z.literal('poll_vote'),
-  outboxId: z.string().uuid(),
-  recipientPhone: z.string(),
-  tenantId: z.string().uuid(),
+export const AuditWebhookSchema = BaseDecisionSchema.extend({
   decision: z.enum(['Approve Anyway', 'Request Re-upload', 'Reject Expense']),
-  timestamp: z.number()
 });
 
 export type AuditWebhookPayload = z.infer<typeof AuditWebhookSchema>;

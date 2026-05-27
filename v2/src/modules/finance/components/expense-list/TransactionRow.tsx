@@ -4,6 +4,7 @@ import React from 'react';
 import { Transaction } from '../../lib/finance';
 import { CategoryPill } from '@/components/CategoryPill';
 import { useSwipeable } from '@/hooks/useSwipeable';
+import { formatCurrency } from '@/lib/utils';
 
 interface TransactionRowProps {
   tx: Transaction;
@@ -25,8 +26,6 @@ export function TransactionRow({ tx, onDelete, onEdit }: TransactionRowProps) {
     onEdit(tx);
     reset();
   };
-
-  const currencySymbol = tx.currency === 'EUR' || !tx.currency ? '€' : tx.currency;
 
   return (
     <div style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--border-color)' }}>
@@ -92,7 +91,7 @@ export function TransactionRow({ tx, onDelete, onEdit }: TransactionRowProps) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>
-              {currencySymbol}{Number(tx.amount).toFixed(2)}
+              {formatCurrency(Number(tx.amount), tx.currency)}
             </span>
             <div className="hide-desktop" style={{ width: 4, height: 20, background: 'var(--border-color)', borderRadius: 2, marginLeft: 4, opacity: 0.5 }} />
           </div>

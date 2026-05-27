@@ -3,6 +3,17 @@
 import { signHmacPayload, getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
 import { createClient } from '@/lib/supabase-server';
+import type { BaseDecisionPayload } from '@/modules/whatsapp/lib/webhook-payloads';
+
+type CompleteActionResult = {
+  status: string;
+  webhook_url: string | null;
+  webhook_secret: string;
+  payload: {
+    recipient_phone?: string;
+    tenant_id?: string;
+  } | null;
+};
 
 export async function dispatchDecision(
   actionId: string,
@@ -41,7 +52,7 @@ export async function dispatchDecision(
     }
 
     // Build and sign the webhook payload
-    const payload = {
+    const payload: BaseDecisionPayload & { decision: string } = {
       type: 'poll_vote' as const,
       outboxId: actionId,
       recipientPhone: result.payload?.recipient_phone || result.webhook_url,

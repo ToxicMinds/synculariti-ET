@@ -3,7 +3,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Logger } from '@/lib/logger';
-import { getErrorMessage } from '@/lib/utils';
+import { getErrorMessage, formatCurrency } from '@/lib/utils';
 
 interface InvoiceItem {
   id?: string;
@@ -48,7 +48,7 @@ export async function notifyLargeInvoice(
 
     const ownerPhone = tenantData.config.phones.owner;
     const lines = largeItems.map(i =>
-      `• €${Number(i.amount).toFixed(2)} — ${i.description || i.merchant || 'Manual entry'} (${i.category || 'Uncategorized'}) by ${i.who || 'Unknown'} on ${i.date || 'today'}`
+      `• ${formatCurrency(Number(i.amount))} — ${i.description || i.merchant || 'Manual entry'} (${i.category || 'Uncategorized'}) by ${i.who || 'Unknown'} on ${i.date || 'today'}`
     ).join('\n');
 
     const messageText = `🚨 Large invoice alert!\n\n${lines}\n\nTap to review → https://synculariti-et.vercel.app`;

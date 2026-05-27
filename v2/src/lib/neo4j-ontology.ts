@@ -1,4 +1,82 @@
 // Slovak B2B Ingredient Mapping Dictionary
+import { enrichDate } from './holidays';
+import type { TransactionSyncPayload, ReceiptItemSyncPayload } from './types';
+
+export function buildMerchantId(name: string): string {
+  return `merchant-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+}
+
+interface TransactionRow {
+  id: string;
+  amount: number | string;
+  date: string;
+  category?: string | null;
+  description?: string | null;
+  who?: string | null;
+  currency?: string | null;
+  tenant_id: string;
+}
+
+interface ReceiptItemRow {
+  id: string;
+  name: string;
+  amount: number | string;
+  category?: string | null;
+  currency?: string | null;
+}
+
+function inferCategory(items: ReceiptItemRow[]): string | undefined {
+  if (items.length === 0) return undefined;
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const cat = item.category || 'COGS - Dry Goods';
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+export function buildSyncPayload(
+  txRow: TransactionRow,
+  items: ReceiptItemRow[],
+  options?: { inferCategory?: boolean }
+): TransactionSyncPayload {
+  const vendorName = (txRow.description || txRow.who || 'Unknown Merchant').trim();
+  const merchantId = buildMerchantId(vendorName);
+  const currency = txRow.currency || 'EUR';
+
+  const mappedItems: ReceiptItemSyncPayload[] = items.map(item => {
+    const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
+    const itemAmount = Number(item.amount);
+    return {
+      ...mapped,
+      itemId: item.id,
+      itemAmount,
+      itemQuantity: 1,
+      itemUnitPrice: itemAmount,
+      itemCategory: item.category || 'COGS - Dry Goods',
+    };
+  });
+
+  let category = txRow.category || undefined;
+  if (!category && options?.inferCategory) {
+    category = inferCategory(items);
+  }
+
+  const enrichment = enrichDate(txRow.date);
+
+  return {
+    txId: txRow.id,
+    tenantId: txRow.tenant_id,
+    amount: Number(txRow.amount),
+    date: txRow.date,
+    category,
+    ...enrichment,
+    vendorName,
+    merchantId,
+    items: mappedItems,
+  };
+}
+
 export function mapToOntologyItem(name: string, merchantId: string, itemCurrency: string) {
   const cleanName = name.trim();
   const lowerName = cleanName.toLowerCase();

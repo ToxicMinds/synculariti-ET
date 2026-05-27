@@ -2,6 +2,7 @@
 
 import { BentoCard } from '@/components/BentoCard';
 import { Transaction } from '../lib/finance';
+import { formatCurrency } from '@/lib/utils';
 
 export function MonthlyPerformance({ 
   transactions, 
@@ -61,7 +62,7 @@ export function MonthlyPerformance({
       <div className="flex-col gap-4">
         <div>
           <p className="card-subtitle">Spent this month</p>
-          <div className="card-title" style={{ fontSize: 32 }}>€{currentTotal.toFixed(2)}</div>
+          <div className="card-title" style={{ fontSize: 32 }}>{formatCurrency(currentTotal)}</div>
         </div>
 
         {!hasSomeData ? (
@@ -93,7 +94,7 @@ export function MonthlyPerformance({
                   {Math.abs(pct).toFixed(1)}% {isBetter ? 'less' : 'more'}
                 </p>
                 <p className="card-subtitle">
-                  vs last month (€{prevTotal.toFixed(0)})
+                  vs last month ({formatCurrency(prevTotal)})
                 </p>
               </div>
             </div>
@@ -102,7 +103,7 @@ export function MonthlyPerformance({
               <p className="card-subtitle" style={{ lineHeight: 1.5 }}>
                 {maxIncrease > 20 ? (
                   <>
-                    ⚠️ Your <strong>{biggestIncreaseCat}</strong> spending is up by <strong>€{maxIncrease.toFixed(0)}</strong> compared to last month.
+                    ⚠️ Your <strong>{biggestIncreaseCat}</strong> spending is up by <strong>{formatCurrency(maxIncrease)}</strong> compared to last month.
                   </>
                 ) : isBetter ? (
                   "✨ Great job! You're trending lower than last month. Keep it up!"

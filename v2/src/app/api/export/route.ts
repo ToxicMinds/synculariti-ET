@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { withAuth } from '@/lib/withAuth';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 
@@ -49,4 +49,4 @@ const handler: SecureHandler = async (req, context) => {
   return NextResponse.json({ transactions });
 };
 
-export const GET = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+export const GET = withTestHandler(handler);

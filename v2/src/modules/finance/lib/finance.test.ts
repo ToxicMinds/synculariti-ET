@@ -112,8 +112,8 @@ describe('Finance Calculation Library (Canonical)', () => {
         { amount: 100, category: 'Food', date: '2026-03-15' }
       ];
       
-      const { deltaStr } = calcMonthDelta(history, '2026-04', 150, '$');
-      expect(deltaStr).toBe('+$50.00');
+      const { deltaStr } = calcMonthDelta(history, '2026-04', 150);
+      expect(deltaStr).toBe('+50,00\xa0€');
     });
 
     test('Handles January -> December transition', () => {

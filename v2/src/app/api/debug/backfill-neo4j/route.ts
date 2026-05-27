@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getNeo4jDriver, processOutboxSync } from '@/lib/neo4j';
 import { ServerLogger } from '@/lib/logger-server';
-import { withAuth } from '@/lib/withAuth';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { SecureHandler } from '@/lib/types/api';
 import { getErrorMessage } from '@/lib/utils';
 import { createClient } from '@/lib/supabase-server';
-import { TransactionSyncPayload, ReceiptItemSyncPayload } from '@/lib/types';
-import { mapToOntologyItem } from '@/lib/neo4j-ontology';
-import { enrichDate } from '@/lib/holidays';
+import { TransactionSyncPayload } from '@/lib/types';
+import { buildSyncPayload } from '@/lib/neo4j-ontology';
 
 /**
  * GET /api/debug/backfill-neo4j
@@ -70,39 +69,9 @@ const handler: SecureHandler = async (req, context) => {
     }
 
     // 3. Map into TransactionSyncPayload
-    const payloadsToSync: TransactionSyncPayload[] = transactions.map(txRow => {
-      const vendorName = (txRow.description || txRow.who || 'Unknown Merchant').trim();
-      const merchantId = `merchant-${vendorName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-      const currency = txRow.currency || 'EUR';
-
-      const relatedItems = itemsByTx[txRow.id] || [];
-      const mappedItems: ReceiptItemSyncPayload[] = relatedItems.map(item => {
-        const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
-        const itemAmount = Number(item.amount);
-        return {
-          ...mapped,
-          itemId: item.id,
-          itemAmount,
-          itemQuantity: 1,
-          itemUnitPrice: itemAmount,
-          itemCategory: item.category || 'COGS - Dry Goods',
-        };
-      });
-
-      const dateEnrichment = enrichDate(txRow.date);
-
-      return {
-        txId: txRow.id,
-        tenantId: txRow.tenant_id,
-        amount: Number(txRow.amount),
-        date: txRow.date,
-        category: txRow.category,
-        ...dateEnrichment,
-        vendorName,
-        merchantId,
-        items: mappedItems,
-      };
-    });
+    const payloadsToSync: TransactionSyncPayload[] = transactions.map(txRow =>
+      buildSyncPayload(txRow, itemsByTx[txRow.id] || [])
+    );
 
     // 4. Run bulk sync using flat-memory cursor slide
     const backfilledCount = await processOutboxSync(payloadsToSync, session);
@@ -122,4 +91,4 @@ const handler: SecureHandler = async (req, context) => {
   }
 };
 
-export const GET = process.env.NODE_ENV === 'test' ? handler : withAuth(handler);
+export const GET = withTestHandler(handler);

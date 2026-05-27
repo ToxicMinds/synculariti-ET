@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
+import { formatCurrency } from '@/lib/utils';
 
 interface AggregatedItem {
   name: string;
@@ -129,7 +130,7 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
               </span>
             </div>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>€{item.total_amount.toFixed(2)}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{formatCurrency(item.total_amount)}</span>
         </div>
       ))}
     </div>

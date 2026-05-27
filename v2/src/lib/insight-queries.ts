@@ -1,4 +1,5 @@
 import { Session } from 'neo4j-driver';
+import { formatCurrency } from '@/lib/utils';
 
 export interface InsightFinding {
   type: 'price' | 'timing' | 'waste';
@@ -67,8 +68,8 @@ export async function queryPriceIntelligence(
     type: 'price',
     impact: Math.round(pctDiff * 10),
     summary: `${ingredient} costs ${pctDiff.toFixed(0)}% more at ${dearest.merchant} than ${cheapest.merchant}`,
-    detail: `${ingredient}: €${cheapest.avgPrice.toFixed(2)} at ${cheapest.merchant} vs €${dearest.avgPrice.toFixed(2)} at ${dearest.merchant} (${diff.toFixed(2)}/unit difference across ${sorted.length} suppliers)`,
-    recommendation: `Switch ${ingredient} procurement to ${cheapest.merchant} to save ~€${diff.toFixed(2)} per unit`,
+    detail: `${ingredient}: ${formatCurrency(cheapest.avgPrice)} at ${cheapest.merchant} vs ${formatCurrency(dearest.avgPrice)} at ${dearest.merchant} (${diff.toFixed(2)}/unit difference across ${sorted.length} suppliers)`,
+    recommendation: `Switch ${ingredient} procurement to ${cheapest.merchant} to save ~${formatCurrency(diff)} per unit`,
     data: { ingredient, merchants: sorted, savingsPerUnit: diff, pctDifference: pctDiff }
   };
 }
@@ -120,10 +121,10 @@ export async function queryTimingPatterns(
     return {
       type: 'timing',
       impact: Math.round(pct * 2),
-      summary: `Weekend purchases average ${pct.toFixed(0)}% ${direction} than weekdays (€${weekendAvg.toFixed(2)} vs €${weekdayAvg.toFixed(2)})`,
-      detail: `Weekday avg: €${weekdayAvg.toFixed(2)} over ${weekday.reduce((s, r) => s + r.count, 0)} purchases. Weekend avg: €${weekendAvg.toFixed(2)} over ${weekend.reduce((s, r) => s + r.count, 0)} purchases.`,
+      summary: `Weekend purchases average ${pct.toFixed(0)}% ${direction} than weekdays (${formatCurrency(weekendAvg)} vs ${formatCurrency(weekdayAvg)})`,
+      detail: `Weekday avg: ${formatCurrency(weekdayAvg)} over ${weekday.reduce((s, r) => s + r.count, 0)} purchases. Weekend avg: ${formatCurrency(weekendAvg)} over ${weekend.reduce((s, r) => s + r.count, 0)} purchases.`,
       recommendation: direction === 'higher'
-        ? `Schedule major purchases on weekdays to save ~€${(weekendAvg - weekdayAvg).toFixed(2)} per trip`
+        ? `Schedule major purchases on weekdays to save ~${formatCurrency(weekendAvg - weekdayAvg)} per trip`
         : `Consider weekend purchasing patterns are actually more cost-effective`,
       data: { weekdayAvg, weekendAvg, days: rows }
     };
@@ -132,9 +133,9 @@ export async function queryTimingPatterns(
   return {
     type: 'timing',
     impact: Math.round(pctDiff),
-    summary: `${DAY_NAMES[highest.dow]} has the highest avg spend at €${highest.avgSpend.toFixed(2)} — ${pctDiff.toFixed(0)}% more than ${DAY_NAMES[lowest.dow]} (€${lowest.avgSpend.toFixed(2)})`,
-    detail: `Your most expensive shopping day is ${DAY_NAMES[highest.dow]} (avg €${highest.avgSpend.toFixed(2)}, ${highest.count} purchases). Cheapest is ${DAY_NAMES[lowest.dow]} (avg €${lowest.avgSpend.toFixed(2)}).`,
-    recommendation: `Shift non-urgent purchases from ${DAY_NAMES[highest.dow]} to ${DAY_NAMES[lowest.dow]} to reduce average spend by ~€${diff.toFixed(2)} per trip`,
+    summary: `${DAY_NAMES[highest.dow]} has the highest avg spend at ${formatCurrency(highest.avgSpend)} — ${pctDiff.toFixed(0)}% more than ${DAY_NAMES[lowest.dow]} (${formatCurrency(lowest.avgSpend)})`,
+    detail: `Your most expensive shopping day is ${DAY_NAMES[highest.dow]} (avg ${formatCurrency(highest.avgSpend)}, ${highest.count} purchases). Cheapest is ${DAY_NAMES[lowest.dow]} (avg ${formatCurrency(lowest.avgSpend)}).`,
+    recommendation: `Shift non-urgent purchases from ${DAY_NAMES[highest.dow]} to ${DAY_NAMES[lowest.dow]} to reduce average spend by ~${formatCurrency(diff)} per trip`,
     data: { highest: { day: DAY_NAMES[highest.dow], ...highest }, lowest: { day: DAY_NAMES[lowest.dow], ...lowest }, days: rows }
   };
 }
@@ -211,7 +212,7 @@ export async function queryWasteRisk(
     type: 'waste',
     impact: top.score,
     summary: `${top.ingredient} (${top.shelfLife}-day shelf life) bought ${riskFactors.join(', ')} — high spoilage risk`,
-    detail: `${top.qty.toFixed(1)} units of ${top.ingredient} at €${top.price.toFixed(2)}/unit purchased on ${top.purchased}. With ${top.shelfLife}-day shelf life and closure risk, ~${Math.round(top.qty * 0.3 * 100) / 100} units (€${(top.qty * top.price * 0.3).toFixed(2)}) may spoil.`,
+    detail: `${top.qty.toFixed(1)} units of ${top.ingredient} at ${formatCurrency(top.price)}/unit purchased on ${top.purchased}. With ${top.shelfLife}-day shelf life and closure risk, ~${Math.round(top.qty * 0.3 * 100) / 100} units (${formatCurrency(top.qty * top.price * 0.3)}) may spoil.`,
     recommendation: `When buying ${top.ingredient} ${top.dow >= 5 ? 'late-week' : ''}, reduce order by 30% or shift purchase to earlier in the week`,
     data: { topRisk: top, allRisks: scored }
   };

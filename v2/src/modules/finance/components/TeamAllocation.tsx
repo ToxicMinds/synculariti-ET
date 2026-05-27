@@ -2,6 +2,7 @@
 
 import { BentoCard } from '@/components/BentoCard';
 import { Transaction, calcPerUserSpend } from '../lib/finance';
+import { formatCurrency } from '@/lib/utils';
 
 interface TeamAllocationProps {
   transactions: Transaction[];
@@ -69,7 +70,7 @@ export function TeamAllocation({ transactions, names, colSpan = 4 }: TeamAllocat
                   }}>
                     <span style={{ color: 'var(--text-primary)' }}>{user.name}</span>
                     <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                      €{user.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrency(user.amount)}
                     </span>
                   </div>
                   

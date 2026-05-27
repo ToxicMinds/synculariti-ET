@@ -82,6 +82,7 @@ Synculariti consists of two separate applications. They do NOT share a database.
 - **search_path Safety**: All DB functions must include `SET search_path = public`.
 - **Auth Guard**: All sensitive API routes MUST be wrapped with `withAuth` middleware and use the `SecureContext` pattern for type-safe App Router compliance.
 - **Input Validation**: All API routes MUST use Zod schemas from the unified validation registry for request sanitization.
+- **Route Auth Pattern**: All internal API routes MUST use `withTestHandler(handler)` from `@/lib/withTestHandler` instead of the inline `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` pattern.
 - **Normalizing Washer**: Use the 'Washer' pattern (Zod transforms + defaults) for all routes handling external or nullable metadata to guarantee type safety without rejecting valid but incomplete data.
 
 ### 4.3 Intelligence Strategy
@@ -134,6 +135,10 @@ The `mapToOntologyItem(name, merchantId, currency)` function maps raw receipt it
 - **SKU ID**: `sku-{merchantId}-{lowercased-item-name-with-special-chars-as-hyphens}`
 - **Ingredient ID**: `ing-{lowercased-canonical-name-with-special-chars-as-hyphens}`
 - **Two items mapping to the same Ingredient ID (via keyword) across different merchants enable Price Intelligence comparisons**, verifying the price of that ingredient at each merchant.
+
+Related helpers in the same module:
+- `buildMerchantId(name: string)`: Slugifies a merchant name into a deterministic merchant ID (`merchant-{lowercase-hyphenated}`). Replaces 4 inline duplications.
+- `buildSyncPayload(txRow, items, options?)`: Constructs a `TransactionSyncPayload` from a DB row + receipt items. Handles vendor name extraction, merchant ID building, item ontology mapping, date enrichment, and optional category inference. Replaces 3 near-identical blocks.
 
 ### 4.8 Seed Data Insight Requirements
 All 3 analytical insight queries require specific seed data patterns:

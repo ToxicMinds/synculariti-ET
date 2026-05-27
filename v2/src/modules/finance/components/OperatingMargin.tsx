@@ -2,6 +2,7 @@
 
 import { BentoCard } from '@/components/BentoCard';
 import { calcOperatingMargin } from '../lib/finance';
+import { formatCurrency } from '@/lib/utils';
 
 interface OperatingMarginProps {
   income: number;
@@ -71,7 +72,7 @@ export function OperatingMargin({ income, spent }: OperatingMarginProps) {
 
         {/* Retained Earnings Context */}
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '2px 0 0 0' }}>
-          €{retainedEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
+          {formatCurrency(retainedEarnings)} 
           <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
             {isNegative ? ' Net Deficit' : ' Cash Retained'}
           </span>

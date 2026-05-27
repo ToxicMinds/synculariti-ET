@@ -3,6 +3,7 @@
 import { BentoCard } from '@/components/BentoCard';
 import { Line } from 'react-chartjs-2';
 import { Transaction } from '../lib/finance';
+import { formatCurrency } from '@/lib/utils';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -68,7 +69,7 @@ export function MarketTrends({ transactions, selectedMonth, colSpan = 8 }: { tra
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (context: TooltipItem<'line'>) => `€${(context.parsed.y || 0).toFixed(2)}`
+          label: (context: TooltipItem<'line'>) => formatCurrency(context.parsed.y || 0)
         }
       }
     },

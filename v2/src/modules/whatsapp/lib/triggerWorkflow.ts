@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ServerLogger } from '@/lib/logger-server'
+import { formatCurrency } from '@/lib/utils'
 import type { TriggerParams, TriggerResult, TenantConfig } from '../types'
 
 export async function triggerWorkflow(
@@ -60,7 +61,7 @@ export async function triggerWorkflow(
     if (workflowKey === 'bill_approval') {
       payload = {
         type: 'poll',
-        name: `Approve bill of €${params.amount?.toFixed(2)}?`,
+        name: `Approve bill of ${params.amount ? formatCurrency(params.amount) : ''}?`,
         options: ['Approve', 'Reject'],
         metadata: { ...metadata, source: `workflow:${workflowKey}` },
       }
