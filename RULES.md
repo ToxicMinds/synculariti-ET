@@ -1,6 +1,7 @@
 # Synculariti-ET: Operational Rulebook
 
 ## 1. Core Architecture
+- **Two Applications**: Synculariti-ET (this codebase — Expense Tracker) and IMS (Inventory Management System) are separate apps with separate databases. They communicate via HTTP APIs with `X-Api-Key` auth.
 - **Root Directory**: `v2/`
 - **Domain Isolation**: Every business domain (`identity`, `logistics`, `finance`) MUST live in `v2/src/modules/[domain]`.
 - **Headless Logic**: Keep business logic in React hooks inside `modules/[domain]/hooks/`. UI components should be lean consumers of these hooks.
@@ -63,6 +64,7 @@
 - **CI Node 24 Hardening**: All workflow pipelines (GitHub Actions) MUST target Node.js 24 and set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to suppress deprecation warnings and align runner execution early.
 - **Engine Compliance**: Ensure `package.json` contains `"engines": { "node": ">=20" }` to prevent npm installer conflicts in modern Node runtimes.
 - **Test boundaries**: Always match Jest-Cucumber BDD tests inside the `backend` node-based project to prevent jsdom context pollution.
+- **Workspace dependency declaration**: Every `@synculariti/*` package from `packages/` MUST be declared explicitly in `v2/package.json` as a `"file:../packages/<name>"` dependency. CI runs `npm ci` from `v2/` and does not resolve workspace hoisting from the root.
 - **Temporal Enrichment**: Every sync payload must call `enrichDate(date)` from `lib/holidays.ts` and pass the 8 temporal fields (`dayOfWeek`...`isBeforeHoliday`) through Phase 1 of the Cypher engine. The `category` field must also be propagated to `:Transaction` nodes.
 - **Unit Price / Quantity**: Every `ReceiptItemSyncPayload` must carry `itemQuantity` and `itemUnitPrice`; Phase 3 stores these on `[:CONTAINS]` edges and `:MerchantSKU` nodes. Default to `1` / total amount when explicit data is unavailable.
 - **ON MATCH SET on all Phases**: Every `MERGE` that sets properties MUST include BOTH `ON CREATE SET` and `ON MATCH SET`. Without `ON MATCH SET`, re-running the backfill on existing nodes/relationships silently skips property updates, leaving stale/null values. This applies to Phase 1 (Transaction/Merchant), Phase 2 (Ingredient), and Phase 3 (MerchantSKU/CONTAINS).
@@ -98,10 +100,14 @@
 - **Read-Only Workflows Endpoint**: `GET /api/tenant/workflows` returns per-tenant workflow thresholds from `tenants.config.workflows`. Authenticates via `X-Api-Key`. Service keys require `tenant_id` query param. Used by IMS to display current thresholds in settings UI.
 - **Workflow Config in tenents.config.workflows**: JSONB schema under `tenants.config.workflows.{workflow_key}`. Fields: `enabled`, `threshold` (bill_approval, default 100), `threshold_pct` (low_stock_alert, default 80), `time` (daily_summary), `recipients` (array of phone keys from `tenants.config.phones`). Written by central Login Service via `update_tenant_config_v1()` RPC.
 
-## 9. POS Data Architecture (Future)
-- **Outbox Reuse**: POS sales will flow through the same `graph_sync_queue` pattern. The `entity_type` CHECK constraint already accepts `'sale'`, `'menu_item'`, `'inventory_adjustment'`.
-- **Flow**: POS system writes to `pos_sales` table via RPC → RPC enqueues `entity_type='sale'` → Sync runner MATCHes purchased ingredients → menu items → sales for margin analysis.
-- **No Schema Changes Needed**: The architecture is prepared; implement the `pos_sales` table RPC when POS data integration begins.
+## 9. POS Data Architecture & IMS/ET Boundary
+- **Two Separate Apps**: The IMS and ET are separate applications with separate databases (separate Supabase projects, separate Neo4j instances). They do NOT share a database.
+- **Cross-App Communication**: IMS ↔ ET communication MUST go through HTTP APIs with `X-Api-Key` auth. The `api_keys` table in each app stores service-level keys (`tenant_id IS NULL`) for the other app.
+- **ET reads from IMS**: ET calls `GET /api/ims/pos-sales?tenant_id=X&from=Y&to=Z` and `GET /api/ims/recipes?tenant_id=X` to fetch POS data and recipes.
+- **IMS sends WhatsApp**: IMS calls `POST /api/whatsapp/notify` (ET's endpoint) for all WhatsApp notifications — never writes to `whatsapp_outbox` directly, never calls `triggerWorkflow()`.
+- **Workflow config**: The central Login Service writes to both systems via `update_tenant_config_v1`. Each app reads from its own `tenants.config`.
+- **No shared tables**: IMS does NOT have access to ET's `graph_sync_queue`, `whatsapp_outbox`, or Neo4j. ET does NOT have access to IMS's `inventory_ledger`, `purchase_orders`, or POS raw data.
+- **ET's pipeline**: POS data from IMS API → `pos_transaction_staging` (anomaly quarantine) → recipe resolution (from cached IMS recipes) → `graph_sync_queue` → Neo4j Sale + ConsumptionEstimate nodes → Food Cost Variance Report.
 
 ## 10. AI Insights Caching & Concurrency
 - **Session Isolation**: Never share a Neo4j session across concurrent `session.run()` calls. Use separate sessions per query when running in parallel.

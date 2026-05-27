@@ -145,8 +145,9 @@
 - `function CalendarGrid()`: Modular UI for the fiscal spend heatmap.
 
 ## WhatsApp & Sidecar
-- `Table: public.api_keys`: Secure storage for third-party integration tokens mapped to tenants.
-- `Table: public.whatsapp_outbox`: Audit ledger (Who, What, When) for outbound messaging events. Carries `idempotency_key` for deduplication, `webhook_url` / `webhook_secret` for two-way flow callbacks.
+- `Package: @synculariti/whatsapp-client`: Shared package at `packages/whatsapp-client/`. Exports `signHmacPayload(payload, secret)`, `verifyWebhookSignature(body, signature, secret)`. Declared via `file:../packages/whatsapp-client` in `v2/package.json`. All signing operations (sidecar dispatch, server action dispatch, external webhook verification) MUST use this package — never re-implement the algorithm inline.
+- `Table: public.api_keys`: Secure storage for third-party integration tokens mapped to tenants. Service-level keys (`tenant_id IS NULL`) used for IMS↔ET cross-app communication.
+- `Table: public.whatsapp_outbox`: Audit ledger (Who, What, When) for outbound messaging events. Carries `idempotency_key` for deduplication, `webhook_url` / `webhook_secret` for two-way flow callbacks. IMS does NOT write here — uses `/api/whatsapp/notify`.
 - `Table: public.whatsapp_inbox`: Secure storage for HMAC-verified inbound messages mapped to tenants and outbox items.
 - `RPC Function: public.purge_expired_whatsapp_logs(days_to_keep INT)`: Revoked-execution routine that deletes both outbox and inbox records older than 30 days.
 - `type InboundWhatsAppEvent`: Discriminated union for incoming webhook events (text vs. poll_vote).
@@ -161,7 +162,7 @@
 - `function getErrorMessage()`: Type-safe utility to parse and format unknown caught errors safely without using `any`.
 - `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
 - `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.
-- `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp. Uses `WashedPayload` Zod transform for nullable metadata normalization. Authenticates via `X-Api-Key` against `api_keys` table (service-role client). Supports per-tenant keys (auto-resolve tenant) and service-level keys (require `tenant_id` + `source` in body). Injects `source` into payload metadata for audit trail.
+- `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp. Uses `WashedPayload` Zod transform for nullable metadata normalization. Authenticates via `X-Api-Key` against `api_keys` table (service-role client). Supports per-tenant keys (auto-resolve tenant) and service-level keys (require `tenant_id` + `source` in body). Injects `source` into payload metadata for audit trail. **This is the ONLY integration point for IMS** to send WhatsApp messages.
 - `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages. Resolves outbox context via `body.outboxId` (action-link bridge), `body.pollMessageId` (native WhatsApp poll), or `body.sender` (fallback). Automatically routes decisions to the correct service based on outbox payload metadata: `poId` → DefaultPOApprovalService, `transactionId` → DefaultFinanceAuditService, `amount+locationId` → DefaultPOSDiscrepancyService. Marks outbox records as `COMPLETED` after successful processing.
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
 - `function processOutboxQueue(supabase, client, baseUrl, records?)`: Shared queue processor in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the DB webhook route and the GCP crontab safety net. Claims PENDING/FAILED records, delivers via OpenWAClient (fallback: action link text message for poll payloads since sidecar lacks `/api/sendPoll`), updates status to SENT/FAILED.
@@ -186,6 +187,33 @@
 - `interface TriggerParams`: Input to `triggerWorkflow()`: `{ tenantId, workflowKey, amount?, stockLevel?, metadata }`. (modules/whatsapp/types.ts)
 - `interface TriggerResult`: Return from `triggerWorkflow()`: `{ fired: boolean, reason?: string, outboxIds: string[] }`. (modules/whatsapp/types.ts)
 - `interface TenantConfig`: Top-level type for `tenants.config` JSONB: `{ phones?: Record<string, string>, workflows?: WorkflowsConfig }`. (modules/whatsapp/types.ts)
-- `function triggerWorkflow(supabase, params)`: Internal utility that reads `tenants.config.workflows`, checks thresholds, and queues `whatsapp_outbox` records via `service_role` client. No SSR/cookie dependency. Used by server actions, cron, webhooks, and RPC triggers. (modules/whatsapp/lib/triggerWorkflow.ts)
+- `function triggerWorkflow(supabase, params)`: **ET-internal utility only**. Reads `tenants.config.workflows`, checks thresholds, and queues `whatsapp_outbox` records via `service_role` client. No SSR/cookie dependency. IMS must NOT call this — uses `POST /api/whatsapp/notify` instead. (modules/whatsapp/lib/triggerWorkflow.ts)
 - `API Route: GET /api/tenant/workflows`: Edge-runtime read-only endpoint returning per-tenant workflow thresholds from `tenants.config.workflows`. Authenticates via `X-Api-Key`. Service-level keys require `tenant_id` query param. Returns `{ workflows: { [key]: WorkflowConfig } }`. (api/tenant/workflows/route.ts)
 - `Migration: sql/b2b_evolution/31_service_api_keys.sql`: Makes `api_keys.tenant_id` nullable, enabling shared service-level keys for multi-tenant external apps (IMS, Login Service).
+
+## IMS Integration (Cross-App Contracts)
+- `API Contract: GET /api/ims/recipes?tenant_id={uuid}`: IMS endpoint returning menu items with ingredient compositions. ET calls this (service API key), caches locally for 24h. Returns `{ menu_items: [{ id, name, selling_price, is_active, ingredients: [{ ingredient_id, ingredient_name, grams_per_portion, cost_per_gram }], total_ingredient_cost, food_cost_pct }], ingredients: [{ id, canonical_name, category, base_unit, perishability_days, cost_per_gram, current_stock_grams }] }`.
+- `API Contract: GET /api/ims/pos-sales?tenant_id={uuid}&from={date}&to={date}`: IMS endpoint returning processed POS receipts. ET polls this for the Food Cost Variance pipeline. Returns `{ receipts: [{ transaction_time, till_id, receipt_number, total_revenue, currency, is_void, is_comp, items: [{ menu_item_id, menu_item_name, quantity, revenue, modifiers }] }] }`. Supports pagination via `&page=N&per_page=1000`.
+- `Table: public.pos_transaction_staging`: ET's own staging table for incoming POS data. NOT shared with IMS. Raw payload from IMS API lands here, passes through anomaly quarantine, then moves to graph_sync_queue.
+- `Table: public.pos_batch_uploads`: ET's metadata table tracking incoming POS batches from IMS API.
+- `Table: public.pos_data_gaps`: ET's gap detection — tracks calendar days where POS data was expected but not received. Triggers WhatsApp alert via the existing notification pipeline.
+- `function fetchRecipesFromIMS(tenantId)`: ET utility that calls IMS recipe API and caches results locally in `cached_recipes` table with 24h TTL.
+- `function fetchPOSSalesFromIMS(tenantId, from, to)`: ET utility that calls IMS POS API, pages through results, and writes to `pos_transaction_staging`.
+- `Table: public.cached_recipes`: ET's local cache of IMS recipe data. Refreshed every 24h. Not the source of truth — IMS is.
+- `Table: public.cached_ingredients`: ET's local cache of IMS ingredient data (cost, stock levels). Refreshed every 24h.
+
+## Food Cost Variance Pipeline
+- `Table: public.pos_transaction_staging`: Staging table for unverified POS data from IMS. Carries `flag` (PENDING/APPROVED/QUARANTINED), `anomaly_score`, `anomaly_reason`. Quarantined rows visible in `v_quarantine_audit`.
+- `Table: public.pos_batch_uploads`: Metadata per IMS POS data pull. Tracks status (STAGED/PROCESSING/COMPLETED/FAILED), receipt counts, period covered.
+- `Table: public.pos_data_gaps`: Tracks calendar days without POS data. Detected by comparing IMS API responses against expected days. Triggers WhatsApp alert after 12h.
+- `Table: public.cached_recipes`: Local cache of IMS recipe data. Menu item → ingredient composition in grams.
+- `RPC Function: public.process_batch_v1(p_batch_id)`: Iterates staging rows, computes Z-scores against 90-day rolling baseline per item_sku, flags outliers as QUARANTINED. Auto-approves when baseline < 5 samples.
+- `View: public.v_quarantine_audit`: Human-readable view of all QUARANTINED rows across all batches. Used by operators to review and manually override.
+- `Neo4j Node: :Sale`: Represents a POS sale receipt. Properties: id, tenant_id, transaction_time, receipt_number, till_id, total_revenue, is_void, is_comp.
+- `Neo4j Node: :ConsumptionEstimate`: Represents theoretical ingredient consumption derived from POS sales × recipes. Properties: id, tenant_id, grams_consumed, cost_at_latest_price. Linked to `:Sale` via `[:ESTIMATES]` and to `:Ingredient` via `[:OF_INGREDIENT]`.
+- `Neo4j Relationship: [:ESTIMATES]`: Links a `:Sale` to its `:ConsumptionEstimate` nodes.
+- `Neo4j Relationship: [:OF_INGREDIENT]`: Links a `:ConsumptionEstimate` to the `:Ingredient` it consumed.
+- `function syncSalesWithConsumption(sales, tx)`: Neo4j sync function (Phase 4) that creates `:Sale` and `:ConsumptionEstimate` nodes after the existing 3-phase bulk merge. (lib/neo4j-temporal.ts, to be built)
+- `function generateFoodCostVarianceReport(tenantId, startDate, endDate)`: Generates the Food Cost Variance Report by querying Neo4j for Revenue (Sale), Theoretical COGS (ConsumptionEstimate × cost), and Actual Spend (Transaction). Returns `FoodCostVarianceReport` interface. (lib/food-cost-variance.ts, to be built)
+- `interface FoodCostVarianceReport`: Full report shape: `{ period, dataCoverage, headline: { totalRevenue, theoreticalCOGS, actualSpend, gap, gapPct, confidenceBands, direction }, topIngredients, weeklyTrend, varianceSpikes, recommendation }`.
+- `API Route: GET /api/analytics/food-cost-variance`: Returns the Food Cost Variance Report for the authenticated tenant's selected period. Cached server-side for 1 hour.

@@ -10,6 +10,32 @@ This document is the definitive guide for AI assistants and developers. It conso
 *   **Core Stack**: Next.js 16.2 (App Router), TypeScript 5, Supabase (Postgres 17), Neo4j 6 (Graph), Groq AI (Llama 3.3 70B).
 *   **Architecture**: "Shared-Nothing" Multi-Tenant Isolation.
 
+### 1.1 Two-Application Architecture
+
+Synculariti consists of two separate applications. They do NOT share a database. They communicate exclusively through HTTP APIs with `X-Api-Key` authentication (see `api_keys` table).
+
+| Application | Owns | Does NOT share |
+|-------------|------|----------------|
+| **IMS** (Inventory Management System) | Inventory items, stock ledger, purchase orders, POS data processing, recipe engine, UoM conversions | Its database, its schema, its data — ET reads via IMS API |
+| **ET** (Expense Tracker — this codebase) | Expense tracking, receipt scanning, WhatsApp service, Neo4j graph, AI insights, Food Cost Variance reporting | Its database, its schema, Neo4j instance — IMS calls via ET API |
+
+**Data flows across the boundary:**
+
+| What | Direction | How |
+|------|-----------|-----|
+| POS processed sales | IMS → ET | ET calls `GET /api/ims/pos-sales?tenant_id=X&from=Y&to=Z` |
+| Recipe data | IMS → ET | ET calls `GET /api/ims/recipes?tenant_id=X` |
+| WhatsApp notifications | IMS → ET | IMS calls `POST /api/whatsapp/notify` (existing endpoint) |
+| Workflow config | Tenant → ET (write) → IMS (read) | Login Service writes via `update_tenant_config_v1`, both read from their own instances |
+| Target customers | Shared | Same customers across both apps — data correlates via shared `tenant_id` UUIDs |
+
+**Each app has its own:**
+- Supabase project (separate Postgres, separate auth)
+- Neo4j instance (ET only — IMS doesn't use Neo4j)
+- Deployment pipeline
+- API keys table for cross-app auth
+- `api_keys` table with service-level keys (`tenant_id IS NULL`) for IMS↔ET communication
+
 ---
 
 ## 2. Core Modules (The Baseline)
@@ -108,12 +134,17 @@ All 3 analytical insight queries require specific seed data patterns:
 - Perishable items MUST have perilability_days < 14 (Milk=7, Chicken Breast=5 from keyword rules)
 - For timing: apply a 2x multiplier to weekend transaction amounts directly in Neo4j if seed data is too uniform
 
-### 4.9 POS Data Architecture (Future)
-The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'menu_item'`, `'inventory_adjustment'` in addition to `'transaction'` and `'merchant'`. When POS data flows in, it will use the same outbox pattern:
-1. POS system writes to a new `pos_sales` table via RPC.
-2. RPC enqueues `entity_type = 'sale'` to `graph_sync_queue`.
-3. Sync runner processes events: MATCH purchased ingredients → menu items → sales for margin analysis.
-4. No schema changes needed — the architecture is already prepared.
+### 4.9 POS Data Architecture
+
+The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'menu_item'`, `'inventory_adjustment'` in addition to `'transaction'` and `'merchant'`. When POS data flows in from the IMS, the ET follows this pipeline:
+
+1. **ET polls IMS API**: ET calls `GET /api/ims/pos-sales?tenant_id=X&from=Y&to=Z` to fetch processed POS data.
+2. **Staging + quarantine**: Raw payload lands in `pos_transaction_staging` for anomaly detection (90-day rolling baseline per item_sku).
+3. **Recipe resolution**: ET fetches recipes from IMS via `GET /api/ims/recipes?tenant_id=X` (cached locally 24h) to compute theoretical consumption.
+4. **Graph sync**: Approved rows enqueue `entity_type = 'sale'` to `graph_sync_queue`. Sync runner creates `:Sale` and `:ConsumptionEstimate` nodes in Neo4j.
+5. **Report**: Food Cost Variance Report compares theoretical consumption (from POS × recipes) against actual spend (from purchase transactions).
+
+**Key boundary**: The IMS owns the raw POS processing and recipe engine. The ET owns the analytics, graph, and reporting. The IMS does NOT write directly to any ET table, and the ET does NOT write directly to any IMS table.
 
 ### 4.10 Headless Viewport Pattern
 - All navigation, fiscal calendar generation, and module switching MUST be handled by the `useNavigation` hook.
@@ -146,7 +177,9 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
 ### 6.2 CI Runner Hardening & Node.js 24 Compliance
 - **Target Node 24**: All CI execution pipelines (GitHub Actions) MUST target Node.js 24 (`node-version: '24'`) and set the `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` runner environment variable to suppress actions runner warnings and align with active deprecation deadlines.
   - **Engine Compliance**: Ensure `package.json` contains `"engines": { "node": ">=20" }` to prevent npm installer conflicts in modern Node runtimes.
+- **Local workspace dependencies**: `@synculariti/*` packages under `packages/` are resolved locally via npm workspace hoisting. CI runs `npm ci` from `v2/`, so every workspace dependency MUST be declared explicitly in `v2/package.json` (`"@synculariti/whatsapp-client": "file:../packages/whatsapp-client"`). Without this, `MODULE_NOT_FOUND` crashes in CI.
 - **Test boundaries**: Always match Jest-Cucumber BDD tests inside the `backend` node-based project to prevent jsdom context pollution.
+- **Nightly Gherkin workflow** (`.github/workflows/nightly-gherkin.yml`): Runs at 2:00 AM UTC daily on Node.js 24. Executes `npx jest --testPathPatterns=features` from `v2/`. Requires `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` secrets.
 
 ### 6.3 Type-Safe Polymorphic Identity Casting (Postgres & TypeScript)
 - **Zero-Crash Polymorphic Casting Gateways**: All UUID database columns MUST use type-safe SQL helper functions (`public.safe_cast_uuid(TEXT)` and `public.safe_cast_user_uuid(TEXT)`) inside bulk ingest operations. 
@@ -502,9 +535,9 @@ SELECT public.update_tenant_config_v1(
 );
 ```
 
-#### Triggering Workflows Programmatically (Internal)
+#### Triggering Workflows Programmatically (ET Internal Only)
 
-Any internal module (server action, cron, webhook, RPC trigger) can fire a workflow using the `triggerWorkflow` utility:
+Any internal ET module (server action, cron, webhook, RPC trigger) can fire a workflow using the `triggerWorkflow` utility. The IMS must NOT call `triggerWorkflow` — it must use the notify endpoint instead.
 
 ```typescript
 import { triggerWorkflow } from '@/modules/whatsapp/lib/triggerWorkflow'
@@ -542,9 +575,9 @@ const result3 = await triggerWorkflow(supabase, {
 - Creates `whatsapp_outbox` records that are delivered via the existing Sidecar pipeline.
 - Returns `{ fired: boolean, reason?: string, outboxIds: string[] }`.
 
-#### Sending Custom Messages from External Apps
+#### Sending Custom Messages from Internal Apps (IMS)
 
-External apps (IMS, Login Service) send ad-hoc messages via the notify endpoint:
+The IMS (separate application, own database) sends messages via the ET's notify endpoint — the only allowed path:
 
 ```bash
 curl -s -X POST https://synculariti-et.vercel.app/api/whatsapp/notify \
@@ -561,9 +594,10 @@ curl -s -X POST https://synculariti-et.vercel.app/api/whatsapp/notify \
   }'
 ```
 
-- Service-level keys require `tenant_id` + `source` in the body.
-- Standard per-tenant keys work as before (no extra params needed).
-- `source` is injected into `payload.metadata.source` for audit trail.
+- The IMS uses a service-level key (`api_keys.tenant_id IS NULL`) provisioned for cross-app communication.
+- `source: "ims"` is injected into payload metadata for audit trail.
+- The IMS does NOT write directly to `whatsapp_outbox` or call `triggerWorkflow()` — those are ET-internal functions.
+- The IMS does NOT need its own `@synculariti/whatsapp-client` package — the HTTP endpoint is the contract.
 
 #### Supported Workflow Types
 
