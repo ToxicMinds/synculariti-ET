@@ -1,14 +1,10 @@
 import './load-env';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '../lib/supabase-server';
 import { getNeo4jDriver, neo4jBulkMerge } from '../lib/neo4j';
 import { buildSyncPayload } from '../lib/neo4j-ontology';
 import { TransactionSyncPayload } from '../lib/types';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+const supabase = createServiceClient();
 
 // Multi-merchant items that map to the same canonicalIngredientId
 // Milk → ing-milk (perishability=7d) — triggers BOTH price intel AND waste

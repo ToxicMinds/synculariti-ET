@@ -54,10 +54,10 @@ const handler: SecureHandler = async (req, context) => {
 
     for (const event of events) {
       // Mark as PROCESSING to avoid concurrent workers grabbing the same event
-      await supabase
-        .from('graph_sync_queue')
-        .update({ status: 'PROCESSING', processed_at: new Date().toISOString() })
-        .eq('id', event.id);
+      await supabase.rpc('update_graph_sync_queue_status_v1', {
+        p_id: event.id,
+        p_status: 'PROCESSING',
+      });
 
       try {
         if (event.operation === 'DELETE') {
@@ -97,15 +97,12 @@ const handler: SecureHandler = async (req, context) => {
         const maxRetries = event.max_retries || 3;
         const finalStatus = retryCount >= maxRetries ? 'FAILED' : 'PENDING';
 
-        await supabase
-          .from('graph_sync_queue')
-          .update({
-            status: finalStatus,
-            retry_count: retryCount,
-            last_error: errorMsg,
-            processed_at: new Date().toISOString(),
-          })
-          .eq('id', event.id);
+        await supabase.rpc('update_graph_sync_queue_status_v1', {
+          p_id: event.id,
+          p_status: finalStatus,
+          p_retry_count: retryCount,
+          p_last_error: errorMsg,
+        });
 
         await ServerLogger.system('ERROR', 'Debug', `Individual outbox event sync failed (ID: ${event.id})`, { error: errorMsg, tenantId });
       }
@@ -119,10 +116,9 @@ const handler: SecureHandler = async (req, context) => {
 
     // 3. Mark successful events as COMPLETED
     if (eventsToComplete.length > 0) {
-      await supabase
-        .from('graph_sync_queue')
-        .update({ status: 'COMPLETED', processed_at: new Date().toISOString() })
-        .in('id', eventsToComplete);
+      await supabase.rpc('complete_graph_sync_batch_v1', {
+        p_ids: eventsToComplete,
+      });
     }
 
     return NextResponse.json({

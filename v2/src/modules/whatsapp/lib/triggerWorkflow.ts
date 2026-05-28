@@ -1,7 +1,60 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ServerLogger } from '@/lib/logger-server'
 import { formatCurrency } from '@/lib/utils'
-import type { TriggerParams, TriggerResult, TenantConfig } from '../types'
+import type { TriggerParams, TriggerResult, TenantConfig, WorkflowConfig } from '../types'
+
+interface WorkflowStrategy {
+  checkThreshold(params: TriggerParams, config: WorkflowConfig): string | null
+  buildPayload(params: TriggerParams, metadata: Record<string, unknown>): Record<string, unknown>
+}
+
+const strategies: Record<string, WorkflowStrategy> = {
+  bill_approval: {
+    checkThreshold(params, config) {
+      const threshold = config.threshold ?? 100
+      if (!params.amount || params.amount < threshold) {
+        return `amount ${params.amount} below threshold ${threshold}`
+      }
+      return null
+    },
+    buildPayload(params, metadata) {
+      return {
+        type: 'poll',
+        name: `Approve bill of ${params.amount ? formatCurrency(params.amount) : ''}?`,
+        options: ['Approve', 'Reject'],
+        metadata: { ...metadata, source: 'workflow:bill_approval' },
+      }
+    },
+  },
+  low_stock_alert: {
+    checkThreshold(params, config) {
+      const thresholdPct = config.threshold_pct ?? 80
+      if (params.stockLevel == null || params.stockLevel > thresholdPct) {
+        return `stock ${params.stockLevel}% above threshold ${thresholdPct}%`
+      }
+      return null
+    },
+    buildPayload(params, metadata) {
+      return {
+        type: 'text',
+        text: `⚠️ Low stock alert: items are at ${params.stockLevel}% of reorder point. Please check inventory.`,
+        metadata: { ...metadata, source: 'workflow:low_stock_alert' },
+      }
+    },
+  },
+  daily_summary: {
+    checkThreshold() {
+      return null
+    },
+    buildPayload(_params, metadata) {
+      return {
+        type: 'text',
+        text: '📊 Daily summary for your restaurant.',
+        metadata: { ...metadata, source: 'workflow:daily_summary' },
+      }
+    },
+  },
+}
 
 export async function triggerWorkflow(
   supabase: SupabaseClient,
@@ -30,21 +83,20 @@ export async function triggerWorkflow(
     return { fired: false, reason: 'not enabled', outboxIds: [] }
   }
 
-  if (workflowKey === 'bill_approval') {
-    const threshold = workflowConfig.threshold ?? 100
-    if (!params.amount || params.amount < threshold) {
-      return { fired: false, reason: `amount ${params.amount} below threshold ${threshold}`, outboxIds: [] }
-    }
-  }
-
-  if (workflowKey === 'low_stock_alert') {
-    const thresholdPct = workflowConfig.threshold_pct ?? 80
-    if (params.stockLevel == null || params.stockLevel > thresholdPct) {
-      return { fired: false, reason: `stock ${params.stockLevel}% above threshold ${thresholdPct}%`, outboxIds: [] }
+  const strategy = strategies[workflowKey]
+  if (strategy) {
+    const thresholdReason = strategy.checkThreshold(params, workflowConfig)
+    if (thresholdReason) {
+      return { fired: false, reason: thresholdReason, outboxIds: [] }
     }
   }
 
   const outboxIds: string[] = []
+  const payload = strategy?.buildPayload(params, metadata) || {
+    type: 'text',
+    text: `📊 ${workflowKey} notification.`,
+    metadata: { ...metadata, source: `workflow:${workflowKey}` },
+  }
 
   for (const recipient of workflowConfig.recipients) {
     const phone = config.phones?.[recipient]
@@ -56,39 +108,17 @@ export async function triggerWorkflow(
       continue
     }
 
-    let payload: Record<string, unknown>
-
-    if (workflowKey === 'bill_approval') {
-      payload = {
-        type: 'poll',
-        name: `Approve bill of ${params.amount ? formatCurrency(params.amount) : ''}?`,
-        options: ['Approve', 'Reject'],
-        metadata: { ...metadata, source: `workflow:${workflowKey}` },
-      }
-    } else if (workflowKey === 'low_stock_alert') {
-      payload = {
-        type: 'text',
-        text: `⚠️ Low stock alert: items are at ${params.stockLevel}% of reorder point. Please check inventory.`,
-        metadata: { ...metadata, source: `workflow:${workflowKey}` },
-      }
-    } else {
-      payload = {
-        type: 'text',
-        text: `📊 Daily summary for your restaurant.`,
-        metadata: { ...metadata, source: `workflow:${workflowKey}` },
-      }
-    }
-
     const { data: outboxRecord, error: insertErr } = await supabase
-      .from('whatsapp_outbox')
-      .insert({
-        tenant_id: tenantId,
-        recipient_phone: phone,
-        payload,
-        status: 'PENDING',
+      .rpc('insert_whatsapp_outbox_v2', {
+        p_tenant_id: tenantId,
+        p_recipient_phone: phone,
+        p_payload: payload,
+        p_api_key_id: null,
+        p_webhook_url: null,
+        p_webhook_secret: null,
+        p_idempotency_key: null,
       })
-      .select('id')
-      .single()
+      .single<{ id: string }>()
 
     if (insertErr || !outboxRecord) {
       await ServerLogger.system('ERROR', 'WhatsApp', 'Failed to queue workflow notification', {

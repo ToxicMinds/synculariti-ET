@@ -24,7 +24,6 @@
 - `interface UseManualEntryFormReturn`: Contract for the useManualEntryForm hook state and actions.
 - `interface FieldErrors`: Field-level validation error map for form hooks.
 - `function useOfflineQueue()`: Hook for queuing financial mutations when offline.
-- `function useCamera()`: Hardware-isolated headless hook managing MediaStream lifecycle, client-side compression, and idempotency hashing.
 - `function useSync()`: Facade hook for delegating financial mutations to transaction and offline queues.
 - `function useTransactions()`: Read-only hook for fetching and subscribing to the transactions ledger.
 - `function useTransactionSync()`: Core write hook for inserting/updating transactions (ACID compliant).
@@ -41,11 +40,14 @@
 - `interface ReceiptData`: Canonical payload for scanned receipt data (in useTransactionSync). Extended by useScannerState with a `source` field.
 - `interface ReceiptItem`: Canonical line item for a receipt (in useTransactionSync). Carries `confidence?: 'high'|'medium'|'low'` from AI extraction or 'high' for eKasa Gov items. Optional category during scan, required at save time.
 - `type ItemConfidence`: `'high' | 'medium' | 'low'` — confidence rating per receipt line item. Auto-downgraded to `'low'` if name < 3 chars or amount === 0.
-- `function processScannerInput(input, categories?, timeoutMs?)`: Unified entry point in `scanner-client.ts`. Routes string → eKasa QR, File → AI Vision. Returns `ScannerResult`. Manages idempotency (SHA-256 cache), timeout (15s AbortController), offline queue fallback, image preprocessing, eKasa enrichment, and confidence scoring.
+- `function processScannerInput(input, categories?, timeoutMs?)`: Unified entry point in `scanner-client.ts` (thin orchestrator). Routes string → `scanner-ekasa.ts`, File → `scanner-vision.ts`. Returns `ScannerResult`. Manages idempotency (SHA-256 cache via `scanner-cache.ts`), timeout (15s AbortController), offline queue fallback, image preprocessing, eKasa enrichment, and confidence scoring.
 - `type ScannerResult`: `{ status: 'SUCCESS' | 'ERROR' | 'QUEUED', source: 'EKASA' | 'AI_VISION' | 'MANUAL' | 'OFFLINE_QUEUE', cacheKey?: string, data?: ReceiptData, error?: string }`. Returned by `processScannerInput()`.
 - `function clearScannerCache()`: Clears the in-memory idempotency `resultCache` map (used in tests).
 - `function preprocessImage(imageDataUrl, signal)`: Client-side call to `POST /api/ai/preprocess-image`. Returns preprocessed WebP data URL, falls back to original on failure. (scanner-client.ts)
-- `Scanner service: src/lib/scanner-client.ts`: Stateless service with SHA-256 idempotency cache, AbortController 15s timeout, offline queue integration, eKasa→parse-receipt enrichment wiring, and two-button→one-pipeline UI architecture.
+- `Scanner orchestrator: src/lib/scanner-client.ts` (78 lines): Thin orchestrator routing to `scanner-cache.ts` (idempotency), `scanner-ekasa.ts` (eKasa QR pipeline), `scanner-vision.ts` (AI vision pipeline). Manages AbortController 15s timeout, offline queue integration, eKasa→parse-receipt enrichment wiring, and two-button→one-pipeline UI architecture. (V-88 split)
+- `Scanner cache: src/lib/scanner-cache.ts`: SHA-256 idempotency cache (`Map<string, ScannerResult>`). Exports `getCachedResult()`, `setCachedResult()`, `clearScannerCache()`.
+- `Scanner eKasa: src/lib/scanner-ekasa.ts`: eKasa QR pathway — fetches raw Gov data from `/api/ekasa`, enriches via `/api/ai/parse-receipt`, applies confidence scoring. Exports `processEkasaInput()`, `applyConfidence()`.
+- `Scanner vision: src/lib/scanner-vision.ts`: AI Vision pathway — preprocesses image, calls `/api/ai/parse-invoice`, applies confidence scoring. Exports `processVisionInput()`.
 - `function preprocessImageWithSharp(imageDataUrl)`: Server-side sharp pipeline in `image-preprocessor.ts`. Resizes to max 2000px, transcodes to WebP quality 80. Returns `{ image, width, height, originalSize, compressedSize, originalFormat }`.
 - `API Route: POST /api/ai/preprocess-image`: Serverless endpoint accepting `{ image: dataUrl }`, runs `preprocessImageWithSharp()`, returns compressed WebP data URL. Logs compression ratio via ServerLogger.
 - `interface ReceiptScannerProps`: Props interface for the `ReceiptScanner` component: `{ onSave, onAddCategory?, categories?, names? }`.
@@ -54,7 +56,6 @@
 - `function useScannerState()`: Simplified hook in `modules/finance/hooks/useScannerState.ts`. Single `process(input: string | File)` method routes internally via `processScannerInput()`. State-only — no intelligence logic.
 - `function calcBudgetStatus()`: Calculates budget vs. actual spend variance.
 - `function calcCategoryTotals()`: Aggregates transaction totals grouped by category.
-- `function calcForecast()`: Predicts end-of-month spend based on current burn rate.
 - `function calcMonthDelta()`: Calculates the financial difference between current and previous months.
 - `function calcNetSavings()`: Computes total net savings (income minus expenses).
 - `function calcOperatingMargin()`: Calculates a mathematically sound B2B Operating Margin against benchmarks.
@@ -109,7 +110,12 @@
 - `function neo4jDeleteTransaction()`: Removes a transaction node and its relationships from the graph.
 - `function enrichDate(date: Date): EnrichedDate`: Slovak holiday calendar enrichment returning `{dayOfWeek, isWeekend, month, quarter, isHoliday, holidayName, daysToNextHoliday, isBeforeHoliday}`. Covers 2025–2026. (lib/holidays.ts)
 - `interface EnrichedDate`: The return type of `enrichDate()` with all 8 temporal fields.
-- `interface Finding`: Structured insight finding with `type`, `title`, `description`, `impact`, and `data` fields. Returned by all 3 analytical query classes. (lib/insight-queries.ts)
+- `Module: lib/insight-types.ts`: Exports `InsightFinding`, `QueryRunner`, `toNum`, `toStr` types extracted from `insight-queries.ts` for SRP. (V-89)
+- `Module: lib/insight-queries.ts` (199 lines): Imports types from `insight-types.ts`. Contains query functions and insight orchestration.
+- `interface InsightFinding extends Finding`: Structured insight finding with `type`, `title`, `description`, `impact`, and `data` fields. (lib/insight-types.ts)
+- `type QueryRunner`: Function signature for analytical Cypher queries. (lib/insight-types.ts)
+- `function toNum(val: unknown, fallback = 0): number`: Safe number extraction for Neo4j query results. (lib/insight-types.ts)
+- `function toStr(val: unknown, fallback = ''): string`: Safe string extraction for Neo4j query results. (lib/insight-types.ts)
 - `function queryPriceIntelligence(session, tenantId)`: Cypher query that compares avg unit price per ingredient across merchants, returns cheapest/dearest findings. (lib/insight-queries.ts)
 - `function queryTimingPatterns(session, tenantId)`: Cypher query analyzing day-of-week / weekend spend patterns, returns highest/lowest-cost timing findings. (lib/insight-queries.ts)
 - `function queryWasteRisk(session, tenantId)`: Cypher query scoring perishability × purchase day × holiday proximity for spoilage risk. (lib/insight-queries.ts)
@@ -171,17 +177,17 @@
 - `class OpenWAClient`: Shared headless REST API client for the OpenWA sidecar.
 - `function signHmacPayload(payload, secret)`: **Canonical shared HMAC-SHA256 signing primitive** exported from `@synculariti/whatsapp-client`. Used by both the GCP Sidecar (`WebhookDispatcher`) and the Next.js `dispatchDecision` Server Action. Never re-implement inline — always import from this package.
 - `function getErrorMessage()`: Type-safe utility to parse and format unknown caught errors safely without using `any`.
-- `function useWhatsAppNotifier()`: Headless React hook for dispatching outbound notifications via Edge API.
-- `function useWhatsAppSession()`: Headless React hook for tracking sidecar gateway session status.
 - `API Route: POST /api/whatsapp/notify`: Edge-runtime API for queuing Outbox delivery to WhatsApp. Uses `WashedPayload` Zod transform for nullable metadata normalization. Authenticates via `X-Api-Key` against `api_keys` table (service-role client). Supports per-tenant keys (auto-resolve tenant) and service-level keys (require `tenant_id` + `source` in body). Injects `source` into payload metadata for audit trail. **This is the ONLY integration point for IMS** to send WhatsApp messages.
-- `API Route: POST /api/whatsapp/webhook`: Edge-runtime API for receiving HMAC-verified inbound messages. Resolves outbox context via `body.outboxId` (action-link bridge), `body.pollMessageId` (native WhatsApp poll), or `body.sender` (fallback). Automatically routes decisions to the correct service based on outbox payload metadata: `poId` → DefaultPOApprovalService, `transactionId` → DefaultFinanceAuditService, `amount+locationId` → DefaultPOSDiscrepancyService. Marks outbox records as `COMPLETED` after successful processing.
+- `API Route: POST /api/whatsapp/webhook` (55 lines): Thin orchestrator delegating to `verify-webhook.ts` (sig check), `resolve-outbox.ts` (tenant/outbox context), `insert-inbox.ts` (inbox RPC), `decision-router.ts` (handler registry). Routes decisions via DecisionHandler registry: `poId` → DefaultPOApprovalService, `transactionId` → DefaultFinanceAuditService, `amount+locationId` → DefaultPOSDiscrepancyService. (V-54 split)
 - `API Route: GET /api/whatsapp/session`: Edge-runtime API for checking gateway session connection state.
 - `function processOutboxQueue(supabase, client, baseUrl, records?)`: Shared queue processor in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the DB webhook route and the GCP crontab safety net. Claims PENDING/FAILED records, delivers via OpenWAClient (fallback: action link text message for poll payloads since sidecar lacks `/api/sendPoll`), updates status to SENT/FAILED.
 - `API Route: POST /api/whatsapp/process-outbox`: **Serverless** (Node.js) runtime — receives Supabase Database Webhook on INSERT to whatsapp_outbox. Calls processOutboxQueue() with the single record. Primary delivery path. Must NOT be Edge runtime because it `fetch()`s the sidecar at a raw IP address.
 - `API Route: GET /api/cron/process-outbox`: **Serverless** (Node.js) runtime — GCP Crontab target (every 60s). Authenticates via `x-cron-secret` header matching `CRON_SECRET` env var (not spoofable `x-vercel-cron`). Calls processOutboxQueue() with no records (claims batch via `claim_whatsapp_outbox_batch` RPC). Safety net path.
 - `RPC Function: public.claim_whatsapp_outbox_batch(p_batch_size)`: Atomic batch claim with `FOR UPDATE SKIP LOCKED`. Transitions PENDING/FAILED → PROCESSING. Includes retry backoff (max 5 retries). Granted `EXECUTE TO service_role` only.
 - `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Atomic action completion. Marks COMPLETED and returns webhook_url + webhook_secret + payload in a single transaction. Fixes ACID V-49 split-brain. **Uses table alias `wo.` in RETURNING clause to avoid ambiguity with RETURNS TABLE output column `status`.** Granted `EXECUTE TO authenticated` only.
-- `Server Action: dispatchDecision()`: Next.js server action that completes interactive actions, signs votes with HMAC-SHA256, and dispatches them back to target webhooks. Uses `complete_whatsapp_action_v1()` RPC for atomic status update. Uses `getAll()`/`setAll()` Supabase SSR cookie API (NOT legacy `get()`/`set()`/`remove()`).
+- `Server Action: dispatchDecision()` (52 lines): Thin orchestrator completing interactive actions. Delegates to `complete-action.ts` (RPC wrapper) and `fire-webhook.ts` (signing + dispatch). Uses `complete_whatsapp_action_v1()` RPC for atomic status update. Uses `getAll()`/`setAll()` Supabase SSR cookie API (NOT legacy `get()`/`set()`/`remove()`). (V-90 split)
+- `Utility: complete-action.ts`: `CompleteActionResult` type + `completeAction()` wrapper around `complete_whatsapp_action_v1()` RPC.
+- `Utility: fire-webhook.ts`: `fireWebhook()` function that signs payloads with `signHmacPayload()` and dispatches to webhook URLs. Handles both success and failure callbacks.
 - `Server Action: notifyLargeInvoice()`: Triggers WhatsApp notification for invoices exceeding configurable threshold. Writes to `whatsapp_outbox` directly rather than calling the sidecar directly.
 - `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links. Generates OG meta tags for WhatsApp link previews.
 - `Component: ActionClient`: Client component implementing user selection buttons, loading states, and submitting decisions to the server action.
@@ -198,7 +204,7 @@
 - `interface TriggerParams`: Input to `triggerWorkflow()`: `{ tenantId, workflowKey, amount?, stockLevel?, metadata }`. (modules/whatsapp/types.ts)
 - `interface TriggerResult`: Return from `triggerWorkflow()`: `{ fired: boolean, reason?: string, outboxIds: string[] }`. (modules/whatsapp/types.ts)
 - `interface TenantConfig`: Top-level type for `tenants.config` JSONB: `{ phones?: Record<string, string>, workflows?: WorkflowsConfig }`. (modules/whatsapp/types.ts)
-- `function triggerWorkflow(supabase, params)`: **ET-internal utility only**. Reads `tenants.config.workflows`, checks thresholds, and queues `whatsapp_outbox` records via `service_role` client. No SSR/cookie dependency. IMS must NOT call this — uses `POST /api/whatsapp/notify` instead. (modules/whatsapp/lib/triggerWorkflow.ts)
+- `function triggerWorkflow(supabase, params)`: **ET-internal utility only**. Reads `tenants.config.workflows`, checks thresholds via `strategies` registry (keyed by `WorkflowKey` — replaces dual if-else chains), and queues `whatsapp_outbox` records via `insert_whatsapp_outbox_v2` RPC. Uses `service_role` client. No SSR/cookie dependency. IMS must NOT call this — uses `POST /api/whatsapp/notify` instead. (modules/whatsapp/lib/triggerWorkflow.ts) (V-86 + V-77)
 - `API Route: GET /api/tenant/workflows`: Edge-runtime read-only endpoint returning per-tenant workflow thresholds from `tenants.config.workflows`. Authenticates via `X-Api-Key`. Service-level keys require `tenant_id` query param. Returns `{ workflows: { [key]: WorkflowConfig } }`. (api/tenant/workflows/route.ts)
 - `Migration: sql/b2b_evolution/31_service_api_keys.sql`: Makes `api_keys.tenant_id` nullable, enabling shared service-level keys for multi-tenant external apps (IMS, Login Service).
 
@@ -232,6 +238,9 @@
 ## Shared Utilities
 - `function getErrorMessage(e: unknown): string`: Single error-to-string function used across the entire codebase. Defined in `src/lib/utils.ts`. Replaces 30+ inline `e instanceof Error ? e.message : String(e)` duplications. Also exported from `@synculariti/whatsapp-client` but ET-internal code must use `@/lib/utils`.
 - `function formatCurrency(amount: number, currency = 'EUR'): string`: Locale-aware currency formatting (`sk-SK` locale, EUR default). Defined in `src/lib/utils.ts`. Used across 17+ components and modules — single source of truth for all monetary display.
+- `function safeAmount(val: unknown, fallback = 0): number`: Safe number parser for financial amounts. Handles `null`, `undefined`, `NaN`, and non-numeric values. Replaces 28 inline `Number(x.amount)` calls across 19 files. Defined in `src/lib/utils.ts`. (V-79)
+- `function createServiceClient(): SupabaseClient`: Factory for `service_role` Supabase clients. Uses `@supabase/supabase-js` `createClient` with `autoRefreshToken: false, persistSession: false`. Centralizes env var access. Defined in `src/lib/supabase-server.ts`. Replaces 12 inline `createClient(URL, KEY)` boilerplate calls. (V-81)
+- `function createOpenWAClient(): OpenWAClient`: Factory for OpenWA gateway clients. Centralizes `baseUrl`, `apiKey`, `sessionId` config. Defined in `src/lib/create-openwa-client.ts`. Replaces 3 inline `new OpenWAClient({...})` instantiations. (V-84)
 - `function withTestHandler(handler: SecureHandler)`: Extracts the `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` guard pattern. Defined in `src/lib/withTestHandler.ts`. Used by all 12 internal API routes. (V-49 fix)
 - `function buildMerchantId(name: string): string`: Slugifies a merchant name into a Neo4j-safe merchant ID (`merchant-{lowercase-hyphenated}`). Defined in `src/lib/neo4j-ontology.ts`. Eliminates 4 inline duplications. (V-46 fix)
 - `function buildSyncPayload(txRow, items, options?): TransactionSyncPayload`: Constructs a `TransactionSyncPayload` from a database transaction row and its receipt items. Handles vendor name extraction, merchant ID building, item mapping via `mapToOntologyItem()`, date enrichment via `enrichDate()`, and optional category inference. Defined in `src/lib/neo4j-ontology.ts`. Eliminates 3 near-identical blocks. (V-47 fix)
@@ -244,5 +253,9 @@
 ## Database RPCs
 - `RPC Function: public.insert_whatsapp_inbox_v1(p_tenant_id, p_outbox_id, p_sender_phone, p_message_id, p_message_type, p_content)`: ACID-compliant inbox insert with `updated_at` propagation. Replaces direct `whatsapp_inbox.insert()` in webhook/route.ts (V-71 fix). SQL in `sql/b2b_evolution/32_insert_whatsapp_inbox_v1.sql`.
 - `RPC Function: public.set_outbox_delivery_result_v1(p_outbox_id, p_success, p_error_message)`: ACID-compliant outbox delivery result update. Atomically sets `status = SENT/FAILED`, `processed_at`, and increments `retry_count`. Replaces direct `whatsapp_outbox.update()` in processOutboxQueue.ts (V-70 fix). SQL in `sql/b2b_evolution/33_set_outbox_delivery_result_v1.sql`.
-- `RPC Function: public.insert_whatsapp_outbox_v1(p_tenant_id, p_recipient_phone, p_payload, p_webhook_url, p_webhook_secret, p_idempotency_key)`: ACID-compliant outbox insert. Replaces direct `whatsapp_outbox.insert()` in notifyLargeInvoice.ts (W-03 fix). SQL in `sql/b2b_evolution/34_insert_whatsapp_outbox_v1.sql`.
+- `RPC Function: public.insert_whatsapp_outbox_v2(p_tenant_id, p_recipient_phone, p_payload, p_api_key_id, p_webhook_url, p_webhook_secret, p_idempotency_key)`: ACID-compliant outbox insert with api_key_id tracking. Replaces direct `whatsapp_outbox.insert()` in `notify/route.ts` (V-78) and `triggerWorkflow.ts` (V-77). v1 (no api_key_id param) is legacy — all callers use v2. SQL in `sql/b2b_evolution/37_insert_whatsapp_outbox_v2.sql`.
 - `RPC Function: public.complete_whatsapp_action_v1(p_outbox_id, p_decision)`: Existing ACID-compliant RPC that atomically marks an outbox record COMPLETED and returns webhook config. Used by webhook/route.ts (V-71 fix).
+- `Utility: verify-webhook.ts`: HMAC-SHA256 signature verification using native Web Crypto API. Validates `X-OpenWA-Signature` header. (V-54 extract)
+- `Utility: resolve-outbox.ts`: Resolves tenant and outbox context from webhook payload body (`outboxId`, `pollMessageId`, `sender`). Returns complete context for decision routing. (V-54 extract)
+- `Utility: insert-inbox.ts`: Inserts inbound message audit record via `insert_whatsapp_inbox_v1()` RPC. (V-54 extract)
+- `Utility: decision-router.ts`: Open/Closed Principle registry of `DecisionHandler` implementations. Supports `canHandle()` / `process()` per handler. Handlers register via `router.register(handler)`. No if-else chains. Service contracts inject dependencies via constructor (DIP). (V-54 extract, resolves V-87 + V-85)

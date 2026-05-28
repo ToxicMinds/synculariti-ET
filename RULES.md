@@ -9,7 +9,7 @@
 - **Viewport Controller**: Use the headless `useNavigation` hook for all fiscal calendar and domain navigation logic. UI components must not manually generate month lists or manipulate routing parameters.
 - **Static Safety**: Any component consuming URL-dependent hooks (e.g., `useNavigation`, `useSearchParams`) MUST be wrapped in a `<Suspense>` boundary and separated from static layout shells to prevent CSR bailouts during build-time static generation.
 - **Shared Gestures**: Use the `useSwipeable` hook for all swipe-to-reveal or horizontal gesture logic.
-- **Hardware/Intelligence Decoupling**: Complex components (like cameras/scanners) MUST decouple hardware logic (`useCamera`) from intelligence parsing (delegated to `scanner-client.ts` service via `processScannerInput()`).
+- **Hardware/Intelligence Decoupling**: Complex components (like cameras/scanners) MUST decouple hardware logic (`useCamera`) from intelligence parsing (delegated to `scanner-client.ts` orchestrator via `processScannerInput()`, which routes to `scanner-cache.ts`, `scanner-ekasa.ts`, or `scanner-vision.ts`).
 - **Fiscal Arithmetic**: Use the `useCalendarGrid` hook for all fiscal heatmap or calendar grid generation. Never perform date math or spend aggregation directly inside a UI component.
 
 ## 2. Coding Standards
@@ -17,6 +17,9 @@
 - **No Direct DML**: Never use `supabase.from('transactions').insert(...)`. Use the canonical RPC `save_receipt_v4`.
 - **One Error-to-String Function**: Always use `getErrorMessage(e)` from `@/lib/utils`. Never write `e instanceof Error ? e.message : String(e)` inline. This function is used across the entire codebase — new code must follow suit. `@synculariti/whatsapp-client` also exports it, but ET-internal code must use `@/lib/utils` to avoid cross-package chain issues during test resolution.
 - **One Currency Format**: Always use `formatCurrency(amount, currency?)` from `@/lib/utils` for all monetary display. Never use `€{x.toFixed(2)}` or `x.toLocaleString('en-US', ...)` inline.
+- **One Amount Parser**: Always use `safeAmount(val, fallback?)` from `@/lib/utils` for all `Number(x.amount)` conversions. Handles null/undefined/NaN internally with optional fallback (default 0). Replaces 28 inline `Number()` calls.
+- **Factory for Service Clients**: Use `createServiceClient()` from `@/lib/supabase-server` for all `service_role` Supabase clients. Never `new createClient(URL, KEY)` inline — factory uses `autoRefreshToken: false, persistSession: false`.
+- **Factory for OpenWA Client**: Use `createOpenWAClient()` from `@/lib/create-openwa-client` for all OpenWA gateway instantiations. Never `new OpenWAClient({...})` inline.
 - **Route Auth Helper**: Always use `withTestHandler(handler)` from `@/lib/withTestHandler` in API route exports. Never write `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` inline.
 - **Neo4j Ontology Helpers**: Use `buildMerchantId(name)` from `@/lib/neo4j-ontology` for merchant ID construction and `buildSyncPayload(txRow, items, opts?)` for sync payload building. Never inline the slug pattern or the mapping logic.
 - **Shared Webhook Schemas**: Extend `BaseDecisionSchema` from `@/modules/whatsapp/lib/webhook-payloads` for all webhook callback payload schemas instead of writing `{ type, outboxId, recipientPhone, tenantId, timestamp }` from scratch.
@@ -28,6 +31,12 @@
 - **Error Boundaries**: Every page-level component must be wrapped in an `ErrorBoundary`.
 
 ## 3. Security & Database Rules
+- **Service Role Key Protection**: The `SUPABASE_SERVICE_ROLE_KEY` in `.env.*` grants full data access bypassing all RLS policies. This is a root-level credential. Mitigations:
+  1. Never commit `.env.local` or `.env.prod` to version control (already in `.gitignore`).
+  2. For CI/CD, use `supabase secrets set` or a secrets manager (GitHub Secrets, Vercel Environment Variables) — never plaintext `.env` files.
+  3. Rotate the key if it may have been exposed to an untrusted context.
+  4. Consider a secrets migration: replace `.env.local` with `supabase secrets set` for the service role key, and reference it via `process.env.SUPABASE_SERVICE_ROLE_KEY` at runtime only.
+- **Tenant Isolation**: Every table has `FORCE ROW LEVEL SECURITY`. Policies must use `get_my_tenant()`.
 - **Tenant Isolation**: Every table has `FORCE ROW LEVEL SECURITY`. Policies must use `get_my_tenant()`.
 - **Server-Side Auth**: API routes use `createServerClient` from `@supabase/ssr`. Never trust `tenant_id` from a client payload.
 - **DB Function Hardening**: Every `SECURITY DEFINER` function MUST:
@@ -97,6 +106,9 @@
 - **Type-Safe Errors**: Do not use `catch (e: any)`. Always treat caught errors as `unknown` and parse them safely using `getErrorMessage(e)` to enforce zero `: any` strictness.
 - **Two-Way Workflow Services**: Interactive business decisions triggered via WhatsApp/Action Link (e.g., PO Approval, Finance Audit, POS Discrepancy) must be implemented behind a strictly typed interface/service contract, and tested in isolation by mocking Supabase client responses.
 - **Shared Processor**: The core delivery logic lives in `modules/whatsapp/lib/processOutboxQueue.ts`. Used by BOTH the webhook route and the cron route — single code path, tested once, DRY.
+- **Webhook SRP Split**: The webhook route (`webhook/route.ts`) is a thin orchestrator (55 lines). Core logic extracted into 4 utilities: `verify-webhook.ts` (HMAC check), `resolve-outbox.ts` (tenant/outbox context), `insert-inbox.ts` (inbox audit via RPC), `decision-router.ts` (DecisionHandler registry — OCP). New decision types added without modifying the router.
+- **dispatchDecision SRP Split**: The server action (`dispatchDecision.ts`) is a thin orchestrator (52 lines). Core logic extracted into `complete-action.ts` (CompleteActionResult type + RPC wrapper) and `fire-webhook.ts` (webhook signing + dispatch).
+- **Decision Router Pattern**: `decision-router.ts` uses a `DecisionHandler` interface with `canHandle()` and `process()` methods. Handlers register via `router.register(handler)`. The router iterates handlers to find the first match — no if-else chains, no switch statements. Service contracts inject dependencies via constructor (DIP).
 - **Atomic Completion**: The `dispatchDecision` server action MUST use `complete_whatsapp_action_v1()` RPC to atomically mark COMPLETED and return webhook config in a single transaction.
 - **Idempotency Shield**: External integrators SHOULD pass an `idempotencyKey`. The endpoint deduplicates via `whatsapp_outbox.idempotency_key`.
 - **Security by Role**: Gateway routes use `service_role` Supabase client (server-to-server). User-facing routes use session-based Supabase SSR client (`authenticated` role). RPCs MUST only grant `EXECUTE` to the minimum required role — never `anon`.

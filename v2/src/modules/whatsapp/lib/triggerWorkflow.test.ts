@@ -11,6 +11,9 @@ jest.mock('@/lib/logger-server', () => ({
 
 function makeSupabase(config?: TenantConfig) {
   return {
+    rpc: jest.fn(() => ({
+      single: mockOutboxSingle,
+    })),
     from: jest.fn((table: string) => {
       if (table === 'tenants') {
         return {
@@ -20,15 +23,6 @@ function makeSupabase(config?: TenantConfig) {
             data: config ? { config } : null,
             error: config ? null : new Error('not found'),
           }),
-        }
-      }
-      if (table === 'whatsapp_outbox') {
-        return {
-          insert: jest.fn(() => ({
-            select: jest.fn(() => ({
-              single: mockOutboxSingle,
-            })),
-          })),
         }
       }
       return {}

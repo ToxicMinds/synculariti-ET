@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import Link from 'next/link';
 
 export default function SettingsPage() {
@@ -40,8 +40,8 @@ export default function SettingsPage() {
       setMessage('Organization settings updated successfully!');
       setMessageType('success');
       Logger.user(tenant?.tenant_id || '', 'SETTINGS_UPDATED', 'Organization settings saved', 'User');
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : 'Unknown error saving settings';
+    } catch (e: unknown) {
+      const errMsg = getErrorMessage(e);
       setMessage('Error saving settings: ' + errMsg);
       setMessageType('error');
       Logger.system('ERROR', 'UI', 'Settings save failed', { error: errMsg });

@@ -3,7 +3,7 @@ export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { getErrorMessage } from '@synculariti/whatsapp-client';
 import { z } from 'zod';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
 
 export interface NotifyRequestBody {
@@ -62,11 +62,7 @@ export const POST = async (req: Request) => {
     }
 
     // Use service_role for API key verification (this is an API gateway, not a user session)
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    const supabase = createServiceClient();
 
     const { data: keyRecord, error: keyError } = await supabase
       .from('api_keys')
@@ -134,23 +130,16 @@ export const POST = async (req: Request) => {
       }
     }
 
-    const insertPayload: Record<string, unknown> = {
-      tenant_id: resolvedTenantId,
-      api_key_id: keyRecord.id,
-      recipient_phone: parsed.recipientPhone,
-      payload: enrichedPayload,
-      status: 'PENDING',
-      webhook_url: parsed.webhookUrl,
-      webhook_secret: parsed.webhookSecret,
-    };
-
-    if (parsed.idempotencyKey) {
-      insertPayload.idempotency_key = parsed.idempotencyKey;
-    }
-
     const { error: insertError } = await supabase
-      .from('whatsapp_outbox')
-      .insert(insertPayload);
+      .rpc('insert_whatsapp_outbox_v2', {
+        p_tenant_id: resolvedTenantId,
+        p_recipient_phone: parsed.recipientPhone,
+        p_payload: enrichedPayload,
+        p_api_key_id: keyRecord.id,
+        p_webhook_url: parsed.webhookUrl,
+        p_webhook_secret: parsed.webhookSecret,
+        p_idempotency_key: parsed.idempotencyKey,
+      });
 
     if (insertError) throw insertError;
 

@@ -3,7 +3,7 @@
 import { BentoCard } from '@/components/BentoCard';
 import { Line } from 'react-chartjs-2';
 import { Transaction } from '../lib/finance';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -45,7 +45,7 @@ export function MarketTrends({ transactions, selectedMonth, colSpan = 8 }: { tra
         const d = new Date(t.date || '');
         return d.getMonth() === m.month && d.getFullYear() === m.year;
       })
-      .reduce((acc, curr) => acc + Number(curr.amount), 0);
+      .reduce((acc, curr) => acc + safeAmount(curr.amount), 0);
   });
 
   const data = {

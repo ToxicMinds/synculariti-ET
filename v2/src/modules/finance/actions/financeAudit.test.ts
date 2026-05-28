@@ -4,26 +4,27 @@ import { supabase } from '@/lib/supabase';
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: jest.fn(),
+    rpc: jest.fn(),
   },
 }));
 
 describe('FinanceAuditService Contract', () => {
   const mockSingle = jest.fn();
-  const mockUpdate = jest.fn();
+  const mockRpc = jest.fn();
   const mockEq = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockSingle.mockReset();
-    mockUpdate.mockReset();
+    mockRpc.mockReset();
     mockEq.mockReset();
 
     (supabase.from as jest.Mock).mockReturnValue({
       select: jest.fn().mockReturnThis(),
       eq: mockEq.mockReturnThis(),
       single: mockSingle,
-      update: mockUpdate,
     });
+    (supabase.rpc as jest.Mock) = mockRpc;
 
     mockEq.mockReturnThis();
   });
@@ -42,22 +43,22 @@ describe('FinanceAuditService Contract', () => {
       error: null,
     });
 
-    mockUpdate.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      }),
-    });
+    mockRpc.mockResolvedValue({ error: null });
 
     const service = new DefaultFinanceAuditService();
     const result = await service.processDecision(
       'tenant-123',
       'outbox-123',
       'Request Re-upload',
-      '421904855155' // Wife's phone
+      '421904855155'
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('PENDING_REUPLOAD');
-    expect(supabase.from).toHaveBeenCalledWith('transactions');
+    expect(mockRpc).toHaveBeenCalledWith('service_update_transaction_v1', {
+      p_tenant_id: 'tenant-123',
+      p_id: 'tx-1042',
+      p_updates: { vat_detail: { audit_status: 'PENDING_REUPLOAD' } },
+    });
   });
 
   it('should process a valid Approve Anyway decision', async () => {
@@ -74,11 +75,7 @@ describe('FinanceAuditService Contract', () => {
       error: null,
     });
 
-    mockUpdate.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      }),
-    });
+    mockRpc.mockResolvedValue({ error: null });
 
     const service = new DefaultFinanceAuditService();
     const result = await service.processDecision(
@@ -89,7 +86,11 @@ describe('FinanceAuditService Contract', () => {
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('APPROVED');
-    expect(supabase.from).toHaveBeenCalledWith('transactions');
+    expect(mockRpc).toHaveBeenCalledWith('service_update_transaction_v1', {
+      p_tenant_id: 'tenant-123',
+      p_id: 'tx-1042',
+      p_updates: { vat_detail: { audit_status: 'APPROVED' } },
+    });
   });
 
   it('should process a valid Reject Expense decision', async () => {
@@ -106,11 +107,7 @@ describe('FinanceAuditService Contract', () => {
       error: null,
     });
 
-    mockUpdate.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      }),
-    });
+    mockRpc.mockResolvedValue({ error: null });
 
     const service = new DefaultFinanceAuditService();
     const result = await service.processDecision(
@@ -121,6 +118,9 @@ describe('FinanceAuditService Contract', () => {
     );
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('REJECTED');
-    expect(supabase.from).toHaveBeenCalledWith('transactions');
+    expect(mockRpc).toHaveBeenCalledWith('service_soft_delete_transaction_v1', {
+      p_tenant_id: 'tenant-123',
+      p_id: 'tx-1042',
+    });
   });
 });

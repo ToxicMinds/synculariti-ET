@@ -3,7 +3,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Logger } from '@/lib/logger';
-import { getErrorMessage, formatCurrency } from '@/lib/utils';
+import { getErrorMessage, formatCurrency, safeAmount } from '@/lib/utils';
 
 interface InvoiceItem {
   id?: string;
@@ -20,7 +20,7 @@ export async function notifyLargeInvoice(
   items: InvoiceItem[]
 ): Promise<{ success: boolean; sent?: boolean; error?: string }> {
   try {
-    const largeItems = items.filter(t => t.amount != null && Number(t.amount) > 500);
+    const largeItems = items.filter(t => t.amount != null && safeAmount(t.amount) > 500);
     if (largeItems.length === 0) return { success: true, sent: false };
 
     const cookieStore = await cookies();
@@ -48,12 +48,12 @@ export async function notifyLargeInvoice(
 
     const ownerPhone = tenantData.config.phones.owner;
     const lines = largeItems.map(i =>
-      `• ${formatCurrency(Number(i.amount))} — ${i.description || i.merchant || 'Manual entry'} (${i.category || 'Uncategorized'}) by ${i.who || 'Unknown'} on ${i.date || 'today'}`
+      `• ${formatCurrency(safeAmount(i.amount))} — ${i.description || i.merchant || 'Manual entry'} (${i.category || 'Uncategorized'}) by ${i.who || 'Unknown'} on ${i.date || 'today'}`
     ).join('\n');
 
     const messageText = `🚨 Large invoice alert!\n\n${lines}\n\nTap to review → https://synculariti-et.vercel.app`;
 
-    await supabase.rpc('insert_whatsapp_outbox_v1', {
+    await supabase.rpc('insert_whatsapp_outbox_v2', {
       p_tenant_id: tenantId,
       p_recipient_phone: ownerPhone,
       p_payload: {
@@ -61,6 +61,10 @@ export async function notifyLargeInvoice(
         text: messageText,
         source: 'large_invoice_auto',
       },
+      p_api_key_id: null,
+      p_webhook_url: null,
+      p_webhook_secret: null,
+      p_idempotency_key: null,
     });
 
     Logger.system('INFO', 'WhatsApp', 'Large invoice notification queued', {

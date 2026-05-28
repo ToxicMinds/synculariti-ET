@@ -63,9 +63,9 @@ Synculariti consists of two separate applications. They do NOT share a database.
 | :--- | :--- | :--- |
 | **ACID** | 🟢 **Hardened** | All ledger mutations (Finance/Logistics) use atomic Postgres RPCs. |
 | **Security** | 🟢 **Hardened** | RLS enforced on all tables. `search_path` and `REVOKE` policies verified via contract. |
-| **DRY** | 🟢 **Hardened** | AI prompts, Neo4j utilities, and Auth components are unified in `@/lib`. |
-| **Type Safety** | 🟢 **Hardened** | **0** `: any` usages. Full interface coverage for external data (eKasa, Groq, Web Locks). |
-| **SOLID** | 🟢 **Hardened** | Domain logic is isolated in `modules/`. Business logic is decoupled from UI via headless hooks. |
+| **DRY** | 🟢 **Hardened** | AI prompts, Neo4j utilities, Auth components, `safeAmount()`, `createServiceClient()`, `createOpenWAClient()`, and error handling unified in `@/lib`. Strategy maps replace if-else chains (financeAudit, triggerWorkflow). |
+| **Type Safety** | 🟢 **Hardened** | **0** `: any` usages. Full interface coverage for external data (eKasa, Groq, Web Locks). All catch blocks typed `unknown` with `getErrorMessage()`. |
+| **SOLID** | 🟢 **Hardened** | Domain logic isolated in `modules/`. Business logic decoupled from UI via headless hooks. SRP extractions: scanner-client split into 3 (V-88), insight-queries types extracted (V-89), dispatchDecision split into 2 (V-90), webhook/route split into 4 utilities (V-54). OCP: decision-router accepts new handlers via registry (V-87). DIP: services injected via constructor pattern (V-85). |
 
 ---
 
@@ -84,12 +84,14 @@ Synculariti consists of two separate applications. They do NOT share a database.
 - **Input Validation**: All API routes MUST use Zod schemas from the unified validation registry for request sanitization.
 - **Route Auth Pattern**: All internal API routes MUST use `withTestHandler(handler)` from `@/lib/withTestHandler` instead of the inline `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` pattern.
 - **Normalizing Washer**: Use the 'Washer' pattern (Zod transforms + defaults) for all routes handling external or nullable metadata to guarantee type safety without rejecting valid but incomplete data.
+- **Factory Pattern for Service Clients**: Use `createServiceClient()` from `@/lib/supabase-server` for all `service_role` Supabase clients. Uses `@supabase/supabase-js` `createClient` with `autoRefreshToken: false, persistSession: false`. Never instantiate `new createClient(URL, SERVICE_KEY)` inline.
 
 ### 4.3 Intelligence Strategy
 We use a deterministic AI pipeline for financial categorization:
 1. **Stage 1 (Vision)**: LLM-based spatial transcription.
 2. **Stage 2 (Reasoning)**: Llama 3.3 70B mapping to injected Tenant category contexts.
-- **Hardware/Intelligence Decoupling (SRP)**: Complex components (like Receipt Scanners) MUST separate hardware logic (`useCamera`) from intelligence parsing (delegated to `scanner-client.ts`).
+- **Hardware/Intelligence Decoupling (SRP)**: Complex components (like Receipt Scanners) MUST separate hardware logic (camera, compression — see `scanner-vision.ts`) from intelligence parsing (delegated to `scanner-client.ts`).
+- **Factory Pattern for External Dependencies**: Use `createServiceClient()` for Supabase service clients and `createOpenWAClient()` for OpenWA gateway clients. Never instantiate `new OpenWAClient()` or `createClient(URL, KEY)` inline — these factories centralize config and enable test injection.
 - **Idempotency Shield**: All intelligence parsing MUST be gated by an idempotency hash (e.g., SHA-256 of the image blob) to prevent redundant AI API calls and ensure graceful degradation timeouts.
 
 ### 4.4 Unified Scanner Pipeline
@@ -104,7 +106,7 @@ Receipt/invoice scanning uses a **single `process(input)` entry point** with int
 7. **Confidence scoring**: AI-extracted items carry a `confidence` field (`'high' | 'medium' | 'low'`) from the LLM response. Items with name < 3 characters or amount === 0 are auto-downgraded to `'low'`. eKasa Gov items are always `'high'`.
 8. **UI badges**: Low/medium confidence items display a colored badge (`status-danger` / `status-warning`) in the review step. Verified eKasa receipts show a `Verified eKasa` green badge.
 
-**Key files**: `src/lib/scanner-client.ts` (service), `src/modules/finance/hooks/useScannerState.ts` (simplified hook — single `process()` method, state-only), `src/modules/finance/components/ReceiptScanner.tsx` (two buttons, one pipeline), `src/lib/image-preprocessor.ts` (sharp resize→WebP), `src/app/api/ai/preprocess-image/route.ts` (POST endpoint).
+**Key files**: `src/lib/scanner-client.ts` (orchestrator), `src/lib/scanner-cache.ts` (idempotency cache), `src/lib/scanner-ekasa.ts` (eKasa QR pipeline), `src/lib/scanner-vision.ts` (AI vision pipeline), `src/modules/finance/hooks/useScannerState.ts` (simplified hook — single `process()` method, state-only), `src/modules/finance/components/ReceiptScanner.tsx` (two buttons, one pipeline), `src/lib/image-preprocessor.ts` (sharp resize→WebP), `src/app/api/ai/preprocess-image/route.ts` (POST endpoint).
 
 ### 4.5 Analytical Insight Pipeline (Graph Intelligence)
 The AI Insights card uses a **Structured Query → LLM Narration** pipeline, NOT an open-ended LLM prompt:
@@ -251,6 +253,9 @@ The `graph_sync_queue.entity_type` CHECK constraint now supports `'sale'`, `'men
 - **Atomic Action Completion**: The `dispatchDecision` server action MUST use the RPC `complete_whatsapp_action_v1()` to atomically mark the outbox COMPLETED and return webhook config in a single transaction (§4.2 ACID).
 - **Idempotency Shield**: External integrators SHOULD pass an `idempotencyKey` (UUID). The endpoint deduplicates via `whatsapp_outbox.idempotency_key` unique constraint.
 - **Shared Processor**: The core logic lives in `modules/whatsapp/lib/processOutboxQueue.ts`. This function is used by BOTH the webhook route and the cron route — single code path, tested once, DRY.
+- **Webhook SRP Split**: The webhook route (`webhook/route.ts`) is a thin orchestrator (55 lines). Core logic extracted into 4 utilities: `verify-webhook.ts` (HMAC check), `resolve-outbox.ts` (tenant/outbox context), `insert-inbox.ts` (inbox audit via RPC), `decision-router.ts` (DecisionHandler registry — OCP). New decision types added without modifying the router.
+- **dispatchDecision SRP Split**: The server action (`dispatchDecision.ts`) is a thin orchestrator (52 lines). Core logic extracted into `complete-action.ts` (CompleteActionResult type + RPC wrapper) and `fire-webhook.ts` (webhook signing + dispatch).
+- **Decision Router Pattern**: `decision-router.ts` uses a `DecisionHandler` interface with `canHandle()` and `process()` methods. Handlers register via `router.register(handler)`. The router iterates handlers to find the first match — no if-else chains, no switch statements. Service contracts inject dependencies via constructor (DIP).
 - **Security by Role**: External gateway routes (notify, process-outbox, cron, webhook) use `service_role` Supabase client (server-to-server, no user session). User-facing routes (action page, `dispatchDecision` server action) use session-based Supabase SSR client with `authenticated` role. RPCs MUST only grant `EXECUTE` to the minimum required role — never `anon`.
 
 ### 6.7 Integrating External Applications with the WhatsApp Sidecar
@@ -424,7 +429,7 @@ app.post('/webhook/whatsapp-decision', async (req, res) => {
 
 ### 6.8 WhatsApp Test Coverage & Mock Patterns
 
-#### Coverage Map (222 tests, all green)
+#### Coverage Map (249 tests, all green)
 | Test File | Location | What It Covers |
 |-----------|----------|----------------|
 | `processOutboxQueue.test.ts` | `src/modules/whatsapp/lib/` | 12 tests: RPC claiming, direct SELECT fallback, text/poll delivery, empty queue, sendText failure (false + throw), unknown payload type, missing text/name/options, partial batch failure |

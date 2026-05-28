@@ -1,6 +1,6 @@
 import { ServerLogger } from '@/lib/logger-server';
 import { getErrorMessage } from '@/lib/utils';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import crypto from 'node:crypto';
@@ -26,10 +26,7 @@ export async function POST(req: Request) {
     const { pin } = result.data;
 
     // 2. Initialize Admin Client
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseAdmin = createServiceClient();
 
     // 3. Rate Limiting Check
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase-server';
 import { BATCH_1_SECURITY_CONTRACT, BATCH_1_LANDMINE_CONTRACT } from './db-security-contract';
 import { safeCastUuid, safeCastUserUuid } from './uuid-helpers';
 import { RPC_GET_SECURITY_STATE, FunctionSecurityState } from './types';
@@ -18,10 +18,7 @@ if (fs.existsSync(envPath)) {
 }
 
 // Initialize real Supabase client with Service Role key to query catalog metadata
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase = createServiceClient();
 
 // Helper to query function security state via live Supabase RPC
 async function checkFunctionSecurity(name: string, args: string): Promise<FunctionSecurityState> {

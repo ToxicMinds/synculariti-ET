@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { BentoCard } from '@/components/BentoCard';
 import { calcTimeBoundForecast, Transaction } from '../lib/finance';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getErrorMessage } from '@/lib/utils';
+import { Logger } from '@/lib/logger';
 
 interface BudgetHealthProps {
   spent: number;
@@ -52,7 +53,8 @@ export function BudgetHealth({ spent, totalBudget, transactions = [], colSpan = 
       
       const data = await response.json();
       setAiForecast(data.aiForecast);
-    } catch (e) {
+    } catch (e: unknown) {
+      Logger.system('ERROR', 'AI', 'Forecast fetch failed', { error: getErrorMessage(e) });
       setAiForecast("AI projection temporarily unavailable.");
     } finally {
       setLoading(false);

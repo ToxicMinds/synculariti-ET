@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Transaction } from '../lib/finance';
 import { ViewMode, UseTransactionFilterProps, UseTransactionFilterReturn } from './useTransactionFilter.types';
+import { safeAmount } from '@/lib/utils';
 
 const DEFAULT_SORT_BY = 'date' as const;
 const DEFAULT_SORT_ORDER = 'desc' as const;
@@ -61,7 +62,7 @@ export function useTransactionFilter({ transactions }: UseTransactionFilterProps
       let comparison = 0;
 
       if (sortBy === 'amount') {
-        comparison = Number(a.amount) - Number(b.amount);
+        comparison = safeAmount(a.amount) - safeAmount(b.amount);
       } else if (sortBy === 'vendor') {
         const aVendor = (a.description ?? a.category).toLowerCase();
         const bVendor = (b.description ?? b.category).toLowerCase();

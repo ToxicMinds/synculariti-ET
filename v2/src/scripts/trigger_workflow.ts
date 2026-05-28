@@ -1,17 +1,12 @@
 import './load-env';
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '../lib/supabase-server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!supabaseUrl || !supabaseKey) {
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error('❌ Missing Supabase credentials in environment.');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
-});
+const supabase = createServiceClient();
 
 const DEMO_TENANT_ID = 'f039714b-8276-4733-8172-58b049bd9163';
 const MANAGER_PHONE = '421904855155'; // Wife's phone

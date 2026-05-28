@@ -1,6 +1,7 @@
 import { OpenWAClient } from '@synculariti/whatsapp-client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ServerLogger } from '@/lib/logger-server';
+import { getErrorMessage } from '@/lib/utils';
 import type { OutboxRecord } from '../types';
 
 export async function processOutboxQueue(
@@ -74,8 +75,12 @@ export async function processOutboxQueue(
           tenantId: record.tenant_id,
         });
       }
-    } catch (err) {
+    } catch (err: unknown) {
       failed++;
+      await ServerLogger.system('WARN', 'WhatsApp', 'Delivery exception', {
+        outboxId: record.id,
+        error: getErrorMessage(err),
+      });
       await supabase
         .rpc('set_outbox_delivery_result_v1', {
           p_outbox_id: record.id,

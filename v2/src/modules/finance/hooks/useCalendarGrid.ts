@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Transaction } from '../lib/finance';
+import { safeAmount } from '@/lib/utils';
 
 export interface CalendarDayData {
   day: number;
@@ -46,7 +47,7 @@ export function useCalendarGrid(transactions: Transaction[], baseDate: Date = ne
       if (d.getMonth() === month && d.getFullYear() === year) {
         const day = d.getDate();
         if (dayMap[day]) {
-          dayMap[day].total += Number(tx.amount);
+          dayMap[day].total += safeAmount(tx.amount);
           dayMap[day].transactions.push(tx);
           if (dayMap[day].total > maxDailySpend) {
             maxDailySpend = dayMap[day].total;

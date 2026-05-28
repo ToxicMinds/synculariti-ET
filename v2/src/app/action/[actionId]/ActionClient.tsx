@@ -33,7 +33,8 @@ export function ActionClient({ actionId, tenantName, payload }: ActionClientProp
         setStatus('error');
         setErrorMsg(result.error || 'Failed to submit decision.');
       }
-    } catch (e) {
+    } catch (e: unknown) {
+      console.warn('dispatchDecision failed:', e);
       setStatus('error');
       setErrorMsg('A network error occurred while submitting.');
     } finally {

@@ -2,6 +2,7 @@ import neo4j, { Driver, Session, ManagedTransaction } from 'neo4j-driver';
 import { Logger } from './logger';
 import { buildMerchantId } from './neo4j-ontology';
 import { Transaction } from '@/modules/finance/lib/finance';
+import { safeAmount } from './utils';
 import { TransactionSyncPayload } from './types';
 
 let driver: Driver | null = null;
@@ -41,7 +42,7 @@ export async function neo4jBulkMerge(expenses: (Transaction | TransactionSyncPay
     return {
       txId: exp.id || '',
       tenantId: exp.tenant_id || '',
-      amount: Number(exp.amount),
+      amount: safeAmount(exp.amount),
       date: exp.date || '',
       category: exp.category,
       dayOfWeek: dow,

@@ -1,7 +1,6 @@
 import {
   calcTotals,
   calcPerUserSpend,
-  calcForecast,
   calcNetSavings,
   calcBudgetStatus,
   calcMonthDelta,
@@ -67,34 +66,6 @@ describe('Finance Calculation Library (Canonical)', () => {
       ];
       const result = calcPerUserSpend(legacy, SAMPLE_NAMES);
       expect(result.u1).toBe(50);
-    });
-  });
-
-  describe('calcForecast', () => {
-    test('Calculates projections accurately', () => {
-      // Mid-month scenario (April has 30 days)
-      const now = new Date('2026-04-15'); 
-      const transactions: Transaction[] = [
-        { amount: 150, category: 'Food', date: '2026-04-01' }, // 150 spent in 15 days = 10/day
-      ];
-      
-      const { projected, dailyRate } = calcForecast(transactions, 500, now);
-      
-      expect(dailyRate).toBe(10);
-      expect(projected).toBe(300); // 150 + (10 * 15 days left)
-    });
-
-    test('Excludes recurring from daily rate burn', () => {
-      const now = new Date('2026-04-10'); 
-      const transactions: Transaction[] = [
-        { amount: 100, category: 'Rent', recurring_id: 'r1', date: '2026-04-01' },
-        { amount: 100, category: 'Food', date: '2026-04-05' } // 100 variable in 10 days = 10/day
-      ];
-      
-      const { projected, dailyRate } = calcForecast(transactions, 1000, now);
-      
-      expect(dailyRate).toBe(10);
-      expect(projected).toBe(400); // 200 (spent) + (10 * 20 days left)
     });
   });
 

@@ -2,16 +2,13 @@ export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
 import { withAuth } from '@/lib/withAuth';
-import { OpenWAClient, getErrorMessage } from '@synculariti/whatsapp-client';
+import { getErrorMessage } from '@synculariti/whatsapp-client';
+import { createOpenWAClient } from '@/lib/create-openwa-client';
 import { ServerLogger } from '@/lib/logger-server';
 
 export const GET = withAuth(async (req, context) => {
   try {
-    const client = new OpenWAClient({
-      baseUrl: process.env.OPENWA_BASE_URL || '',
-      apiKey: process.env.OPENWA_API_KEY || '',
-      sessionId: process.env.OPENWA_SESSION_ID || 'synculariti-bot'
-    });
+    const client = createOpenWAClient();
 
     // We do a direct call to OpenWA here since status check is fast and synchronous
     const statusResult = await client.getSessionStatus();

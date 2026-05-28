@@ -1,29 +1,8 @@
 import { Session } from 'neo4j-driver';
 import { formatCurrency } from '@/lib/utils';
+import { InsightFinding, toNum, toStr } from './insight-types';
 
-export interface InsightFinding {
-  type: 'price' | 'timing' | 'waste';
-  impact: number;
-  summary: string;
-  detail: string;
-  recommendation: string;
-  data: Record<string, unknown>;
-}
-
-function toNum(v: unknown): number {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === 'number') return v;
-  if (typeof v === 'object' && v !== null) {
-    const o = v as { low?: number; high?: number };
-    if (typeof o.low === 'number') return o.low;
-  }
-  return Number(v) || 0;
-}
-
-function toStr(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  return String(v);
-}
+export type { InsightFinding } from './insight-types';
 
 // ──────────────────────────────────────────────
 // Class A: Price Intelligence
@@ -218,4 +197,4 @@ export async function queryWasteRisk(
   };
 }
 
-export type QueryRunner<T> = (session: Session, tenantId: string) => Promise<T | null>;
+export type { QueryRunner } from './insight-types';

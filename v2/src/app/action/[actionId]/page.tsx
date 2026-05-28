@@ -1,10 +1,9 @@
 import React from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { createClient as createSessionClient } from '@/lib/supabase-server';
+import { createClient as createSessionClient, createServiceClient } from '@/lib/supabase-server';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ActionClient } from './ActionClient';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://synculariti-et.vercel.app';
@@ -17,11 +16,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const resolvedParams = await params;
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
+  const supabase = createServiceClient();
   const { data: record } = await supabase
     .from('whatsapp_outbox')
     .select('payload')
@@ -30,7 +25,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const name = record?.payload?.name || 'Action Required';
   const meta = record?.payload?.metadata || {};
-  const desc = meta.description || (meta.amount ? formatCurrency(Number(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : 'Respond to this action request');
+  const desc = meta.description || (meta.amount ? formatCurrency(safeAmount(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : 'Respond to this action request');
 
   return {
     title: `${name} - Synculariti`,
@@ -117,7 +112,7 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
   const meta = record.payload?.metadata || {};
   const clientPayload = {
     title: record.payload?.name || 'Action Required',
-    description: meta.description || (meta.amount ? formatCurrency(Number(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : ''),
+    description: meta.description || (meta.amount ? formatCurrency(safeAmount(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : ''),
     options: record.payload?.options || [],
   };
 

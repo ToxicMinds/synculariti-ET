@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Transaction, calcCategoryTotals } from '../lib/finance';
+import { safeAmount } from '@/lib/utils';
 
 ChartJS.register(
   ArcElement,
@@ -76,7 +77,7 @@ export function DailyTrend({ transactions }: { transactions: Transaction[] }) {
   const daily = transactions.reduce((acc: Record<string, number>, t) => {
     if (t.category === 'Savings' || t.category === 'Adjustment') return acc;
     const day = t.date?.slice(8, 10) || '01'; // DD
-    acc[day] = (acc[day] || 0) + (Number(t.amount) || 0);
+    acc[day] = (acc[day] || 0) + safeAmount(t.amount);
     return acc;
   }, {});
 

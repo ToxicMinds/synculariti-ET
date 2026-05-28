@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase-server';
 
 import { LogLevel, LogComponent } from './types/logging';
 
@@ -13,10 +13,7 @@ import { LogLevel, LogComponent } from './types/logging';
  */
 export class ServerLogger {
   private static getClient() {
-    return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    return createServiceClient();
   }
 
   /**

@@ -5,6 +5,20 @@ export function getErrorMessage(e: unknown): string {
 }
 
 /**
+ * Safely coerces a value to a number with a fallback for null/undefined/NaN.
+ */
+export function safeAmount(val: unknown, fallback = 0): number {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : fallback;
+  if (typeof val === 'string') {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  const n = Number(val);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
  * Executes a fetch request with exponential backoff retries.
  */
 export async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 3, backoff = 500): Promise<Response> {

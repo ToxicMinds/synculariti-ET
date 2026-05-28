@@ -6,7 +6,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { useScannerState, UseScannerStateReturn, ReceiptData } from '../hooks/useScannerState';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import styles from './ReceiptScanner.module.css';
 
 interface ReceiptScannerProps {
@@ -63,14 +63,14 @@ function ScanStep({ scanner }: { scanner: UseScannerStateReturn }) {
 
     html5Scanner.render(
       (decodedText) => {
-        html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed', { error: String(e) }));
+        html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed', { error: getErrorMessage(e) }));
         scanner.process(decodedText);
       },
       () => {}
     );
 
     return () => {
-      html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed on unmount', { error: String(e) }));
+      html5Scanner.clear().catch(e => Logger.system('WARN', 'Scanner', 'Clear failed on unmount', { error: getErrorMessage(e) }));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -157,7 +157,7 @@ function ReviewStep({
 
       <div className={styles.itemsContainer}>
         {receipt.items.map((item, i) => (
-          <div key={i} className={styles.itemRow}>
+          <div key={`${item.name}-${i}`} className={styles.itemRow}>
             <div className={styles.itemLeft}>
               <input
                 type="checkbox"

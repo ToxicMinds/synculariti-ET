@@ -43,44 +43,37 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
       throw new Error('Transaction ID missing from outbox payload metadata');
     }
 
-    if (decision === 'Approve Anyway') {
-      const { error } = await this.supabaseClient
-        .from('transactions')
-        .update({
-          vat_detail: { audit_status: 'APPROVED' },
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transactionId)
-        .eq('tenant_id', tenantId);
+    const auditActions: Record<AuditDecision, () => Promise<{ success: boolean; resolution: string }>> = {
+      'Approve Anyway': async () => {
+        const { error } = await this.supabaseClient.rpc('service_update_transaction_v1', {
+          p_tenant_id: tenantId,
+          p_id: transactionId,
+          p_updates: { vat_detail: { audit_status: 'APPROVED' } },
+        });
+        if (error) throw new Error(`Failed to approve transaction: ${error.message}`);
+        return { success: true, resolution: 'APPROVED' };
+      },
+      'Request Re-upload': async () => {
+        const { error } = await this.supabaseClient.rpc('service_update_transaction_v1', {
+          p_tenant_id: tenantId,
+          p_id: transactionId,
+          p_updates: { vat_detail: { audit_status: 'PENDING_REUPLOAD' } },
+        });
+        if (error) throw new Error(`Failed to update transaction for re-upload: ${error.message}`);
+        return { success: true, resolution: 'PENDING_REUPLOAD' };
+      },
+      'Reject Expense': async () => {
+        const { error } = await this.supabaseClient.rpc('service_soft_delete_transaction_v1', {
+          p_tenant_id: tenantId,
+          p_id: transactionId,
+        });
+        if (error) throw new Error(`Failed to reject transaction: ${error.message}`);
+        return { success: true, resolution: 'REJECTED' };
+      },
+    };
 
-      if (error) throw new Error(`Failed to approve transaction: ${error.message}`);
-      return { success: true, resolution: 'APPROVED' };
-    } else if (decision === 'Request Re-upload') {
-      const { error } = await this.supabaseClient
-        .from('transactions')
-        .update({
-          vat_detail: { audit_status: 'PENDING_REUPLOAD' },
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transactionId)
-        .eq('tenant_id', tenantId);
-
-      if (error) throw new Error(`Failed to update transaction for re-upload: ${error.message}`);
-      return { success: true, resolution: 'PENDING_REUPLOAD' };
-    } else if (decision === 'Reject Expense') {
-      const { error } = await this.supabaseClient
-        .from('transactions')
-        .update({
-          is_deleted: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transactionId)
-        .eq('tenant_id', tenantId);
-
-      if (error) throw new Error(`Failed to reject transaction: ${error.message}`);
-      return { success: true, resolution: 'REJECTED' };
-    }
-
-    throw new Error(`Invalid decision: ${decision}`);
+    const action = auditActions[decision];
+    if (!action) throw new Error(`Invalid decision: ${decision}`);
+    return action();
   }
 }

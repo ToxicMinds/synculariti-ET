@@ -1,13 +1,15 @@
 import { POST } from './route';
 import { NextRequest } from 'next/server';
 
-const mockInsert = jest.fn();
 const mockMaybeSingle = jest.fn();
 const mockApiSingle = jest.fn();
 const mockTenantSingle = jest.fn();
 
+const mockRpc = jest.fn();
+
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
+    rpc: mockRpc,
     from: jest.fn((table: string) => {
       if (table === 'api_keys') {
         return {
@@ -25,7 +27,6 @@ jest.mock('@supabase/supabase-js', () => ({
       }
       if (table === 'whatsapp_outbox') {
         return {
-          insert: mockInsert.mockResolvedValue({ error: null }),
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           maybeSingle: mockMaybeSingle,
@@ -44,7 +45,8 @@ describe('WhatsApp Notify API Contract', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockMaybeSingle.mockReset();
-    mockInsert.mockReset();
+    mockRpc.mockReset();
+    mockRpc.mockResolvedValue({ error: null });
     mockApiSingle.mockReset();
     mockTenantSingle.mockReset();
   });
@@ -105,24 +107,21 @@ describe('WhatsApp Notify API Contract', () => {
       const response = await (POST as any)(req, { params: Promise.resolve({}) });
       expect(response.status).toBe(202);
 
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: 'tenant-123',
-          api_key_id: 'key-123',
-          recipient_phone: '421903123456',
-          payload: expect.objectContaining({
-            type: 'poll',
-            name: 'Approve Invoice #INV-001?',
-            options: ['Approve', 'Reject'],
-            text: null,
-            metadata: { invoiceId: 'inv-001', amount: 100, currency: 'EUR' },
-          }),
-          status: 'PENDING',
-          webhook_url: body.webhookUrl,
-          webhook_secret: body.webhookSecret,
-          idempotency_key: body.idempotencyKey,
-        })
-      );
+      expect(mockRpc).toHaveBeenCalledWith('insert_whatsapp_outbox_v2', {
+        p_tenant_id: 'tenant-123',
+        p_recipient_phone: '421903123456',
+        p_payload: {
+          type: 'poll',
+          name: 'Approve Invoice #INV-001?',
+          options: ['Approve', 'Reject'],
+          text: null,
+          metadata: { invoiceId: 'inv-001', amount: 100, currency: 'EUR' },
+        },
+        p_api_key_id: 'key-123',
+        p_webhook_url: body.webhookUrl,
+        p_webhook_secret: body.webhookSecret,
+        p_idempotency_key: body.idempotencyKey,
+      });
     });
 
     it('should reject invalid payload with bad recipient phone', async () => {
@@ -192,16 +191,15 @@ describe('WhatsApp Notify API Contract', () => {
       const response = await (POST as any)(req, { params: Promise.resolve({}) });
       expect(response.status).toBe(202);
 
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: 'tenant-abc',
-          recipient_phone: '421901234567',
-          payload: expect.objectContaining({
-            type: 'text',
-            text: 'Hello from API',
-          }),
-        })
-      );
+      expect(mockRpc).toHaveBeenCalledWith('insert_whatsapp_outbox_v2', {
+        p_tenant_id: 'tenant-abc',
+        p_recipient_phone: '421901234567',
+        p_payload: { type: 'text', text: 'Hello from API', name: null, options: null, metadata: {} },
+        p_api_key_id: 'key-456',
+        p_webhook_url: null,
+        p_webhook_secret: null,
+        p_idempotency_key: null,
+      });
     });
 
     it('should return existing outbox on idempotency key collision', async () => {
@@ -262,18 +260,19 @@ describe('WhatsApp Notify API Contract', () => {
       const response = await (POST as any)(req, { params: Promise.resolve({}) });
       expect(response.status).toBe(202);
 
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenant_id: TARGET_TENANT,
-          api_key_id: 'svc-key-001',
-          recipient_phone: '421901234567',
-          payload: expect.objectContaining({
-            type: 'text',
-            text: 'Stock alert from IMS',
-            metadata: expect.objectContaining({ source: 'ims' }),
-          }),
-        })
-      );
+      expect(mockRpc).toHaveBeenCalledWith('insert_whatsapp_outbox_v2', {
+        p_tenant_id: TARGET_TENANT,
+        p_recipient_phone: '421901234567',
+        p_payload: expect.objectContaining({
+          type: 'text',
+          text: 'Stock alert from IMS',
+          metadata: expect.objectContaining({ source: 'ims' }),
+        }),
+        p_api_key_id: 'svc-key-001',
+        p_webhook_url: null,
+        p_webhook_secret: null,
+        p_idempotency_key: null,
+      });
     });
 
     it('should reject when tenant_id is missing in body', async () => {

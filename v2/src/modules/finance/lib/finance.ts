@@ -1,5 +1,5 @@
 import { OperatingMarginMetrics, TimeBoundForecast } from '../../../lib/types';
-import { formatCurrency } from '../../../lib/utils';
+import { formatCurrency, safeAmount } from '../../../lib/utils';
 
 export interface Transaction {
   id?: string;
@@ -45,38 +45,12 @@ export function isAdjustment(e: Transaction): boolean {
 export function calcTotals(transactions: Transaction[]) {
   let spent = 0, saved = 0, adjusted = 0;
   transactions.forEach((e) => {
-    const amt = Number(e.amount) || 0;
+    const amt = safeAmount(e.amount);
     if (isSavings(e)) saved += amt;
     else if (isAdjustment(e)) adjusted += amt;
     else spent += amt;
   });
   return { spent, saved, adjusted };
-}
-
-/**
- * Projects end-of-month spend based on current burn rate.
- */
-export function calcForecast(transactions: Transaction[], totalBudget: number, now: Date = new Date()) {
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const currentDay = Math.max(1, now.getDate());
-  const daysLeft = daysInMonth - currentDay;
-
-  const spent = transactions
-    .filter((e) => !isSavings(e) && !isAdjustment(e))
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-
-  const recurringPaid = transactions
-    .filter((e) => e.recurring_id)
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-
-  const variableSpent = Math.max(0, spent - recurringPaid);
-  const dailyRate = currentDay > 0 ? variableSpent / currentDay : 0;
-  const projected = spent + (dailyRate * daysLeft);
-  const diff = projected - totalBudget;
-
-  return { projected, diff, dailyRate };
 }
 
 /**
@@ -116,7 +90,7 @@ export function calcPerUserSpend(transactions: Transaction[], userNames: Record<
     }
 
     if (targetUserId && result.hasOwnProperty(targetUserId)) {
-      result[targetUserId] += (Number(exp.amount) || 0);
+      result[targetUserId] += safeAmount(exp.amount);
     }
   });
 
@@ -160,7 +134,7 @@ export function calcMonthDelta(
 
   const prevTotal = allTransactions.reduce((sum, e) => {
     if (e.date && e.date.startsWith(prevMonth) && !isSavings(e) && !isAdjustment(e)) {
-      return sum + (Number(e.amount) || 0);
+      return sum + (safeAmount(e.amount));
     }
     return sum;
   }, 0);
@@ -178,7 +152,7 @@ export function calcCategoryTotals(transactions: Transaction[]) {
   return transactions.reduce((acc, e) => {
     if (isSavings(e) || isAdjustment(e)) return acc;
     const key = e.category || 'Uncategorized'; 
-    acc[key] = (acc[key] || 0) + (Number(e.amount) || 0);
+    acc[key] = (acc[key] || 0) + (safeAmount(e.amount));
     return acc;
   }, {} as Record<string, number>);
 }
@@ -248,11 +222,11 @@ export function calcTimeBoundForecast(
 
   const spent = transactions
     .filter((e) => !isSavings(e) && !isAdjustment(e))
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    .reduce((s, e) => s + (safeAmount(e.amount)), 0);
 
   const recurringPaid = transactions
     .filter((e) => e.recurring_id)
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    .reduce((s, e) => s + (safeAmount(e.amount)), 0);
 
   const variableSpent = Math.max(0, spent - recurringPaid);
   const dailySpendRate = currentDay > 0 ? variableSpent / currentDay : 0;

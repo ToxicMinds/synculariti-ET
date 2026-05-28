@@ -1,5 +1,6 @@
 // Slovak B2B Ingredient Mapping Dictionary
 import { enrichDate } from './holidays';
+import { safeAmount } from './utils';
 import type { TransactionSyncPayload, ReceiptItemSyncPayload } from './types';
 
 export function buildMerchantId(name: string): string {
@@ -46,7 +47,7 @@ export function buildSyncPayload(
 
   const mappedItems: ReceiptItemSyncPayload[] = items.map(item => {
     const mapped = mapToOntologyItem(item.name, merchantId, item.currency || currency);
-    const itemAmount = Number(item.amount);
+    const itemAmount = safeAmount(item.amount);
     return {
       ...mapped,
       itemId: item.id,
@@ -67,7 +68,7 @@ export function buildSyncPayload(
   return {
     txId: txRow.id,
     tenantId: txRow.tenant_id,
-    amount: Number(txRow.amount),
+    amount: safeAmount(txRow.amount),
     date: txRow.date,
     category,
     ...enrichment,

@@ -1124,3 +1124,90 @@ Do not add any comments to the code. Follow existing code style and conventions 
 ---
 
 *End of architecture document. This is a live design — update as decisions change.*
+
+---
+
+## 10. Implementation Plan (AI-Generated)
+
+> **Status:** Awaiting approval — see open questions before execution begins.
+
+### Intent
+
+Build the ET side of the Food Cost Variance pipeline. Since the IMS does not exist yet, the entire pipeline runs against **mocked IMS responses (Wizard of Oz)** — real ET infrastructure, real Supabase staging tables, real Neo4j nodes, real report output. Flip `IMS_MOCK_MODE=false` when the IMS is live.
+
+---
+
+### Open Questions (Must Resolve Before Execution)
+
+1. **Demo Tenant UUID** — What is the `tenant_id` for `@demo-2026` in the live Supabase `tenants` table? The seed script and mock client need it hardcoded.
+2. **Burger Joint Menu** — What are the 3–5 real menu items + key ingredients? The mock data uses placeholders (Chicken Schnitzel, Beef Burger, Fries, Draft Beer) unless you provide the real menu.
+3. **TeamAllocation removal** — The spec says to remove this card from the dashboard. Confirming before `page.tsx` is touched.
+4. **ConsumptionEstimate `transaction_time`** — The Cypher queries filter `ce.transaction_time` but that field only lives on `:Sale`. Recommendation: **denormalize `transaction_time` onto `:ConsumptionEstimate`** to avoid join overhead in report queries. Proceeding with this unless overridden.
+
+---
+
+### Wizard of Oz Strategy
+
+```
+# .env.local
+IMS_MOCK_MODE=true
+IMS_BASE_URL=https://ims.synculariti.com
+IMS_API_KEY=mock-key-placeholder
+```
+
+`ims-client.ts` checks `IMS_MOCK_MODE`. When `true` → returns hardcoded JSON. When `false` → makes real HTTP calls. **Zero code changes to go live.**
+
+---
+
+### Execution Order (16 steps)
+
+| # | File | Action |
+|---|------|--------|
+| 1 | `supabase/migrations/20260528001_pos_batch_staging.sql` | Create tables: `pos_batch_uploads`, `pos_transaction_staging`, `pos_data_gaps`; function `process_batch_v1()`; view `v_quarantine_audit`; RLS; REVOKE anon |
+| 2 | `supabase/migrations/20260528002_recipe_cache.sql` | Create tables: `cached_recipes`, `cached_ingredients`; RLS; grants |
+| 3 | `v2/src/lib/ims-client.ts` | Create — IMS HTTP interface + Wizard of Oz mock data (4 menu items, 60 days POS) |
+| 4 | `v2/src/lib/pos-batch-worker.ts` | Create — `pollNewSales()`, `processBatch()`, `detectDataGaps()` |
+| 5 | `v2/src/lib/neo4j.ts` | Add `syncSalesWithConsumption()` after line 151 — Phase 4a `:Sale` nodes + Phase 4b `:ConsumptionEstimate` nodes with denormalized `transaction_time` |
+| 6 | `v2/src/app/api/debug/sync-neo4j/route.ts` | Add branch for `entity_type='sale'` events; call `syncSalesWithConsumption()` after existing bulk merge |
+| 7 | `v2/src/app/api/pos/ingest/route.ts` | Create — POST trigger for full pipeline (poll → stage → process → enqueue) |
+| 8 | `v2/src/lib/food-cost-variance.ts` | Create — 5 parallel Cypher queries, `FoodCostVarianceReport` interface, recommendation engine |
+| 9 | `v2/src/app/api/analytics/food-cost-variance/route.ts` | Create — GET endpoint, Zod date validation, 1h server cache |
+| 10 | `v2/src/modules/finance/components/FoodCostVarianceCard.tsx` | Create — colSpan=8, big Gap number, top 3 ingredients, coverage indicator |
+| 11 | `v2/src/modules/finance/components/VarianceCalendar.tsx` | Create — colSpan=4, monthly color grid, click tooltip |
+| 12 | `v2/src/modules/finance/components/AIInsights.tsx` | Modify — FCV as primary source; existing insight queries as fallback |
+| 13 | `v2/src/app/page.tsx` | Modify — remove `TeamAllocation`; add `FoodCostVarianceCard` + `VarianceCalendar`; rebalance layout |
+| 14 | `v2/src/scripts/seed_pos_mock.ts` | Create — one-shot demo seed: 60 days POS staged + approved + synced to Neo4j |
+| 15 | 3 test files | `ims-client.test.ts`, `pos-batch-worker.test.ts`, `food-cost-variance.test.ts` |
+| 16 | Verify | `npm run build` clean + `npm test` green |
+
+---
+
+### Key Architectural Decisions
+
+**No shared DB.** `ims-client.ts` is the only file that crosses the IMS boundary (via HTTP). All staging, caching, Neo4j sync, and reporting is ET-internal.
+
+**`ConsumptionEstimate.transaction_time` is denormalized.** The Cypher report queries filter CEs by date range directly without joining through `:Sale`. This is a performance decision, not a normalisation violation — the data is owned by the sale.
+
+**`process_batch_v1` cold start = auto-approve.** The first 4 batches per (tenant, item_sku) have no baseline so all rows are approved. Anomaly detection activates after 5+ historical data points exist.
+
+**Dashboard layout order (top → bottom after changes):**
+```
+Row 1: MonthlyPerformance (8) + CommandCenter (4)
+Row 2: FoodCostVarianceCard (8) + VarianceCalendar (4)
+Row 3: OperatingMargin (4) + BudgetHealth (4) + AIInsights (reformatted, 4)
+Row 4: Total Spent card (4) + MarketTrends (8)
+Row 5: All Transactions (8, rowSpan 2) + Category Breakdown (4)
+Row 6: Top Items / ItemAnalytics (12)
+```
+
+---
+
+### Success Criteria
+
+- [ ] `pos_transaction_staging` has APPROVED rows with `theoretical_grams` populated
+- [ ] Neo4j has `:Sale`→`[:ESTIMATES]`→`:ConsumptionEstimate`→`[:OF_INGREDIENT]`→`:Ingredient`
+- [ ] `/api/analytics/food-cost-variance` returns non-zero headline: revenue, theoretical COGS, actual spend
+- [ ] Dashboard gap card shows a colored €X,XXX number as the primary metric
+- [ ] `AIInsights` card text starts with a specific food cost number, not timing trivia
+- [ ] `npm test` passes; `npm run build` clean; no new `: any` usages
+

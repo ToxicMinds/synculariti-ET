@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 
 interface AggregatedItem {
   name: string;
@@ -81,7 +81,7 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
           };
         }
 
-        acc[nameKey].total_amount += Number(curr.amount || 0);
+        acc[nameKey].total_amount += safeAmount(curr.amount);
         acc[nameKey].count += 1;
 
         // Track latest context
@@ -118,7 +118,7 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {items.map((item, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div key={`${item.name}-${item.last_date}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</span>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

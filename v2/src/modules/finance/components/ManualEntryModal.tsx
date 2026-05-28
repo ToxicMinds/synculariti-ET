@@ -5,6 +5,7 @@ import { labelStyle, inputStyle } from '@/components/formStyles';
 import { Expense } from '../lib/finance';
 import { CategorySelector } from '@/components/CategorySelector';
 import { AppState } from '@/modules/identity/hooks/useTenant';
+import { safeAmount } from '@/lib/utils';
 import { useManualEntryForm } from '../hooks/useManualEntryForm';
 
 export interface ManualEntryPayload {
@@ -35,7 +36,7 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
     prefill: prefill ? {
       ...prefill,
       who_id: prefill.who_id || selectedUser,
-      amount: prefill.amount != null ? Number(prefill.amount) : undefined
+      amount: prefill.amount != null ? safeAmount(prefill.amount) : undefined
     } : undefined,
     names,
     onSave,

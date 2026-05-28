@@ -13,7 +13,7 @@ import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
 import { StatementScanner } from '@/modules/finance/components/StatementScanner';
 import { ItemAnalytics } from '@/modules/finance/components/ItemAnalytics';
 import { SpendingBreakdown, DailyTrend } from '@/modules/finance/components/FinanceCharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 import { AIInsights } from '@/modules/finance/components/AIInsights';
 import { OperatingMargin } from '@/modules/finance/components/OperatingMargin';
 import { BudgetHealth } from '@/modules/finance/components/BudgetHealth';
@@ -210,7 +210,7 @@ function DashboardContent() {
                 <ExpenseList 
                    transactions={displayTransactions} 
                   onDelete={softDeleteTransaction} 
-                  onEdit={(tx) => setManualEntry({ ...tx, amount: Number(tx.amount) })}
+                   onEdit={(tx) => setManualEntry({ ...tx, amount: safeAmount(tx.amount) })}
                 />
               </div>
             </BentoCard>

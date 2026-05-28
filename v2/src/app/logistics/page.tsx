@@ -40,7 +40,6 @@ function LogisticsDashboard() {
         </div>
         <div className="flex-row gap-2">
           <button className="btn btn-primary" onClick={() => setShowNewItem(true)}>➕ New Item</button>
-          <button className="btn btn-secondary">📦 Create PO</button>
         </div>
       </header>
 
@@ -68,7 +67,7 @@ function LogisticsDashboard() {
               </span>
             </div>
             <div className="glass-card p-3 rounded-xl">
-              <p className="card-subtitle" style={{ fontSize: 11 }}>PRO TIP: Use the "Create PO" button to restock items that are trending low.</p>
+              <p className="card-subtitle" style={{ fontSize: 11 }}>PRO TIP: Use the "New Item" button to add items to your catalog.</p>
             </div>
           </div>
         </BentoCard>
@@ -78,8 +77,7 @@ function LogisticsDashboard() {
            <div className="flex-center" style={{ padding: 48 }}>
              <div className="flex-col items-center gap-3">
                <span style={{ fontSize: 48 }}>📑</span>
-               <p className="card-subtitle">No active purchase orders.</p>
-               <button className="btn btn-secondary">View History</button>
+                <p className="card-subtitle">No active purchase orders.</p>
              </div>
            </div>
         </BentoCard>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useStatementScanner, ParsedTransaction } from '../hooks/useStatementScanner';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 
 interface StatementScannerProps {
   names: Record<string, string>;
@@ -96,7 +96,7 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
                       <span>{tx.category}</span>
                     </div>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{formatCurrency(Number(tx.amount))}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{formatCurrency(safeAmount(tx.amount))}</div>
                 </div>
               ))}
             </div>

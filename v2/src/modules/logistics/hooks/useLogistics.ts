@@ -13,7 +13,7 @@ export type { InventoryItemInput };
  */
 export function useLogistics(tenantId: string | undefined) {
   const { items, categories, stock, loading, refresh } = useInventory(tenantId);
-  const { receivePO, addItem } = useLogisticsSync(tenantId, refresh);
+  const { addItem } = useLogisticsSync(tenantId, refresh);
 
   return {
     items,
@@ -21,7 +21,6 @@ export function useLogistics(tenantId: string | undefined) {
     stock,
     loading,
     refresh,
-    receivePO,
     addItem
   };
 }

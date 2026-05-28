@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Transaction } from '../../lib/finance';
 import { useCalendarGrid } from '../../hooks/useCalendarGrid';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 
 interface CalendarGridProps {
   transactions: Transaction[];
@@ -19,8 +19,8 @@ export function CalendarGrid({ transactions, baseDate = new Date() }: CalendarGr
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
-        {['M','T','W','T','F','S','S'].map((d, i) => (
-          <div key={i} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', padding: '4px 0' }}>
+        {['M','T','W','T','F','S','S'].map((d) => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', padding: '4px 0' }}>
             {d}
           </div>
         ))}
@@ -71,7 +71,7 @@ export function CalendarGrid({ transactions, baseDate = new Date() }: CalendarGr
             <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0' }}>
               <span style={{ color: 'var(--text-primary)' }}>{t.description || t.category}</span>
               <span style={{ fontWeight: 600 }}>
-                {formatCurrency(Number(t.amount), t.currency)}
+                {formatCurrency(safeAmount(t.amount), t.currency)}
               </span>
             </div>
           ))}

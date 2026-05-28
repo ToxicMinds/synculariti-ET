@@ -2,7 +2,7 @@
 
 import { BentoCard } from '@/components/BentoCard';
 import { Transaction } from '../lib/finance';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeAmount } from '@/lib/utils';
 
 export function MonthlyPerformance({ 
   transactions, 
@@ -23,9 +23,9 @@ export function MonthlyPerformance({
 
   const currentMonthTx = transactions.filter(t => t.date?.startsWith(currentPrefix) && t.category !== 'Savings' && t.category !== 'Adjustment');
   const prevMonthTx = transactions.filter(t => t.date?.startsWith(prevPrefix) && t.category !== 'Savings' && t.category !== 'Adjustment');
+  const currentTotal = currentMonthTx.reduce((acc, t) => acc + safeAmount(t.amount), 0);
 
-  const currentTotal = currentMonthTx.reduce((acc, t) => acc + Number(t.amount), 0);
-  const prevTotal = prevMonthTx.reduce((acc, t) => acc + Number(t.amount), 0);
+  const prevTotal = prevMonthTx.reduce((acc, t) => acc + safeAmount(t.amount), 0);
 
   const diff = currentTotal - prevTotal;
   const pct = prevTotal > 0 ? (diff / prevTotal) * 100 : 0;
@@ -41,10 +41,10 @@ export function MonthlyPerformance({
 
   // Find biggest category increase
   const currentCats: Record<string, number> = {};
-  currentMonthTx.forEach(t => currentCats[t.category] = (currentCats[t.category] || 0) + Number(t.amount));
-  
+  currentMonthTx.forEach(t => currentCats[t.category] = (currentCats[t.category] || 0) + safeAmount(t.amount));
+
   const prevCats: Record<string, number> = {};
-  prevMonthTx.forEach(t => prevCats[t.category] = (prevCats[t.category] || 0) + Number(t.amount));
+  prevMonthTx.forEach(t => prevCats[t.category] = (prevCats[t.category] || 0) + safeAmount(t.amount));
 
   let biggestIncreaseCat = '';
   let maxIncrease = 0;

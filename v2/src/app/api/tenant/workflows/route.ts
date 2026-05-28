@@ -3,7 +3,7 @@ export const runtime = 'edge'
 import { NextResponse } from 'next/server'
 import { getErrorMessage } from '@synculariti/whatsapp-client'
 import { z } from 'zod'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/supabase-server'
 import { ServerLogger } from '@/lib/logger-server'
 
 const querySchema = z.object({
@@ -21,11 +21,7 @@ export const GET = async (req: Request) => {
       return NextResponse.json({ error: 'Missing X-Api-Key header' }, { status: 401 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const supabase = createServiceClient()
 
     const { data: keyRecord, error: keyError } = await supabase
       .from('api_keys')

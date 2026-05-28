@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { OpenWAClient, getErrorMessage } from '@synculariti/whatsapp-client';
-import { createClient } from '@supabase/supabase-js';
+import { getErrorMessage } from '@synculariti/whatsapp-client';
+import { createServiceClient } from '@/lib/supabase-server';
+import { createOpenWAClient } from '@/lib/create-openwa-client';
 import { ServerLogger } from '@/lib/logger-server';
 import { processOutboxQueue } from '@/modules/whatsapp/lib/processOutboxQueue';
 
@@ -11,16 +12,8 @@ export const GET = async (req: Request) => {
   }
 
   // Use service_role to bypass RLS on whatsapp_outbox
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    { auth: { autoRefreshToken: false, persistSession: false } }
-  );
-  const client = new OpenWAClient({
-    baseUrl: process.env.OPENWA_BASE_URL || 'http://34.66.35.89:2785',
-    apiKey: process.env.OPENWA_API_KEY || '',
-    sessionId: process.env.OPENWA_SESSION_ID || 'synculariti-bot',
-  });
+  const supabase = createServiceClient();
+  const client = createOpenWAClient();
 
   const result = await processOutboxQueue(
     supabase,
