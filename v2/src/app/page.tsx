@@ -12,17 +12,13 @@ import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
 import { StatementScanner } from '@/modules/finance/components/StatementScanner';
 import { ItemAnalytics } from '@/modules/finance/components/ItemAnalytics';
-import { SpendingBreakdown, DailyTrend } from '@/modules/finance/components/FinanceCharts';
 import { formatCurrency, safeAmount } from '@/lib/utils';
-import { AIInsights } from '@/modules/finance/components/AIInsights';
 import { FoodCostVarianceCard } from '@/modules/finance/components/FoodCostVarianceCard';
 import { NeedsAttentionCard } from '@/modules/finance/components/NeedsAttentionCard';
-import { OperatingMargin } from '@/modules/finance/components/OperatingMargin';
-import { BudgetHealth } from '@/modules/finance/components/BudgetHealth';
-import { TeamAllocation } from '@/modules/finance/components/TeamAllocation';
 import { CommandCenter } from '@/modules/finance/components/CommandCenter';
 import { MarketTrends } from '@/modules/finance/components/MarketTrends';
 import { MonthlyPerformance } from '@/modules/finance/components/MonthlyPerformance';
+import { SpendingBreakdown } from '@/modules/finance/components/FinanceCharts';
 import { ExpenseList } from '@/modules/finance/components/ExpenseList';
 import { ManualEntryModal, ManualEntryPayload } from '@/modules/finance/components/ManualEntryModal';
 import { ParsedTransaction } from '@/modules/finance/hooks/useStatementScanner';
@@ -92,8 +88,6 @@ function DashboardContent() {
   const activeTransactions = isDemo ? demoTransactions : transactions;
   const displayTransactions = activeTransactions.filter(t => t.date?.startsWith(selectedMonth));
   const totals = calcTotals(displayTransactions);
-  const totalIncome = Object.values(tenant.income || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
-  const totalBudget = Object.values(tenant.budgets || {}).reduce((a: number, b: unknown) => a + Number(b), 0);
   const monthlySavingsGoal = tenant.goals?.monthly_savings || 500;
 
   if (Object.keys(tenant.names || {}).length === 0) {
@@ -158,7 +152,7 @@ function DashboardContent() {
           </div>
         ) : (
           <>
-            {/* ROW 1: ACTION & PERFORMANCE */}
+            {/* ROW 1: SPEND OVERVIEW */}
             {isDemo && (
               <div style={{ gridColumn: 'span 12', padding: '12px 24px', borderRadius: 16, background: 'var(--bg-hover)', border: '1px solid var(--border-color)', marginBottom: -16, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 18 }}>💡</span>
@@ -175,25 +169,10 @@ function DashboardContent() {
               onStatement={() => setShowStatement(true)}
             />
 
-            {/* ROW 2: TEAM & BUDGET */}
-            <TeamAllocation transactions={displayTransactions} names={tenant.names} colSpan={6} />
-            <BudgetHealth spent={totals.spent} totalBudget={totalBudget} transactions={displayTransactions} colSpan={6} />
-
-            {/* ROW 3: STATUS & INTELLIGENCE */}
-            <OperatingMargin income={totalIncome} spent={totals.spent} goal={Number(monthlySavingsGoal)} />
-            <AIInsights 
-              tenantId={tenant.tenant_id} 
-              transactionCount={transactions.length} 
-              dataHash={transactions.length + '_' + totals.spent.toFixed(0)}
-              updateState={updateState} 
-              tenant={tenant} 
-              isDemo={isDemo}
-            />
-
-            {/* ROW 4: FOOD COST VARIANCE */}
+            {/* ROW 2: FOOD COST VARIANCE */}
             <FoodCostVarianceCard selectedMonth={selectedMonth} colSpan={8} />
 
-            {/* ROW 5: TRENDS & CONTEXT */}
+            {/* ROW 3: TRENDS & CONTEXT */}
             <BentoCard
               colSpan={4}
               title={`Total Spent (${selectedMonth})`}
@@ -207,12 +186,11 @@ function DashboardContent() {
                 {formatCurrency(totals.spent)}
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Spending for {selectedMonth}</p>
-              <div style={{ marginTop: 20 }}><DailyTrend transactions={displayTransactions} /></div>
             </BentoCard>
 
             <MarketTrends transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
 
-            {/* ROW 6: LIST & BREAKDOWN */}
+            {/* ROW 4: LIST & BREAKDOWN */}
             <BentoCard colSpan={8} rowSpan={2} title="All Transactions">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
@@ -227,8 +205,8 @@ function DashboardContent() {
               <SpendingBreakdown transactions={displayTransactions} />
             </BentoCard>
 
-            {/* ROW 7: DEEP ANALYTICS */}
-            <BentoCard colSpan={12} title="Top Items (Deep Analytics)">
+            {/* ROW 5: DEEP ANALYTICS */}
+            <BentoCard colSpan={12} title="Top Purchased Items (OPEX)">
               <ItemAnalytics isDemo={isDemo} />
             </BentoCard>
 

@@ -452,7 +452,32 @@ async function seed() {
   }
   console.log(`  ${purchaseCount} purchase records inserted`);
 
-  // 2g. Data Gaps (some days without POS data)
+  // 2g-bis. Attention-needing items (for NeedsAttention banner)
+  if (locationRows.length > 0) {
+    const loc = locationRows[0];
+    const accounts = Array.from(accountMap.values());
+    if (accounts.length > 0) {
+      await supabase.from('purchases').insert({
+        tenant_id: tenantId, location_id: loc.id, account_id: accounts[0],
+        total_amount: 89.50, purchase_date: '2026-06-15',
+        ingredient_id: 'ing-chicken-breast', ingredient_name: 'Kuracie prsia',
+        vendor_name: 'Bidfood Slovakia', quarantine_status: 'PENDING',
+      });
+      const { data: latest } = await supabase.from('purchases')
+        .select('id').eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false }).limit(1);
+      if (latest?.[0]) {
+        await supabase.from('purchase_anomaly_queue').insert({
+          tenant_id: tenantId, location_id: loc.id,
+          purchase_id: latest[0].id, check_type: 'price_spike',
+          severity: 'medium', status: 'OPEN',
+        });
+      }
+      console.log('  Seeded items needing attention');
+    }
+  }
+
+  // 2h. Data Gaps (some days without POS data)
   console.log('Seeding POS data gaps...');
   let gapCount = 0;
   for (let d = new Date(posStart); d <= posEnd; d.setUTCDate(d.getUTCDate() + 1)) {
