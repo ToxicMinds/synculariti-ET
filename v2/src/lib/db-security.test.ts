@@ -1,54 +1,11 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { createServiceClient } from '@/lib/supabase-server';
+import { supabase, checkFunctionSecurity } from '@/lib/db-security-helpers';
 import { BATCH_1_SECURITY_CONTRACT, BATCH_1_LANDMINE_CONTRACT } from './db-security-contract';
 import { safeCastUuid, safeCastUserUuid } from './uuid-helpers';
-import { RPC_GET_SECURITY_STATE, FunctionSecurityState } from './types';
-
-// Load .env.local synchronously for live database checks in NodeJS test environment
-const envPath = path.resolve(__dirname, '../../.env.local');
-if (fs.existsSync(envPath)) {
-  const envFile = fs.readFileSync(envPath, 'utf8');
-  envFile.split('\n').forEach(line => {
-    const match = line.match(/^([^#\s][^=]+)=(.*)$/);
-    if (match) {
-      process.env[match[1]] = match[2];
-    }
-  });
-}
-
-// Initialize real Supabase client with Service Role key to query catalog metadata
-const supabase = createServiceClient();
-
-// Helper to query function security state via live Supabase RPC
-async function checkFunctionSecurity(name: string, args: string): Promise<FunctionSecurityState> {
-  const { data, error } = await supabase.rpc(RPC_GET_SECURITY_STATE, {
-    p_func_name: name,
-    p_args_signature: args
-  });
-  
-  if (error) {
-    throw new Error(`Supabase RPC error: ${error.message}`);
-  }
-  
-  if (!data || data.length === 0) {
-    return { exists: false, hasSearchPathPublic: false, isRevokedFromPublic: false };
-  }
-  
-  // Return the security state mapping database fields to the frontend contract
-  return {
-    exists: data[0].func_exists,
-    hasSearchPathPublic: data[0].has_search_path_public,
-    isRevokedFromPublic: data[0].is_revoked_from_public
-  };
-}
-
 
 describe('Database Security Contract - Batch 1', () => {
   BATCH_1_SECURITY_CONTRACT.forEach(req => {
     test(`Function ${req.functionName}(${req.args}) should be hardened`, async () => {
       const state = await checkFunctionSecurity(req.functionName, req.args);
-      
       expect(state.exists).toBe(req.exists);
       expect(state.hasSearchPathPublic).toBe(req.hasSearchPathPublic);
       expect(state.isRevokedFromPublic).toBe(req.isRevokedFromPublic);
@@ -57,7 +14,6 @@ describe('Database Security Contract - Batch 1', () => {
 
   BATCH_1_LANDMINE_CONTRACT.forEach(req => {
     test(`Landmine ${req.functionName}(${req.args}) should not exist in hardening targets`, async () => {
-      // For landmines, we check if they exist in the DB
       const state = await checkFunctionSecurity(req.functionName, req.args);
       expect(state.exists).toBe(req.exists);
     });

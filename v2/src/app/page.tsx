@@ -15,6 +15,8 @@ import { ItemAnalytics } from '@/modules/finance/components/ItemAnalytics';
 import { SpendingBreakdown, DailyTrend } from '@/modules/finance/components/FinanceCharts';
 import { formatCurrency, safeAmount } from '@/lib/utils';
 import { AIInsights } from '@/modules/finance/components/AIInsights';
+import { FoodCostVarianceCard } from '@/modules/finance/components/FoodCostVarianceCard';
+import { QuarantineQueueCard } from '@/modules/finance/components/QuarantineQueueCard';
 import { OperatingMargin } from '@/modules/finance/components/OperatingMargin';
 import { BudgetHealth } from '@/modules/finance/components/BudgetHealth';
 import { TeamAllocation } from '@/modules/finance/components/TeamAllocation';
@@ -184,6 +186,10 @@ function DashboardContent() {
               tenant={tenant} 
               isDemo={isDemo}
             />
+
+            {/* ROW 4: FOOD COST VARIANCE */}
+            <FoodCostVarianceCard selectedMonth={selectedMonth} colSpan={8} />
+            <QuarantineQueueCard tenantId={tenant.tenant_id} selectedMonth={selectedMonth} colSpan={4} />
 
             {/* ROW 5: TRENDS & CONTEXT */}
             <BentoCard

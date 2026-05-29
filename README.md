@@ -56,5 +56,8 @@ For architecture deep-dives, design rules, and operational standards, refer to:
 - **[RULES.md](./RULES.md)** — Operational rulebook
 - **[SYMBOLS.md](./SYMBOLS.md)** — Symbol map for all hooks, interfaces, and routes
 - **[audit_report.md](./audit_report.md)** — Current system audit and backlog
+- **docs/architecture/** — Pipeline and boundary contract specs
+  - [`batch-ingestion-pipeline.md`](./docs/architecture/batch-ingestion-pipeline.md) — Batch Ingestion & Food Cost Variance Pipeline
+  - [`login-service-contract.md`](./docs/architecture/login-service-contract.md) — Login Service Boundary Contract
 
 *Built with ❤️ for High-Velocity Business Management.*

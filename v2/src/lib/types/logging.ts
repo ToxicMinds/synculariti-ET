@@ -12,6 +12,7 @@ export type LogComponent =
   | 'Sync' 
   | 'AI' 
   | 'Finance' 
+  | 'FCV'
   | 'Logistics' 
   | 'eKasa' 
   | 'OfflineQueue' 

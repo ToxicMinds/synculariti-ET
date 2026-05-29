@@ -639,7 +639,21 @@ curl -s -X POST https://synculariti-et.vercel.app/api/whatsapp/notify \
 | `notify/route.test.ts` | 11 | API key auth, body validation, service-key tenant resolution, idempotency |
 | `workflows/route.test.ts` | 6 | API key auth, per-tenant vs service-key access, missing tenant_id, 404 |
 
-### 6.10 Unified Error Message Extraction
+### 6.10 Food Cost Variance Formula Reference
+
+All FCV formulas, thresholds, and financial logic are documented in:
+`docs/finance/food-cost-variance.md`
+
+Key formulas captured there:
+- **Core gap**: `Actual Spend − Theoretical COGS`
+- **Direction logic**: BLEEDING/PROFITABLE/NEUTRAL based on gap > 5% of revenue
+- **Variance spikes**: HIGH_VARIANCE when actual > theoretical × 1.3, NEGATIVE_VARIANCE when actual < theoretical × 0.7
+- **Data coverage**: Uncertainty bands widen as POS coverage drops below 100%
+- **Per-ingredient share**: Each ingredient's gap as % of total gap
+
+Read this file before modifying any FCV logic to maintain formula consistency.
+
+### 6.11 Unified Error Message Extraction
 
 - **One function, zero duplication**: All error-to-string conversions MUST use `getErrorMessage(e)` from `@/lib/utils`. No inline `e instanceof Error ? e.message : String(e)` anywhere.
 - **Definition** (`src/lib/utils.ts`):

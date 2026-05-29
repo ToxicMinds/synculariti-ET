@@ -86,3 +86,69 @@ export const BATCH_1_LANDMINE_CONTRACT: FunctionSecurityRequirement[] = [
     exists: false
   }
 ];
+
+/**
+ * Batch 2: Phase 0 schema — purchases, quarantine queue, and release RPCs.
+ */
+export const BATCH_2_SECURITY_CONTRACT: FunctionSecurityRequirement[] = [
+  {
+    functionName: 'release_expired_quarantines_v1',
+    args: '',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+  },
+  {
+    functionName: 'approve_purchase_v1',
+    args: 'uuid, uuid',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+  },
+  {
+    functionName: 'reject_purchase_v1',
+    args: 'uuid, uuid, text',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+  },
+];
+
+export const BATCH_2_LANDMINE_CONTRACT: FunctionSecurityRequirement[] = [
+  {
+    functionName: 'release_expired_quarantines_v1',
+    args: 'integer',
+    exists: false,
+  },
+  {
+    functionName: 'approve_purchase_v1',
+    args: 'uuid',
+    exists: false,
+  },
+];
+
+/**
+ * Batch 3: POS staging — process_batch_v1 anomaly engine.
+ */
+export const BATCH_3_SECURITY_CONTRACT: FunctionSecurityRequirement[] = [
+  {
+    functionName: 'process_batch_v1',
+    args: 'uuid',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+  },
+];
+
+export const BATCH_3_LANDMINE_CONTRACT: FunctionSecurityRequirement[] = [
+  {
+    functionName: 'process_batch',
+    args: 'uuid',
+    exists: false,
+  },
+  {
+    functionName: 'process_batch_v1_wrong_name',
+    args: 'uuid',
+    exists: false,
+  },
+];
