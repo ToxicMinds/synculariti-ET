@@ -15,6 +15,7 @@ interface AttentionItems {
   openAnomalies: number;
   rejectedPurchases: number;
   dataGaps: number;
+  pendingApprovals: number;
 }
 
 export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCardProps) {
@@ -34,7 +35,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
   async function fetchItems() {
     setLoading(true);
     try {
-      const [pending, rejected, anomalies, gaps] = await Promise.all([
+      const [pending, rejected, anomalies, gaps, approvals] = await Promise.all([
         supabase.from('purchases').select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenantId).eq('quarantine_status', 'PENDING'),
         supabase.from('purchases').select('*', { count: 'exact', head: true })
@@ -43,6 +44,8 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
           .eq('tenant_id', tenantId).eq('status', 'OPEN'),
         supabase.from('pos_data_gaps').select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenantId).gte('gap_date', periodStart).lte('gap_date', periodEnd),
+        supabase.from('whatsapp_outbox').select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId).in('status', ['PENDING', 'SENT']),
       ]);
 
       setItems({
@@ -50,6 +53,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
         rejectedPurchases: rejected.count ?? 0,
         openAnomalies: anomalies.count ?? 0,
         dataGaps: gaps.count ?? 0,
+        pendingApprovals: approvals.count ?? 0,
       });
     } catch (e: unknown) {
       Logger.system('ERROR', 'FCV', 'Attention fetch failed', { error: getErrorMessage(e) });
@@ -60,7 +64,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
 
   if (loading || !items) return null;
 
-  const totalAttention = items.pendingPurchases + items.openAnomalies + items.rejectedPurchases;
+  const totalAttention = items.pendingPurchases + items.openAnomalies + items.rejectedPurchases + items.pendingApprovals;
   const hasGaps = items.dataGaps > 0;
 
   if (totalAttention === 0 && !hasGaps) return null;
@@ -71,6 +75,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
   if (items.pendingPurchases > 0) chips.push(`${items.pendingPurchases} pending purchase${items.pendingPurchases > 1 ? 's' : ''}`);
   if (items.openAnomalies > 0) chips.push(`${items.openAnomalies} anomal${items.openAnomalies > 1 ? 'ies' : 'y'}`);
   if (items.rejectedPurchases > 0) chips.push(`${items.rejectedPurchases} rejected`);
+  if (items.pendingApprovals > 0) chips.push(`${items.pendingApprovals} pending approval${items.pendingApprovals > 1 ? 's' : ''}`);
   if (items.dataGaps > 0) chips.push(`${items.dataGaps} data gap${items.dataGaps > 1 ? 's' : ''}`);
 
   return (

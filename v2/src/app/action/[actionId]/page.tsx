@@ -3,8 +3,9 @@ import { createClient as createSessionClient, createServiceClient } from '@/lib/
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ActionClient } from './ActionClient';
-import { formatCurrency, safeAmount } from '@/lib/utils';
+import { formatCurrency, safeAmount, getErrorMessage } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ServerLogger } from '@/lib/logger-server';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://synculariti-et.vercel.app';
 
@@ -68,33 +69,88 @@ export default async function ActionPage({ params }: PageProps) {
   );
 }
 
-async function ActionPageLoader({ actionId }: { actionId: string }) {
-  // Use session-based client — only logged-in users can act
-  const supabase = await createSessionClient();
+/** @internal exported for testing */
+export async function ActionPageLoader({ actionId }: { actionId: string }) {
+  // 1. Authenticate via session cookies (matches withAuth.ts pattern)
+  const sessionSupabase = await createSessionClient();
+  const { data: { session }, error: sessionError } = await sessionSupabase.auth.getSession();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
+  if (sessionError || !session?.user) {
+    await ServerLogger.system('WARN', 'WhatsApp', 'Action page — no session', {
+      actionId,
+      error: getErrorMessage(sessionError),
+    });
     redirect(`/login?redirect=/action/${actionId}`);
   }
 
-  // Fetch the outbox record (RLS applies: tenant_id = get_my_tenant())
-  const { data: record, error } = await supabase
+  const user = session.user;
+  const userEmail = user.email;
+
+  // 2. Read outbox via service_role client (bypasses RLS tenant filter)
+  //    The user received this link via WhatsApp — the outbox ID is an unguessable UUID.
+  //    Security is enforced by verifying tenant membership below.
+  const serviceClient = createServiceClient();
+  const { data: record, error: outboxErr } = await serviceClient
     .from('whatsapp_outbox')
-    .select('*, tenants!inner(name)')
+    .select('*, tenants!inner(name, id)')
     .eq('id', actionId)
     .single();
 
-  if (error || !record) {
-    return (
-      <div className="bento-card glass-card flex-col flex-center gap-4" style={{ padding: '40px 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: '48px' }}>⚠️</div>
-        <h2 className="card-title text-gradient">Action Not Found</h2>
-        <p className="card-subtitle" style={{ maxWidth: '320px' }}>
-          This action does not belong to your account or has expired.
-        </p>
-      </div>
-    );
+  if (outboxErr || !record) {
+    const errCode = (outboxErr as { code?: string })?.code || 'N/A';
+    const errMsg = getErrorMessage(outboxErr);
+    await ServerLogger.system('WARN', 'WhatsApp', 'Action page — outbox not found', {
+      actionId,
+      error: errMsg,
+      errorCode: errCode,
+      userEmail: userEmail || null,
+    });
+    return <ActionNotFound />;
   }
+
+  if (!userEmail) {
+    await ServerLogger.system('WARN', 'WhatsApp', 'Action page — user has no email, rejecting', {
+      actionId,
+      tenantId: record.tenants?.id,
+      userId: user.id,
+    });
+    return <ActionNotFound />;
+  }
+
+  // 3. Verify the authenticated user is a member of the outbox's tenant
+  const { data: member, error: memberErr } = await serviceClient
+    .from('tenant_members')
+    .select('id, role')
+    .eq('tenant_id', record.tenants.id)
+    .eq('email', userEmail)
+    .maybeSingle();
+
+  if (memberErr) {
+    await ServerLogger.system('WARN', 'WhatsApp', 'Action page — membership query failed', {
+      actionId,
+      tenantId: record.tenants.id,
+      userEmail,
+      error: getErrorMessage(memberErr),
+    });
+  }
+
+  if (!member) {
+    await ServerLogger.system('WARN', 'WhatsApp', 'Action page — user not a tenant member', {
+      actionId,
+      tenantId: record.tenants.id,
+      tenantName: record.tenants?.name,
+      userEmail,
+    });
+    return <ActionNotFound />;
+  }
+
+  await ServerLogger.system('INFO', 'WhatsApp', 'Action page — user authorized', {
+    actionId,
+    tenantId: record.tenants.id,
+    tenantName: record.tenants?.name,
+    userEmail,
+    role: member.role,
+  });
 
   if (record.status === 'COMPLETED') {
     return (
@@ -122,5 +178,18 @@ async function ActionPageLoader({ actionId }: { actionId: string }) {
       tenantName={tenantName}
       payload={clientPayload}
     />
+  );
+}
+
+/** @internal exported for testing */
+export function ActionNotFound() {
+  return (
+    <div className="bento-card glass-card flex-col flex-center gap-4" style={{ padding: '40px 24px', textAlign: 'center' }}>
+      <div style={{ fontSize: '48px' }}>⚠️</div>
+      <h2 className="card-title text-gradient">Action Not Found</h2>
+      <p className="card-subtitle" style={{ maxWidth: '320px' }}>
+        This action does not belong to your account or has expired.
+      </p>
+    </div>
   );
 }
