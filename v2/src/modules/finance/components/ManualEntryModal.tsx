@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { labelStyle, inputStyle } from '@/components/formStyles';
 import { Expense } from '../lib/finance';
 import { CategorySelector } from '@/components/CategorySelector';
@@ -17,10 +17,11 @@ export interface ManualEntryPayload {
   who_id: string;
   who: string;
   date: string;
+  recurring_id?: string;
 }
 
 interface ManualEntryProps {
-  prefill?: Partial<Expense> & { merchant?: string };
+  prefill?: Partial<Expense> & { merchant?: string; recurring_id?: string };
   tenant: AppState;
   selectedUser: string;
   onSave: (entry: ManualEntryPayload) => Promise<void>;
@@ -31,6 +32,14 @@ interface ManualEntryProps {
 export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddCategory, onClose }: ManualEntryProps) {
   const names = (tenant.names || {}) as Record<string, string>;
   const categories = tenant.categories || [];
+  const [isRecurring, setIsRecurring] = useState(prefill?.recurring_id ? true : false);
+
+  const handleSaveWithRecurring = async (entry: ManualEntryPayload) => {
+    if (isRecurring && !entry.recurring_id) {
+      entry.recurring_id = crypto.randomUUID();
+    }
+    await onSave(entry);
+  };
 
   const form = useManualEntryForm({
     prefill: prefill ? {
@@ -39,7 +48,7 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
       amount: prefill.amount != null ? safeAmount(prefill.amount) : undefined
     } : undefined,
     names,
-    onSave,
+    onSave: handleSaveWithRecurring,
     onClose
   });
 
@@ -163,7 +172,7 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
 
           {/* Who */}
           <div>
-            <label style={labelStyle}>Who is this for?</label>
+            <label style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: 600 }}>Who is this for?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               {Object.entries(names).map(([id, name]) => (
                 <button
@@ -183,6 +192,19 @@ export function ManualEntryModal({ prefill, tenant, selectedUser, onSave, onAddC
               ))}
             </div>
           </div>
+
+          {/* Recurring toggle */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 0' }}>
+            <input
+              type="checkbox"
+              checked={isRecurring}
+              onChange={e => setIsRecurring(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+              🔄 Recurring expense (repeats monthly)
+            </span>
+          </label>
 
           {form.error && (
             <p style={{ fontSize: 13, color: 'var(--accent-danger)', background: 'rgba(239, 68, 68, 0.1)', padding: '8px 12px', borderRadius: 8 }}>

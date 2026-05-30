@@ -5,7 +5,6 @@ import { BentoCard } from '@/components/BentoCard';
 import { CATEGORY_ICONS } from '@/lib/constants';
 
 const QUICK_ACTIONS = [
-  { label: `${CATEGORY_ICONS['Food Costs'] || '🍎'} Inventory`, category: 'Food Costs' },
   { label: `${CATEGORY_ICONS['Labor & Wages'] || '👥'} Labor`, category: 'Labor & Wages' },
   { label: `${CATEGORY_ICONS['Utilities'] || '⚡'} Utilities`, category: 'Utilities' },
   { label: `${CATEGORY_ICONS['Supplies'] || '📦'} Supplies`, category: 'Supplies' },
@@ -42,7 +41,7 @@ export function CommandCenter({ onScan, onManual, onStatement }: { onScan: () =>
 
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10, letterSpacing: '0.05em' }}>
-            ⚡ Quick Add
+            ⚡ Quick Add (OPEX)
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {QUICK_ACTIONS.map((action) => (

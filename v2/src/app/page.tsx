@@ -7,7 +7,6 @@ import { useTenant } from '@/modules/identity/hooks/useTenant';
 import { useTransactions } from '@/modules/finance/hooks/useTransactions';
 import { useSync } from '@/modules/finance/hooks/useSync';
 import { ReceiptData } from '@/modules/finance/hooks/useScannerState';
-import { calcTotals } from '@/modules/finance/lib/finance';
 import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
 import { StatementScanner } from '@/modules/finance/components/StatementScanner';
@@ -16,9 +15,7 @@ import { formatCurrency, safeAmount } from '@/lib/utils';
 import { FoodCostVarianceCard } from '@/modules/finance/components/FoodCostVarianceCard';
 import { NeedsAttentionCard } from '@/modules/finance/components/NeedsAttentionCard';
 import { CommandCenter } from '@/modules/finance/components/CommandCenter';
-import { MarketTrends } from '@/modules/finance/components/MarketTrends';
 import { MonthlyPerformance } from '@/modules/finance/components/MonthlyPerformance';
-import { SpendingBreakdown } from '@/modules/finance/components/FinanceCharts';
 import { ExpenseList } from '@/modules/finance/components/ExpenseList';
 import { ManualEntryModal, ManualEntryPayload } from '@/modules/finance/components/ManualEntryModal';
 import { ParsedTransaction } from '@/modules/finance/hooks/useStatementScanner';
@@ -86,9 +83,6 @@ function DashboardContent() {
   ] : [];
 
   const activeTransactions = isDemo ? demoTransactions : transactions;
-  const displayTransactions = activeTransactions.filter(t => t.date?.startsWith(selectedMonth));
-  const totals = calcTotals(displayTransactions);
-  const monthlySavingsGoal = tenant.goals?.monthly_savings || 500;
 
   if (Object.keys(tenant.names || {}).length === 0) {
     return (
@@ -172,45 +166,23 @@ function DashboardContent() {
             {/* ROW 2: FOOD COST VARIANCE */}
             <FoodCostVarianceCard selectedMonth={selectedMonth} colSpan={8} />
 
-            {/* ROW 3: TRENDS & CONTEXT */}
-            <BentoCard
-              colSpan={4}
-              title={`Total Spent (${selectedMonth})`}
-              tooltip={{
-                title: "Total Spent",
-                explanation: "Sum of all non-Savings, non-Adjustment transactions for your tenant for the selected month.",
-                formula: "Σ(amount) WHERE category ≠ 'Savings' AND is_deleted = false"
-              }}
-            >
-              <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em' }}>
-                {formatCurrency(totals.spent)}
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>Spending for {selectedMonth}</p>
-            </BentoCard>
-
-            <MarketTrends transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
-
-            {/* ROW 4: LIST & BREAKDOWN */}
-            <BentoCard colSpan={8} rowSpan={2} title="All Transactions">
+            {/* ROW 3: LIST & TRANSACTIONS */}
+            <BentoCard colSpan={12} rowSpan={2} title="All Transactions">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
-                   transactions={displayTransactions} 
+                   transactions={activeTransactions.filter(t => t.date?.startsWith(selectedMonth))} 
                   onDelete={softDeleteTransaction} 
                    onEdit={(tx) => setManualEntry({ ...tx, amount: safeAmount(tx.amount) })}
                 />
               </div>
             </BentoCard>
 
-            <BentoCard colSpan={4} title="Category Breakdown">
-              <SpendingBreakdown transactions={displayTransactions} />
-            </BentoCard>
-
-            {/* ROW 5: DEEP ANALYTICS */}
+            {/* ROW 4: DEEP ANALYTICS */}
             <BentoCard colSpan={12} title="Top Purchased Items (OPEX)">
               <ItemAnalytics isDemo={isDemo} />
             </BentoCard>
 
-            {displayTransactions.length === 0 && (
+            {activeTransactions.filter(t => t.date?.startsWith(selectedMonth)).length === 0 && (
               <BentoCard colSpan={12} title="Timeframe Status">
                 <div style={{ textAlign: 'center', padding: '48px 0' }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>🗓️</div>

@@ -4,6 +4,17 @@ import { BentoCard } from '@/components/BentoCard';
 import { Transaction } from '../lib/finance';
 import { formatCurrency, safeAmount } from '@/lib/utils';
 
+const CATEGORY_COLORS: Record<string, string> = {
+  'Food Costs': '#ef4444',
+  'Labor & Wages': '#f59e0b',
+  'Utilities': '#3b82f6',
+  'Supplies': '#8b5cf6',
+  'Rent': '#10b981',
+  'Insurance': '#ec4899',
+  'Admin': '#6366f1',
+  'Marketing': '#14b8a6',
+};
+
 export function MonthlyPerformance({ 
   transactions, 
   selectedMonth,
@@ -30,21 +41,22 @@ export function MonthlyPerformance({
   const diff = currentTotal - prevTotal;
   const pct = prevTotal > 0 ? (diff / prevTotal) * 100 : 0;
   
-  const isBetter = diff <= 0; // Spending less is better
+  const isBetter = diff <= 0;
   const colorClass = isBetter ? 'status-success' : 'status-danger';
   const colorHex = isBetter ? '#10b981' : '#ef4444';
 
-  // Smart states
   const isNewMonthNoData = currentTotal === 0;
   const isFirstMonthEver = prevMonthTx.length === 0;
   const hasSomeData = currentMonthTx.length > 0 || prevMonthTx.length > 0;
 
-  // Find biggest category increase
+  // Category breakdown
   const currentCats: Record<string, number> = {};
   currentMonthTx.forEach(t => currentCats[t.category] = (currentCats[t.category] || 0) + safeAmount(t.amount));
 
   const prevCats: Record<string, number> = {};
   prevMonthTx.forEach(t => prevCats[t.category] = (prevCats[t.category] || 0) + safeAmount(t.amount));
+
+  const sortedCats = Object.entries(currentCats).sort(([, a], [, b]) => b - a);
 
   let biggestIncreaseCat = '';
   let maxIncrease = 0;
@@ -58,13 +70,15 @@ export function MonthlyPerformance({
   });
 
   return (
-    <BentoCard title="Monthly Performance" colSpan={colSpan}>
+    <BentoCard title="Spend Comparison" colSpan={colSpan}>
       <div className="flex-col gap-4">
+        {/* Total Spent */}
         <div>
-          <p className="card-subtitle">Spent this month</p>
+          <p className="card-subtitle">Total spent</p>
           <div className="card-title" style={{ fontSize: 32 }}>{formatCurrency(currentTotal)}</div>
         </div>
 
+        {/* Comparison vs last month */}
         {!hasSomeData ? (
           <div className="flex-col items-center gap-2 py-4">
             <div style={{ fontSize: 24 }}>📊</div>
@@ -73,14 +87,14 @@ export function MonthlyPerformance({
         ) : isNewMonthNoData ? (
           <div className="flex-row items-center gap-3 p-3 glass-card rounded-xl">
             <div style={{ fontSize: 20 }}>✨</div>
-            <p className="card-subtitle">It's a new month! Start scanning receipts to see your performance.</p>
+            <p className="card-subtitle">It's a new month! Start scanning receipts to see how your spending changes.</p>
           </div>
         ) : isFirstMonthEver ? (
           <div className="flex-row items-center gap-3 p-3 glass-card rounded-xl">
             <div style={{ fontSize: 20 }}>🚀</div>
             <div className="flex-col">
               <p className="card-title" style={{ fontSize: 14 }}>First month of tracking!</p>
-              <p className="card-subtitle">We'll show comparisons once you have two months of data.</p>
+              <p className="card-subtitle">We'll show trend comparisons once you have two months of data.</p>
             </div>
           </div>
         ) : (
@@ -98,21 +112,40 @@ export function MonthlyPerformance({
                 </p>
               </div>
             </div>
-            
-            <div className="p-3 glass-card rounded-xl">
-              <p className="card-subtitle" style={{ lineHeight: 1.5 }}>
-                {maxIncrease > 20 ? (
-                  <>
-                    ⚠️ Your <strong>{biggestIncreaseCat}</strong> spending is up by <strong>{formatCurrency(maxIncrease)}</strong> compared to last month.
-                  </>
-                ) : isBetter ? (
-                  "✨ Great job! You're trending lower than last month. Keep it up!"
-                ) : (
-                  "You've spent slightly more than last month. Watch your variable expenses."
-                )}
-              </p>
-            </div>
+
+            {maxIncrease > 20 && (
+              <div className="p-3 glass-card rounded-xl">
+                <p className="card-subtitle" style={{ lineHeight: 1.5 }}>
+                  ⚠️ Your <strong>{biggestIncreaseCat}</strong> spending is up by <strong>{formatCurrency(maxIncrease)}</strong> compared to last month.
+                </p>
+              </div>
+            )}
           </>
+        )}
+
+        {/* Category Breakdown */}
+        {sortedCats.length > 0 && (
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.05em' }}>
+              By Category
+            </p>
+            <div className="flex-col gap-2">
+              {sortedCats.slice(0, 6).map(([cat, amount]) => {
+                const pctOfTotal = currentTotal > 0 ? (amount / currentTotal) * 100 : 0;
+                const color = CATEGORY_COLORS[cat] || '#6366f1';
+                return (
+                  <div key={cat} className="flex-row items-center gap-2" style={{ fontSize: 12 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {cat}
+                    </span>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{formatCurrency(amount)}</span>
+                    <span style={{ color: 'var(--text-muted)', width: 36, textAlign: 'right' }}>{pctOfTotal.toFixed(0)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
     </BentoCard>
