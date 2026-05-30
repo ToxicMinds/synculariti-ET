@@ -7,6 +7,8 @@ const mockOrder = jest.fn();
 const mockLimit = jest.fn();
 const mockIn = jest.fn();
 const mockSelect = jest.fn();
+const mockUpdate = jest.fn();
+const mockEq = jest.fn();
 
 jest.mock('@synculariti/whatsapp-client', () => ({
   OpenWAClient: jest.fn(() => ({
@@ -32,6 +34,7 @@ function makeSupabase() {
           in: mockIn,
           order: mockOrder,
           limit: mockLimit,
+          update: mockUpdate,
         };
       }
       return {};
@@ -67,6 +70,8 @@ function makePollRecord(overrides: Record<string, unknown> = {}) {
 describe('processOutboxQueue', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUpdate.mockReturnValue({ eq: mockEq });
+    mockEq.mockResolvedValue({ data: null, error: null });
   });
 
   describe('record claiming via RPC', () => {

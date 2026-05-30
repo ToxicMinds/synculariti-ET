@@ -62,6 +62,15 @@ export async function processOutboxQueue(
         p_success: success,
       });
 
+      // Auto-complete text-type messages — no user action needed,
+      // so they won't appear in NeedsAttentionCard's PENDING/SENT query
+      if (success && record.payload?.type === 'text') {
+        await supabase
+          .from('whatsapp_outbox')
+          .update({ status: 'COMPLETED' })
+          .eq('id', record.id);
+      }
+
       if (success) {
         processed++;
         await ServerLogger.system('INFO', 'WhatsApp', `Delivered to ${record.recipient_phone}`, {
