@@ -51,9 +51,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
           .eq('tenant_id', tenantId).eq('status', 'OPEN'),
         supabase.from('pos_data_gaps').select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenantId).gte('gap_date', periodStart).lte('gap_date', periodEnd),
-        supabase.from('whatsapp_outbox').select('id, payload')
-          .eq('tenant_id', tenantId).in('status', ['PENDING', 'SENT'])
-          .order('created_at', { ascending: false }).limit(5),
+        supabase.rpc('get_pending_approvals_v1'),
       ]);
 
       setItems({
@@ -61,7 +59,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
         rejectedPurchases: rejected.count ?? 0,
         openAnomalies: anomalies.count ?? 0,
         dataGaps: gaps.count ?? 0,
-        pendingApprovals: (approvalRows.data || []).map(r => ({
+        pendingApprovals: (approvalRows.data || []).map((r: { id: string; payload: Record<string, unknown> }) => ({
           id: r.id,
           name: (r.payload as { name?: string })?.name || 'Action Required',
         })),

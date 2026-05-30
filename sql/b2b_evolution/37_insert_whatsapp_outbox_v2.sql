@@ -11,7 +11,8 @@ CREATE OR REPLACE FUNCTION public.insert_whatsapp_outbox_v2(
   p_api_key_id UUID DEFAULT NULL,
   p_webhook_url TEXT DEFAULT NULL,
   p_webhook_secret TEXT DEFAULT NULL,
-  p_idempotency_key UUID DEFAULT NULL
+  p_idempotency_key UUID DEFAULT NULL,
+  p_recipient_email TEXT DEFAULT NULL
 )
 RETURNS SETOF public.whatsapp_outbox
 LANGUAGE plpgsql
@@ -20,9 +21,9 @@ AS $$
 BEGIN
   RETURN QUERY
   INSERT INTO public.whatsapp_outbox
-    (tenant_id, recipient_phone, payload, status, api_key_id, webhook_url, webhook_secret, idempotency_key)
+    (tenant_id, recipient_phone, payload, status, api_key_id, webhook_url, webhook_secret, idempotency_key, recipient_email)
   VALUES
-    (p_tenant_id, p_recipient_phone, p_payload, 'PENDING', p_api_key_id, p_webhook_url, p_webhook_secret, p_idempotency_key)
+    (p_tenant_id, p_recipient_phone, p_payload, 'PENDING', p_api_key_id, p_webhook_url, p_webhook_secret, p_idempotency_key, p_recipient_email)
   RETURNING *;
 END;
 $$;
