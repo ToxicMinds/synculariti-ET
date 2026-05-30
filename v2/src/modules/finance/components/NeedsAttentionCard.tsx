@@ -51,7 +51,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
           .eq('tenant_id', tenantId).eq('status', 'OPEN'),
         supabase.from('pos_data_gaps').select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenantId).gte('gap_date', periodStart).lte('gap_date', periodEnd),
-        supabase.from('whatsapp_outbox').select('id, payload->>name')
+        supabase.from('whatsapp_outbox').select('id, payload')
           .eq('tenant_id', tenantId).in('status', ['PENDING', 'SENT'])
           .order('created_at', { ascending: false }).limit(5),
       ]);
@@ -63,7 +63,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
         dataGaps: gaps.count ?? 0,
         pendingApprovals: (approvalRows.data || []).map(r => ({
           id: r.id,
-          name: r.name || 'Action Required',
+          name: (r.payload as { name?: string })?.name || 'Action Required',
         })),
       });
     } catch (e: unknown) {
@@ -138,8 +138,8 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
               fontWeight: 600,
               padding: '3px 10px',
               borderRadius: 8,
-              background: 'var(--accent-warn)',
-              color: '#fff',
+              background: '#fef3cd',
+              color: '#92400e',
               whiteSpace: 'nowrap',
               textDecoration: 'none',
               display: 'inline-flex',

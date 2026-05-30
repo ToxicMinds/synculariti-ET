@@ -14,6 +14,10 @@ export async function fireWebhook(
   secret: string,
   payload: WebhookPayload
 ): Promise<{ ok: boolean; status: number }> {
+  if (!url) {
+    return { ok: true, status: 204 };
+  }
+
   const payloadString = JSON.stringify(payload);
   const signature = await signHmacPayload(payloadString, secret);
 

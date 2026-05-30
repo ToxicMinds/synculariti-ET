@@ -50,9 +50,9 @@ export function ActionClient({ actionId, tenantName, payload }: ActionClientProp
         <p className="card-subtitle" style={{ maxWidth: '320px' }}>
           Thank you. Your selection of <strong>"{selectedOption}"</strong> has been securely logged and processed by {tenantName}.
         </p>
-        <p className="card-subtitle" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          You can safely close this window now.
-        </p>
+        <a href="/" className="btn btn-primary" style={{ marginTop: 16, padding: '12px 24px', textDecoration: 'none' }}>
+          ← Back to Dashboard
+        </a>
       </div>
     );
   }
