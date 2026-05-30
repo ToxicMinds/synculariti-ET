@@ -22,8 +22,17 @@ export async function dispatchDecision(
       return { success: false, error: `Action failed: ${rpcError}` };
     }
 
-    if (!result || result.status === 'NOT_FOUND') {
+    if (!result) {
       return { success: false, error: 'Action not found, already completed, or expired' };
+    }
+
+    if (result.status === 'NOT_FOUND') {
+      return { success: false, error: 'Action not found, already completed, or expired' };
+    }
+
+    if (result.status === 'COMPLETED_SKIP_WEBHOOK') {
+      await ServerLogger.system('INFO', 'WhatsApp', 'Action already completed — skip webhook', { outboxId: actionId });
+      return { success: true };
     }
 
     // Build and dispatch webhook (best-effort after atomic status update)

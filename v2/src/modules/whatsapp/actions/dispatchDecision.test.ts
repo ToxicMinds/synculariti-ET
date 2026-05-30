@@ -102,3 +102,39 @@ describe('Server Action: dispatchDecision', () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe('dispatchDecision: COMPLETED_SKIP_WEBHOOK', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSupabaseClient();
+  });
+
+  it('should return success without calling fetch when status is COMPLETED_SKIP_WEBHOOK', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        status: 'COMPLETED_SKIP_WEBHOOK',
+        webhook_url: null,
+        webhook_secret: null,
+        payload: null,
+      },
+      error: null,
+    });
+
+    const result = await dispatchDecision('already-done-id', 'Approve');
+
+    expect(result.success).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('should return error when RPC returns null data (outbox deleted or not found)', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    const result = await dispatchDecision('ghost-id', 'Approve');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Action not found');
+  });
+});

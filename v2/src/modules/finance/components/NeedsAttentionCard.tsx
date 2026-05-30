@@ -10,13 +10,20 @@ interface NeedsAttentionCardProps {
   selectedMonth: string;
 }
 
+interface PendingApproval {
+  id: string;
+  name: string;
+}
+
 interface AttentionItems {
   pendingPurchases: number;
   openAnomalies: number;
   rejectedPurchases: number;
   dataGaps: number;
-  pendingApprovals: number;
+  pendingApprovals: PendingApproval[];
 }
+
+const BASE = process.env.NEXT_PUBLIC_BASE_URL || 'https://synculariti-et.vercel.app';
 
 export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCardProps) {
   const [items, setItems] = useState<AttentionItems | null>(null);
@@ -35,7 +42,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
   async function fetchItems() {
     setLoading(true);
     try {
-      const [pending, rejected, anomalies, gaps, approvals] = await Promise.all([
+      const [pending, rejected, anomalies, gaps, approvalRows] = await Promise.all([
         supabase.from('purchases').select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenantId).eq('quarantine_status', 'PENDING'),
         supabase.from('purchases').select('*', { count: 'exact', head: true })
@@ -44,8 +51,9 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
           .eq('tenant_id', tenantId).eq('status', 'OPEN'),
         supabase.from('pos_data_gaps').select('*', { count: 'exact', head: true })
           .eq('tenant_id', tenantId).gte('gap_date', periodStart).lte('gap_date', periodEnd),
-        supabase.from('whatsapp_outbox').select('*', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId).in('status', ['PENDING', 'SENT']),
+        supabase.from('whatsapp_outbox').select('id, payload->>name')
+          .eq('tenant_id', tenantId).in('status', ['PENDING', 'SENT'])
+          .order('created_at', { ascending: false }).limit(5),
       ]);
 
       setItems({
@@ -53,7 +61,10 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
         rejectedPurchases: rejected.count ?? 0,
         openAnomalies: anomalies.count ?? 0,
         dataGaps: gaps.count ?? 0,
-        pendingApprovals: approvals.count ?? 0,
+        pendingApprovals: (approvalRows.data || []).map(r => ({
+          id: r.id,
+          name: r.name || 'Action Required',
+        })),
       });
     } catch (e: unknown) {
       Logger.system('ERROR', 'FCV', 'Attention fetch failed', { error: getErrorMessage(e) });
@@ -64,19 +75,18 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
 
   if (loading || !items) return null;
 
-  const totalAttention = items.pendingPurchases + items.openAnomalies + items.rejectedPurchases + items.pendingApprovals;
+  const totalAttention = items.pendingPurchases + items.openAnomalies + items.rejectedPurchases + items.pendingApprovals.length;
   const hasGaps = items.dataGaps > 0;
 
   if (totalAttention === 0 && !hasGaps) return null;
 
   const attentionType = totalAttention > 0 ? 'error' : 'warning';
 
-  const chips: string[] = [];
-  if (items.pendingPurchases > 0) chips.push(`${items.pendingPurchases} pending purchase${items.pendingPurchases > 1 ? 's' : ''}`);
-  if (items.openAnomalies > 0) chips.push(`${items.openAnomalies} anomal${items.openAnomalies > 1 ? 'ies' : 'y'}`);
-  if (items.rejectedPurchases > 0) chips.push(`${items.rejectedPurchases} rejected`);
-  if (items.pendingApprovals > 0) chips.push(`${items.pendingApprovals} pending approval${items.pendingApprovals > 1 ? 's' : ''}`);
-  if (items.dataGaps > 0) chips.push(`${items.dataGaps} data gap${items.dataGaps > 1 ? 's' : ''}`);
+  const chips: { text: string; href?: string }[] = [];
+  if (items.pendingPurchases > 0) chips.push({ text: `${items.pendingPurchases} pending purchase${items.pendingPurchases > 1 ? 's' : ''}` });
+  if (items.openAnomalies > 0) chips.push({ text: `${items.openAnomalies} anomal${items.openAnomalies > 1 ? 'ies' : 'y'}` });
+  if (items.rejectedPurchases > 0) chips.push({ text: `${items.rejectedPurchases} rejected` });
+  if (items.dataGaps > 0) chips.push({ text: `${items.dataGaps} data gap${items.dataGaps > 1 ? 's' : ''}` });
 
   return (
     <div style={{
@@ -105,7 +115,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
           ? `${totalAttention} item${totalAttention > 1 ? 's' : ''} need${totalAttention === 1 ? 's' : ''} your attention`
           : 'POS data gaps detected'}
       </span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         {chips.map((chip, i) => (
           <span key={i} style={{
             fontSize: 11,
@@ -116,8 +126,29 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
             color: 'var(--text-secondary)',
             whiteSpace: 'nowrap',
           }}>
-            {chip}
+            {chip.text}
           </span>
+        ))}
+        {items.pendingApprovals.map((a) => (
+          <a
+            key={a.id}
+            href={`/action/${a.id}`}
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              padding: '3px 10px',
+              borderRadius: 8,
+              background: 'var(--accent-warn)',
+              color: '#fff',
+              whiteSpace: 'nowrap',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            {a.name.substring(0, 30)}{a.name.length > 30 ? '…' : ''} →
+          </a>
         ))}
       </div>
     </div>

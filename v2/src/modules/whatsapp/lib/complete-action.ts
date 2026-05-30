@@ -1,7 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export type CompletionStatus = 'COMPLETED' | 'NOT_FOUND' | 'COMPLETED_SKIP_WEBHOOK';
+
 export interface CompleteActionResult {
-  status: string;
+  status: CompletionStatus;
   webhook_url: string | null;
   webhook_secret: string;
   payload: {
