@@ -606,6 +606,74 @@ async function seed() {
     } // end transaction generation for loop
   } // end else (skip if transactions already exist)
 
+  // ====== 5. Tenant Members & Config ======
+  console.log('Setting up tenant members and config...');
+  const { data: authUsers, error: authErr } = await supabase.auth.admin.listUsers();
+  if (authErr) {
+    console.error('Failed to list auth users:', authErr.message);
+  } else {
+    const userMap = new Map<string, string>();
+    for (const u of authUsers.users) {
+      if (u.email === 'nikshanbhag@gmail.com') userMap.set('nik', u.id);
+      if (u.email === 'prasanth.k.ramesh@gmail.com') userMap.set('prasanth', u.id);
+      if (u.email === 'yokheshraja@gmail.com') userMap.set('yoki', u.id);
+    }
+
+    // Insert tenant_members
+    const members = [
+      { email: 'nikshanbhag@gmail.com', role: 'OWNER' },
+      { email: 'prasanth.k.ramesh@gmail.com', role: 'ADMIN' },
+      { email: 'yokheshraja@gmail.com', role: 'MEMBER' },
+    ];
+    for (const m of members) {
+      const { error: meErr } = await supabase
+        .from('tenant_members')
+        .upsert({ tenant_id: tenantId, ...m }, { onConflict: 'tenant_id,email' });
+      if (meErr) console.error(`  Member insert error (${m.email}):`, meErr.message);
+    }
+    console.log(`  Added ${members.length} tenant members`);
+
+    // Set tenant config
+    const names: Record<string, string> = {};
+    if (userMap.get('nik')) names[userMap.get('nik')!] = 'Nik';
+    if (userMap.get('prasanth')) names[userMap.get('prasanth')!] = 'Prasanth';
+    if (userMap.get('yoki')) names[userMap.get('yoki')!] = 'Yoki';
+
+    const { error: configErr } = await supabase
+      .from('tenants')
+      .update({
+        config: {
+          names,
+          phones: {
+            owner: '421904855155',
+            manager: '421904855155',
+            prasanth: '421944016820',
+            yoki: '421951153761',
+          },
+          income: {
+            'Bratislava - Obchodná': 25000,
+            'Bratislava - Ružinov': 18000,
+            'Košice - Hlavná': 22000,
+          },
+          budgets: {
+            'Food Costs': 8000,
+            'Labor & Wages': 12000,
+            'Utilities': 1500,
+            'Supplies': 1000,
+          },
+          goals: { monthly_savings: 5000 },
+          workflows: {
+            bill_approval: { enabled: true, threshold: 100, recipients: ['owner'] },
+            low_stock_alert: { enabled: true, threshold_pct: 80, recipients: ['manager'] },
+            daily_summary: { enabled: false, time: '21:00', recipients: ['owner'] },
+          },
+        },
+      })
+      .eq('id', tenantId);
+    if (configErr) console.error('  Config update error:', configErr.message);
+    else console.log('  Tenant config updated with phones + workflows');
+  }
+
   console.log('--- SEEDING COMPLETE ---');
 }
 

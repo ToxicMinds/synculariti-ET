@@ -11,15 +11,16 @@ import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { ReceiptScanner } from '@/modules/finance/components/ReceiptScanner';
 import { StatementScanner } from '@/modules/finance/components/StatementScanner';
 import { ItemAnalytics } from '@/modules/finance/components/ItemAnalytics';
-import { formatCurrency, safeAmount } from '@/lib/utils';
 import { FoodCostVarianceCard } from '@/modules/finance/components/FoodCostVarianceCard';
 import { NeedsAttentionCard } from '@/modules/finance/components/NeedsAttentionCard';
 import { CommandCenter } from '@/modules/finance/components/CommandCenter';
 import { MonthlyPerformance } from '@/modules/finance/components/MonthlyPerformance';
+import { AIInsights } from '@/modules/finance/components/AIInsights';
 import { ExpenseList } from '@/modules/finance/components/ExpenseList';
 import { ManualEntryModal, ManualEntryPayload } from '@/modules/finance/components/ManualEntryModal';
 import { ParsedTransaction } from '@/modules/finance/hooks/useStatementScanner';
 import { useCategories } from '@/modules/finance/hooks/useCategories';
+import { safeAmount } from '@/lib/utils';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -29,7 +30,6 @@ function DashboardContent() {
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedMonth = searchParams.get('m') || currentMonthISO;
   
-  // SOLID Split: Transactions for Read, Sync for Write
   const { transactions, loading: eLoading } = useTransactions(tenant?.tenant_id, selectedMonth);
   const { softDeleteTransaction, saveReceipt, addTransaction, updateTransaction } = useSync(tenant?.tenant_id);
   const [showScanner, setShowScanner] = useState(false);
@@ -74,7 +74,6 @@ function DashboardContent() {
 
   if (!tenant) return <OrgAccessForm session={session} />;
 
-  // Platinum Demo Mode: Show ghost data if no real transactions exist
   const isDemo = transactions.length === 0;
   const demoTransactions = isDemo ? [
     { id: 'd1', amount: 450.00, category: 'Food Costs', who: 'System', date: selectedMonth + '-01', note: 'Demo: Bulk Produce' },
@@ -83,6 +82,7 @@ function DashboardContent() {
   ] : [];
 
   const activeTransactions = isDemo ? demoTransactions : transactions;
+  const displayTransactions = activeTransactions.filter(t => t.date?.startsWith(selectedMonth));
 
   if (Object.keys(tenant.names || {}).length === 0) {
     return (
@@ -91,8 +91,7 @@ function DashboardContent() {
           <div style={{ padding: '32px 0' }}>
             <h2 style={{ fontSize: 24, marginBottom: 16 }}>Let's set up your tenant</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 32, lineHeight: 1.6 }}>
-              It looks like you don't have any members in your tenant yet. 
-              Before you can start tracking transactions, you need to add yourself (and anyone else) to the tenant.
+              It looks like you don't have any members in your tenant yet.
             </p>
             <a href="/settings" className="btn btn-primary" style={{ padding: '14px 32px', fontSize: 16, textDecoration: 'none', display: 'inline-block' }}>
               Go to Settings →
@@ -105,7 +104,6 @@ function DashboardContent() {
 
   return (
     <main>
-      {/* Statement Scanner Modal */}
       {showStatement && (
         <StatementScanner
           names={tenant.names}
@@ -116,7 +114,6 @@ function DashboardContent() {
         />
       )}
 
-      {/* Manual Entry Modal */}
       {manualEntry !== null && (
         <ManualEntryModal
           prefill={manualEntry}
@@ -128,7 +125,6 @@ function DashboardContent() {
         />
       )}
 
-      {/* Needs Attention banner — first element, outside grid */}
       <NeedsAttentionCard tenantId={tenant.tenant_id} selectedMonth={selectedMonth} />
 
       <div className="bento-grid">
@@ -146,49 +142,57 @@ function DashboardContent() {
           </div>
         ) : (
           <>
-            {/* ROW 1: SPEND OVERVIEW */}
             {isDemo && (
               <div style={{ gridColumn: 'span 12', padding: '12px 24px', borderRadius: 16, background: 'var(--bg-hover)', border: '1px solid var(--border-color)', marginBottom: -16, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 18 }}>💡</span>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  <strong style={{ color: 'var(--text-primary)' }}>Demo Mode Active:</strong> We've populated some sample operating data for {selectedMonth} to show you what's possible. 
+                  <strong style={{ color: 'var(--text-primary)' }}>Demo Mode Active:</strong> Sample operating data for {selectedMonth}.
                   Scan your first invoice to replace this.
                 </p>
               </div>
             )}
-            <MonthlyPerformance transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
+
+            {/* ROW 1: DIAGNOSTICS + ACTION */}
+            <FoodCostVarianceCard selectedMonth={selectedMonth} colSpan={8} />
             <CommandCenter
               onScan={() => setShowScanner(true)}
               onManual={(prefill) => setManualEntry({ ...prefill, who_id: selectedUser || undefined })}
               onStatement={() => setShowStatement(true)}
             />
 
-            {/* ROW 2: FOOD COST VARIANCE */}
-            <FoodCostVarianceCard selectedMonth={selectedMonth} colSpan={8} />
+            {/* ROW 2: SPEND COMPARISON + TOP ITEMS */}
+            <MonthlyPerformance transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
+            <BentoCard colSpan={4} title="Top Purchased Items (OPEX)">
+              <ItemAnalytics tenantId={tenant.tenant_id} selectedMonth={selectedMonth} isDemo={isDemo} />
+            </BentoCard>
 
-            {/* ROW 3: LIST & TRANSACTIONS */}
+            {/* ROW 3: GRAPH INTELLIGENCE */}
+            <AIInsights
+              tenantId={tenant.tenant_id}
+              transactionCount={transactions.length}
+              dataHash={transactions.length + '_' + displayTransactions.reduce((s, t) => s + safeAmount(t.amount), 0).toFixed(0)}
+              updateState={updateState}
+              tenant={tenant}
+              isDemo={isDemo}
+            />
+
+            {/* ROW 4: ALL TRANSACTIONS */}
             <BentoCard colSpan={12} rowSpan={2} title="All Transactions">
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
-                   transactions={activeTransactions.filter(t => t.date?.startsWith(selectedMonth))} 
+                  transactions={displayTransactions} 
                   onDelete={softDeleteTransaction} 
-                   onEdit={(tx) => setManualEntry({ ...tx, amount: safeAmount(tx.amount) })}
+                  onEdit={(tx) => setManualEntry({ ...tx, amount: safeAmount(tx.amount) })}
                 />
               </div>
             </BentoCard>
 
-            {/* ROW 4: DEEP ANALYTICS */}
-            <BentoCard colSpan={12} title="Top Purchased Items (OPEX)">
-              <ItemAnalytics isDemo={isDemo} />
-            </BentoCard>
-
-            {activeTransactions.filter(t => t.date?.startsWith(selectedMonth)).length === 0 && (
+            {displayTransactions.length === 0 && (
               <BentoCard colSpan={12} title="Timeframe Status">
                 <div style={{ textAlign: 'center', padding: '48px 0' }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>🗓️</div>
                   <h3 style={{ fontSize: 20, marginBottom: 8 }}>No data for {selectedMonth}</h3>
                   <p style={{ color: 'var(--text-secondary)', maxWidth: 400, margin: '0 auto' }}>
-                    There are no recorded transactions for this month. 
                     Scan a receipt or add a manual entry to start tracking your {selectedMonth} spending.
                   </p>
                 </div>

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
 import { formatCurrency, safeAmount } from '@/lib/utils';
 
@@ -27,13 +26,12 @@ interface RawReceiptItem {
   }> | null;
 }
 
-export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
+export function ItemAnalytics({ tenantId, selectedMonth, isDemo = false }: { tenantId?: string; selectedMonth?: string; isDemo?: boolean }) {
   const [items, setItems] = useState<AggregatedItem[]>([]);
-  const [loading, setLoading] = useState(!isDemo);
+  const [loading, setLoading] = useState(!isDemo && !!tenantId);
 
   useEffect(() => {
     if (isDemo) {
-      // Professional Mock Data for B2B Demo
       setItems([
         { name: 'Bulk Organic Coffee Beans', total_amount: 850.40, count: 4, last_store: 'Global Supply Co', last_date: new Date().toISOString() },
         { name: 'Paper Takeaway Cups (500x)', total_amount: 120.00, count: 2, last_store: 'Eco Packaging', last_date: new Date().toISOString() },
@@ -42,14 +40,14 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
       setLoading(false);
       return;
     }
-
+    if (!tenantId) return;
     fetchTopItems();
-  }, [isDemo]);
+  }, [tenantId, selectedMonth, isDemo]);
 
   async function fetchTopItems() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('receipt_items')
         .select(`
           name, 
@@ -59,7 +57,18 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
             description,
             date
           )
-        `);
+        `)
+        .eq('tenant_id', tenantId);
+
+      if (selectedMonth) {
+        const monthStart = selectedMonth + '-01';
+        const [y, m] = selectedMonth.split('-');
+        const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate();
+        const monthEnd = selectedMonth + '-' + String(lastDay).padStart(2, '0');
+        query = query.gte('transactions.date', monthStart).lte('transactions.date', monthEnd);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -68,7 +77,6 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
       const aggregated = rawData.reduce((acc: Record<string, AggregatedItem>, curr: RawReceiptItem) => {
         const rawName = curr.name || 'Unknown Item';
         const nameKey = rawName.trim().toUpperCase();
-        // Supabase nested join can return object or array depending on query
         const parent = Array.isArray(curr.transactions) ? curr.transactions[0] : curr.transactions;
         
         if (!acc[nameKey]) {
@@ -84,7 +92,6 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
         acc[nameKey].total_amount += safeAmount(curr.amount);
         acc[nameKey].count += 1;
 
-        // Track latest context
         if (parent?.date && (!acc[nameKey].last_date || parent.date > acc[nameKey].last_date)) {
           acc[nameKey].last_date = parent.date;
           acc[nameKey].last_store = parent.description || 'Unknown';
@@ -110,7 +117,7 @@ export function ItemAnalytics({ isDemo = false }: { isDemo?: boolean }) {
   if (items.length === 0) {
     return (
       <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-        No item data yet. Scan a receipt to see insights!
+        No scanned item data for this period.
       </div>
     );
   }
