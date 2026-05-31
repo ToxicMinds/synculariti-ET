@@ -704,3 +704,30 @@ This section documents the Phase 1 security hardening campaign. All 4 issues hav
 - 503 total tests passing, 3 pre-existing failures (pipeline-schema.test.ts — unrelated)
 - Zero regressions introduced
 
+---
+
+## 8. Phase 2: Route Standardization
+
+### 8.1 Issues Found & Fixed
+
+| # | Issue | Severity | File/Location | Fix |
+|---|-------|----------|---------------|-----|
+| 5 | `whatsapp/session/route.ts` uses `withAuth()` directly instead of `withTestHandler()` | **HIGH** | `session/route.ts:9` | Refactored to `const handler: SecureHandler; export const GET = withTestHandler(handler)` |
+| 6 | `whatsapp/process-outbox/route.ts` compares webhook secret with `!==` (timing attack) | **HIGH** | `process-outbox/route.ts:13` | Replaced with constant-time `timingSafeEqual()` |
+
+### 8.2 New Test Files
+
+| Test File | Tests | What It Covers |
+|-----------|-------|----------------|
+| `src/app/api/whatsapp/session/route.test.ts` | 2 | Session status success + gateway failure |
+| `src/app/api/whatsapp/process-outbox/route.test.ts` | 5 | Valid INSERT, missing auth, wrong token, non-INSERT skip, exception handling |
+| `src/app/api/whatsapp/webhook/route.test.ts` | 4 | Invalid HMAC (403), missing HMAC (401), valid poll vote (200), missing outbox context (400) |
+| `src/app/api/analytics/food-cost-variance/route.test.ts` | 3 | Report generation, query param parsing, error handling |
+
+### 8.3 Coverage Improvement
+
+- **Before Phase 2**: 9/21 routes had tests (43%)
+- **After Phase 2**: 13/21 routes have tests (62%)
+- Net new tests: 14 (517 total passing, same 3 pre-existing failures)
+- Zero regressions
+

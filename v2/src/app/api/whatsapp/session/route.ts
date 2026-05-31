@@ -1,12 +1,13 @@
 export const runtime = 'edge';
 
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/withAuth';
+import { SecureHandler } from '@/lib/types/api';
+import { withTestHandler } from '@/lib/withTestHandler';
 import { getErrorMessage } from '@synculariti/whatsapp-client';
 import { createOpenWAClient } from '@/lib/create-openwa-client';
 import { ServerLogger } from '@/lib/logger-server';
 
-export const GET = withAuth(async (req, context) => {
+const handler: SecureHandler = async (req, context) => {
   try {
     const client = createOpenWAClient();
 
@@ -30,4 +31,6 @@ export const GET = withAuth(async (req, context) => {
     await ServerLogger.system('ERROR', 'WhatsApp', `Session check failed`, { error: errMsg });
     return NextResponse.json({ error: 'Session check failed' }, { status: 500 });
   }
-});
+};
+
+export const GET = withTestHandler(handler);

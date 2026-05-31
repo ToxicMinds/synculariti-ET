@@ -249,11 +249,15 @@
 - `Zod Schema: BaseDecisionSchema`: Shared base Zod schema for webhook callback payloads (`type`, `outboxId`, `recipientPhone`, `tenantId`, `timestamp`). Extended by `POApprovalWebhookSchema`, `AuditWebhookSchema`, `POSDiscrepancyWebhookSchema` with domain-specific `decision` enums. Defined in `src/modules/whatsapp/lib/webhook-payloads.ts`. (V-48 fix)
 - `interface BaseDecisionPayload`: Inferred type from `BaseDecisionSchema`. Used by `dispatchDecision` server action for its constructed payload. (V-48 fix)
 
-## Phase 1 Security Hardening (Test Files)
+## Phase 1-2 Security Hardening & Route Standardization (Test Files)
 - `Test File: src/lib/db-security-privileges.test.ts` (7 tests): Verifies anon privilege lockdown on 6 tables (`api_keys`, `current_inventory`, `graph_sync_queue`, `rate_limits`, `whatsapp_inbox`, `whatsapp_outbox`) + ALTER DEFAULT PRIVILEGES does not grant INSERT to anon. Uses `get_table_privilege_state_v1` and `check_default_privileges_v1` RPCs.
 - `Test File: src/app/api/health/route.test.ts` (1 test): Verifies health endpoint returns `{ status: 'ok' }` without exposing Supabase or Neo4j infrastructure details.
 - `Test File: src/app/api/cron/process-outbox/route.test.ts` (2 tests): Verifies CRON_SECRET uses timing-safe comparison (not `!==`) and returns 401 when CRON_SECRET is missing.
-- `function timingSafeEqual(a, b)`: Custom constant-time string comparison used in `cron/process-outbox/route.ts`. XOR-based loop prevents timing side-channel attacks on secret comparison. Defined inline in the route. Replaces `!==` pattern.
+- `Test File: src/app/api/whatsapp/session/route.test.ts` (2 tests): Verifies session status returns connected/disconnected state and handles gateway failure (500).
+- `Test File: src/app/api/whatsapp/process-outbox/route.test.ts` (5 tests): Valid INSERT auth, missing auth (401), wrong token (401), non-INSERT skip, exception handling (500).
+- `Test File: src/app/api/whatsapp/webhook/route.test.ts` (4 tests): Invalid HMAC (403), missing HMAC (401), valid poll vote with decision routing (200), missing outbox context (400).
+- `Test File: src/app/api/analytics/food-cost-variance/route.test.ts` (3 tests): Report generation with computeFCVReport, query params, error handling (500).
+- `function timingSafeEqual(a, b)`: Custom constant-time string comparison used in `cron/process-outbox/route.ts` (CRON_SECRET) and `whatsapp/process-outbox/route.ts` (webhook secret). XOR-based loop prevents timing side-channel attacks on secret comparison. Defined inline in each route. Replaces `!==` pattern.
 
 ## WhatsApp Types
 - `interface OutboxRecord`: Full type for `whatsapp_outbox` rows. Properties: `id`, `tenant_id`, `recipient_phone`, `payload` (`{ type: 'text' | 'poll', text?, name?, options?, metadata? }`), `webhook_url?`. Exported from `src/modules/whatsapp/types.ts`.
