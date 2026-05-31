@@ -3,6 +3,7 @@ import { OfflineQueue } from '@/lib/offlineQueue';
 import { Logger } from '@/lib/logger';
 import { Transaction } from '../lib/finance';
 import { ReceiptData } from './useTransactionSync';
+import { QUEUE_SAVE_RECEIPT } from '@/lib/constants';
 
 interface SyncCallbacks {
   addTransaction: (transaction: Partial<Transaction> | Partial<Transaction>[]) => Promise<void>;
@@ -25,7 +26,7 @@ export function useOfflineQueue(tenantId: string | undefined, callbacks: SyncCal
           try {
             if (item.type === 'ADD_TRANSACTION') {
               await callbacks.addTransaction(item.payload as Partial<Transaction> | Partial<Transaction>[]);
-            } else if (item.type === 'SAVE_RECEIPT') {
+            } else if (item.type === QUEUE_SAVE_RECEIPT) {
               const p = item.payload as { receipt: ReceiptData; whoId: string; whoName: string; locationId?: string; currency?: string };
               await callbacks.saveReceipt(p.receipt, p.whoId, p.whoName, p.locationId, p.currency);
             }

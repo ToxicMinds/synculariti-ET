@@ -1,9 +1,10 @@
 import { Logger } from './logger';
 import { getErrorMessage } from './utils';
+import { QUEUE_SAVE_RECEIPT } from '@/lib/constants';
 
 export interface QueuedMutation {
   id: string;
-  type: 'ADD_TRANSACTION' | 'SAVE_RECEIPT';
+  type: 'ADD_TRANSACTION' | typeof QUEUE_SAVE_RECEIPT;
   payload: unknown;
   timestamp: number;
   retryCount: number;
@@ -44,7 +45,7 @@ export class OfflineQueue {
     }
   }
 
-  static async enqueue(type: 'ADD_TRANSACTION' | 'SAVE_RECEIPT', payload: unknown): Promise<string | undefined> {
+  static async enqueue(type: 'ADD_TRANSACTION' | typeof QUEUE_SAVE_RECEIPT, payload: unknown): Promise<string | undefined> {
     if (typeof window === 'undefined') return;
 
     return await this.withLock(async () => {

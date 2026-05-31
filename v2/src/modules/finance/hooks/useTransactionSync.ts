@@ -5,6 +5,7 @@ import { useTenantContext } from '@/context/TenantContext';
 import { OfflineQueue } from '@/lib/offlineQueue';
 import { formatCurrency, safeAmount } from '@/lib/utils';
 import { notifyLargeInvoice } from '@/actions/notifyLargeInvoice';
+import { QUEUE_SAVE_RECEIPT } from '@/lib/constants';
 
 export type ItemConfidence = 'high' | 'medium' | 'low';
 
@@ -79,7 +80,7 @@ export function useTransactionSync(tenantId: string | undefined) {
     if (selectedItems.length === 0) throw new Error('No items selected');
 
     if (OfflineQueue.isOffline()) {
-      await OfflineQueue.enqueue('SAVE_RECEIPT', { receipt, whoId, whoName, locationId, currency });
+      await OfflineQueue.enqueue(QUEUE_SAVE_RECEIPT, { receipt, whoId, whoName, locationId, currency });
       triggerRefresh();
       return;
     }

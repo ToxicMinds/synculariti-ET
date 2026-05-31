@@ -63,9 +63,9 @@ Synculariti consists of two separate applications. They do NOT share a database.
 | :--- | :--- | :--- |
 | **ACID** | 🟢 **Hardened** | All ledger mutations (Finance/Logistics) use atomic Postgres RPCs. |
 | **Security** | 🟢 **Hardened** | Phase 1: enqueue_graph_sync_internal hardened (SECURITY DEFINER + search_path), anon privilege lockdown on 6 tables, ALTER DEFAULT PRIVILEGES fixed, health endpoint simplified to static liveness, CRON_SECRET uses timingSafeEqual. Verified via 10 new automated tests (db-security-privileges, health, cron). |
-| **DRY** | 🟢 **Hardened** | AI prompts, Neo4j utilities, Auth components, `safeAmount()`, `createServiceClient()`, `createOpenWAClient()`, and error handling unified in `@/lib`. Strategy maps replace if-else chains (financeAudit, triggerWorkflow). |
-| **Type Safety** | 🟢 **Hardened** | **0** `: any` usages. Full interface coverage for external data (eKasa, Groq, Web Locks). All catch blocks typed `unknown` with `getErrorMessage()`. |
-| **SOLID** | 🟢 **Hardened** | Domain logic isolated in `modules/`. Business logic decoupled from UI via headless hooks. SRP extractions: scanner-client split into 3 (V-88), insight-queries types extracted (V-89), dispatchDecision split into 2 (V-90), webhook/route split into 4 utilities (V-54). OCP: decision-router accepts new handlers via registry (V-87). DIP: services injected via constructor pattern (V-85). |
+| **DRY** | 🟢 **Hardened** | AI prompts, Neo4j utilities, Auth components, `safeAmount()`, `createServiceClient()`, `createOpenWAClient()`, and error handling unified in `@/lib`. Strategy maps replace if-else chains (financeAudit, triggerWorkflow). Hardcoded strings centralized in `@/lib/constants.ts` (41 occurrences across 14 files replaced). |
+| **Type Safety** | 🟢 **Hardened** | **0** `: any` usages. Full interface coverage for external data (eKasa, Groq, Web Locks). All catch blocks typed `unknown` with `getErrorMessage()`. 100% route test coverage (21/21 routes). |
+| **SOLID** | 🟢 **Hardened** | Domain logic isolated in `modules/`. Business logic decoupled from UI via headless hooks. SRP extractions: scanner-client split into 3 (V-88), insight-queries types extracted (V-89), dispatchDecision split into 2 (V-90), webhook/route split into 4 utilities (V-54). OCP: decision-router accepts new handlers via registry (V-87). DIP: services injected via constructor pattern (V-85). Factory pattern for Supabase clients enforced across all server actions. |
 
 ---
 
@@ -729,5 +729,46 @@ This section documents the Phase 1 security hardening campaign. All 4 issues hav
 - **Before Phase 2**: 9/21 routes had tests (43%)
 - **After Phase 2**: 13/21 routes have tests (62%)
 - Net new tests: 14 (517 total passing, same 3 pre-existing failures)
+- Zero regressions
+
+---
+
+## 9. Phase 3: Code Quality Hardening
+
+### 9.1 Issues Found & Fixed
+
+| # | Issue | Severity | File/Location | Fix |
+|---|-------|----------|---------------|-----|
+| 7 | 6 `: any` type annotations in scripts | **HIGH** | `rebuild-neo4j-graph.ts` (3), `trigger_workflow.ts` (1), `seed_demo_2026.ts` (2) | Replaced with typed interfaces (`Transaction`, `TransactionSyncPayload`, `ReceiptItemInsert`, `WorkflowPayload`) |
+| 8 | 4 unused `import React` | **LOW** | `BrandHeader.tsx`, `ExpenseList.tsx`, `ManualEntryModal.tsx`, `ActionClient.tsx` | Removed unused imports |
+| 9 | `console.warn` instead of Logger | **LOW** | `ActionClient.tsx:37` | Replaced with `Logger.system()` |
+| 10 | `notifyLargeInvoice.ts` uses `createServerClient` directly | **MED** | `notifyLargeInvoice.ts` | Refactored to use `createClient()` from `@/lib/supabase-server` |
+| 11 | `timingSafeEqual` duplicated in 2 routes | **LOW** | `cron/process-outbox/route.ts`, `whatsapp/process-outbox/route.ts` | Extracted to `@/lib/utils.ts`, both routes import it |
+| 12 | 4 groups of hardcoded strings (41 occurrences, 14 files) | **MED** | 14 files across `lib/`, `modules/`, `app/` | Centralized in `@/lib/constants.ts` as `CONTENT_TYPE_JSON`, `HEADER_CONTENT_TYPE`, `HEADER_API_KEY`, `QUEUE_SAVE_RECEIPT` |
+| 13 | 8 routes with zero test coverage | **HIGH** | `auth/pin`, `groq`, `debug/backfill-neo4j`, `debug/sync-neo4j`, `ai/statement`, `ai/parse-receipt`, `ai/parse-invoice`, `ai/forecast` | Added 38 tests across 8 route test files |
+
+### 9.2 New Test Files (Phase 3)
+
+| Test File | Tests | What It Covers |
+|-----------|-------|----------------|
+| `src/app/api/auth/pin/route.test.ts` | 7 | Invalid PIN format (2), rate limit RPC failure (503), rate limited (429), tenant lookup failure (401), PIN verification failure (401), successful auth (200) |
+| `src/app/api/groq/route.test.ts` | 6 | Missing messages (400), non-array messages (400), valid response (200), default model (200), Groq failure (500), empty model string (200) |
+| `src/app/api/debug/backfill-neo4j/route.test.ts` | 4 | No session (401), driver not initialized (500), no transactions (200), Neo4j merge failure (500) |
+| `src/app/api/debug/sync-neo4j/route.test.ts` | 3 | No session (401), driver not initialized (500), no pending events (200) |
+| `src/app/api/ai/statement/route.test.ts` | 4 | Missing text (400), non-string text (400), successful parse (200), Groq failure (500) |
+| `src/app/api/ai/parse-receipt/route.test.ts` | 4 | Missing ekasaData (400), AI-enriched receipt (200), known store bypass (200), Groq failure (500) |
+| `src/app/api/ai/parse-invoice/route.test.ts` | 4 | Missing image (400), non-string image (400), rejected triage (200), successful parse (200), Groq failure (500) |
+| `src/app/api/ai/forecast/route.test.ts` | 5 | Missing spent (400), zero daysElapsed early return (200), negative daysElapsed validation (400), AI forecast (200), Groq failure (500) |
+
+### 9.3 Coverage Improvement
+
+- **Before Phase 3**: 13/21 routes had tests (62%)
+- **After Phase 3**: 21/21 routes have tests (100%)
+- Zero `: any` in production code
+- Zero `import React` unused imports
+- Zero hardcoded `'application/json'` / `'Content-Type'` / `'X-Api-Key'` / `'SAVE_RECEIPT'` strings
+- `timingSafeEqual` defined once in `@/lib/utils.ts`, both routes import it
+- All server action factory violations fixed
+- Net new tests: 38 (555 total passing, same 3 pre-existing failures)
 - Zero regressions
 

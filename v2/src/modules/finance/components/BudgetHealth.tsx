@@ -5,6 +5,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { calcTimeBoundForecast, Transaction } from '../lib/finance';
 import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 interface BudgetHealthProps {
   spent: number;
@@ -42,7 +43,7 @@ export function BudgetHealth({ spent, totalBudget, transactions = [], colSpan = 
 
       const response = await fetch('/api/ai/forecast', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
         body: JSON.stringify({
           spent,
           budget: totalBudget,

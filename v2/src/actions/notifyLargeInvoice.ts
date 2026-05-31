@@ -1,7 +1,6 @@
 'use server';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase-server';
 import { Logger } from '@/lib/logger';
 import { getErrorMessage, formatCurrency, safeAmount } from '@/lib/utils';
 
@@ -23,17 +22,7 @@ export async function notifyLargeInvoice(
     const largeItems = items.filter(t => t.amount != null && safeAmount(t.amount) > 500);
     if (largeItems.length === 0) return { success: true, sent: false };
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll(); },
-          setAll(cookies) { cookies.forEach((c) => cookieStore.set(c.name, c.value)); },
-        }
-      }
-    );
+    const supabase = await createClient();
 
     const { data: tenantData, error: tenantErr } = await supabase
       .from('tenants')

@@ -4,6 +4,36 @@ import { getNeo4jDriver, neo4jBulkMerge } from '../lib/neo4j';
 import { buildSyncPayload } from '../lib/neo4j-ontology';
 import { TransactionSyncPayload } from '../lib/types';
 
+interface ReceiptItemInsert {
+  id: string;
+  transaction_id: string;
+  tenant_id: string;
+  name: string;
+  amount: number;
+  category: string;
+  currency: string;
+}
+
+interface TransactionRow {
+  id: string;
+  amount: number;
+  date: string;
+  category: string;
+  who: string;
+  description: string;
+  currency: string;
+  tenant_id: string;
+}
+
+interface ReceiptItemRow {
+  id: string;
+  transaction_id: string | null;
+  name: string;
+  amount: number;
+  category: string;
+  currency: string;
+}
+
 const supabase = createServiceClient();
 
 // Multi-merchant items that map to the same canonicalIngredientId
@@ -48,7 +78,7 @@ async function main() {
   }
 
   // Step 2: For each vendor-transaction pair, add a receipt_item with the multi-merchant item
-  const newItems: any[] = [];
+  const newItems: ReceiptItemInsert[] = [];
   for (const item of MULTI_MERCHANT_ITEMS) {
     for (const vendor of item.vendors) {
       const txs = vendorTx[vendor] || [];
@@ -107,7 +137,7 @@ async function main() {
   console.log('  Clean slate ready');
 
   // Step 5: Fetch ALL data from Postgres (no default 1000-row limit)
-  let allTransactions: any[] = [];
+  let allTransactions: TransactionRow[] = [];
   let page = 0;
   const PAGE_SIZE = 1000;
   while (true) {
@@ -129,7 +159,7 @@ async function main() {
   console.log(`Fetched ${transactions.length} transactions`);
 
   // Paginate items too
-  let allItems: any[] = [];
+  let allItems: ReceiptItemRow[] = [];
   let itemPage = 0;
   while (true) {
     const { data: chunk, error } = await supabase

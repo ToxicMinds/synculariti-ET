@@ -1,5 +1,6 @@
 import { ServerLogger } from './logger-server';
 import { GROQ_ERRORS } from './types';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 type GroqVisionContent =
   | { type: 'text'; text: string }
@@ -50,7 +51,7 @@ export async function callGroq(
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON
       },
       body: JSON.stringify({
         model,

@@ -2,6 +2,7 @@ import { ReceiptData } from '@/modules/finance/hooks/useTransactionSync';
 import { ScannerResult } from './scanner-cache';
 import { mapItemsWithConfidence } from './scanner-ekasa';
 import { getErrorMessage } from './utils';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 const FALLBACK_STORE = 'Unknown Store';
 
@@ -23,7 +24,7 @@ async function preprocessImageData(dataUrl: string, signal: AbortSignal): Promis
   try {
     const response = await fetch('/api/ai/preprocess-image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
       body: JSON.stringify({ image: dataUrl }),
       signal,
     });
@@ -44,7 +45,7 @@ export async function processAiVision(file: File, hash: string, signal: AbortSig
 
   const response = await fetch('/api/ai/parse-invoice', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
     body: JSON.stringify({ image: processedImage, categories }),
     signal,
   });

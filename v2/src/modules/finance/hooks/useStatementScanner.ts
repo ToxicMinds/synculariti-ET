@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Logger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/utils';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 export type StatementStep = 'upload' | 'processing' | 'review' | 'reconciling';
 
@@ -132,7 +133,7 @@ export function useStatementScanner({
       for (const chunk of chunks) {
         const res = await fetch('/api/ai/statement', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
           body: JSON.stringify({ text: chunk.join('\n'), categories })
         });
 

@@ -38,7 +38,14 @@ async function run() {
     process.exit(1);
   }
 
-  let payload: any = {};
+  interface WorkflowPayload {
+    type: string;
+    name: string;
+    options: string[];
+    metadata: Record<string, string | number | undefined>;
+  }
+
+  let payload: WorkflowPayload = {} as WorkflowPayload;
   let webhookUrl = 'https://synculariti-et.vercel.app/api/whatsapp/webhook';
   let webhookSecret = 'local-development-secret-key-12345';
 

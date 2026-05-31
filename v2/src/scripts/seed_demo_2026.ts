@@ -1,6 +1,7 @@
 import './load-env';
 import { createServiceClient } from '../lib/supabase-server';
 import { getNeo4jDriver, neo4jBulkMerge } from '../lib/neo4j';
+import { Transaction } from '../modules/finance/lib/finance';
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase credentials');
@@ -515,8 +516,19 @@ async function seed() {
     '00000000-0000-0000-0000-000000000002',
   ];
 
-  let transactionsBatch: any[] = [];
-  let itemsBatch: any[] = [];
+  interface ReceiptItemInsert {
+    id: string;
+    transaction_id: string;
+    tenant_id: string;
+    name: string;
+    amount: number;
+    category: string;
+    currency: string;
+    source_type: string;
+  }
+
+  let transactionsBatch: (Transaction & { transacted_at: string; receipt_number: string })[] = [];
+  let itemsBatch: ReceiptItemInsert[] = [];
 
   for (let i = 1; i <= TOTAL_TRANSACTIONS; i++) {
     const vendor = VENDORS[Math.floor(Math.random() * VENDORS.length)];

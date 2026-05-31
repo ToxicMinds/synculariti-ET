@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { labelStyle, inputStyle } from '@/components/formStyles';
 import { Expense } from '../lib/finance';
 import { CategorySelector } from '@/components/CategorySelector';

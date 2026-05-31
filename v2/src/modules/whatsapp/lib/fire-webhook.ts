@@ -1,4 +1,5 @@
 import { signHmacPayload } from '@synculariti/whatsapp-client';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 interface WebhookPayload {
   type: 'poll_vote';
@@ -24,7 +25,7 @@ export async function fireWebhook(
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON,
       'X-OpenWA-Signature': signature,
     },
     body: payloadString,

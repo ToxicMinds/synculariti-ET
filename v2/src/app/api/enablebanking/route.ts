@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 import { getErrorMessage } from '@/lib/utils';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 // 1. Validation Schema
 const EnableBankingSchema = z.object({
@@ -50,8 +51,8 @@ const handler: SecureHandler = async (req, context) => {
     const { action, country, institution_id, redirect_uri, session_id, account_id } = result.data;
     
     const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON,
+      'Accept': CONTENT_TYPE_JSON,
       'Authorization': `Token ${appSecret}`
     };
 

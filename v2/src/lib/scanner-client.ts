@@ -4,6 +4,7 @@ import { processEkasa } from './scanner-ekasa';
 import { processAiVision } from './scanner-vision';
 import { computeHash, makeCacheKey, cacheGet, cacheSet, clearScannerCache, ScannerResult } from './scanner-cache';
 import { getErrorMessage } from './utils';
+import { QUEUE_SAVE_RECEIPT } from '@/lib/constants';
 
 export type { ScannerSource, ScannerResult } from './scanner-cache';
 export { clearScannerCache } from './scanner-cache';
@@ -37,7 +38,7 @@ export async function processScannerInput(
   }
 
   if (OfflineQueue.isOffline()) {
-    await OfflineQueue.enqueue('SAVE_RECEIPT', {
+    await OfflineQueue.enqueue(QUEUE_SAVE_RECEIPT, {
       input: typeof input === 'string' ? input : '[file]',
       hash,
     });

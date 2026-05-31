@@ -131,7 +131,15 @@
 - **No shared tables**: IMS does NOT have access to ET's `graph_sync_queue`, `whatsapp_outbox`, or Neo4j. ET does NOT have access to IMS's `inventory_ledger`, `purchase_orders`, or POS raw data.
 - **ET's pipeline**: POS data from IMS API → `pos_transaction_staging` (anomaly quarantine) → recipe resolution (from cached IMS recipes) → `graph_sync_queue` → Neo4j Sale + ConsumptionEstimate nodes → Food Cost Variance Report.
 
-## 10. AI Insights Caching & Concurrency
+## 10. Code Quality Standards
+- **Zero `: any`**: All TypeScript code MUST avoid the `: any` type annotation. Use proper typed interfaces for all variables, especially in database scripts (`rebuild-neo4j-graph.ts`, `seed_demo_2026.ts`, `trigger_workflow.ts`). TypeScript's `strict` mode enforces this.
+- **No unused imports**: Every import in every file must be consumed. Remove `import React` from files using the modern JSX transform. The `tsc --noUnusedLocals` flag catches violations.
+- **Constants in `@/lib/constants.ts`**: All hardcoded string literals that appear 2+ times across the codebase MUST be centralized in `@/lib/constants.ts`. This includes HTTP headers (`HEADER_CONTENT_TYPE`, `HEADER_API_KEY`), content types (`CONTENT_TYPE_JSON`), queue names (`QUEUE_SAVE_RECEIPT`), and environment variable names.
+- **Hook SRP**: Hooks longer than 80 lines MUST be evaluated for extraction. Lifecycle management and state transitions should be extracted into sub-hooks.
+- **Logger over console**: All production code MUST use `Logger.system()` / `Logger.user()` from `@/lib/logger`. Zero `console.log` / `console.warn` / `console.error` allowed outside the logger implementation itself.
+- **Single `timingSafeEqual`**: The constant-time comparison function lives in `@/lib/utils.ts` as `timingSafeEqual(a, b)`. All routes requiring timing-safe comparison MUST import from there, not re-implement inline.
+
+## 11. AI Insights Caching & Concurrency
 - **Session Isolation**: Never share a Neo4j session across concurrent `session.run()` calls. Use separate sessions per query when running in parallel.
 - **Caching**: Winning insight is cached in `tenants.config.ai_insight` with a 24-hour TTL. Bypass cache via `?force=1` query parameter.
 - **Fallback**: If any part of the pipeline fails (Neo4j disconnect, LLM 503, malformed data), fall back gracefully to `articulateFinding()` and never throw a 500 to the client. Return the "still syncing" status until valid data is produced.

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server';
 import { withTestHandler } from '@/lib/withTestHandler';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
+import { HEADER_CONTENT_TYPE } from '@/lib/constants';
 
 /**
  * GET /api/export
@@ -40,7 +41,7 @@ const handler: SecureHandler = async (req, context) => {
 
     return new NextResponse(header + rows, {
       headers: {
-        'Content-Type': 'text/csv',
+        [HEADER_CONTENT_TYPE]: 'text/csv',
         'Content-Disposition': `attachment; filename="Synculariti-Export-${new Date().toISOString().slice(0, 10)}.csv"`
       }
     });

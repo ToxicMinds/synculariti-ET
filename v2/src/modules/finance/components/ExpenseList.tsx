@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Transaction } from '../lib/finance';
 import { useTransactionFilter } from '../hooks/useTransactionFilter';
 

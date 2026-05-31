@@ -1,6 +1,7 @@
 import { extractUniversal } from './ekasa-protocols';
 import { ReceiptData, ReceiptItem, ItemConfidence } from '@/modules/finance/hooks/useTransactionSync';
 import { ScannerResult } from './scanner-cache';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 const FALLBACK_STORE = 'Unknown Store';
 
@@ -23,7 +24,7 @@ export async function processEkasa(qrString: string, hash: string, signal: Abort
 
   const govResponse = await fetch('/api/ekasa', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
     body: JSON.stringify(payload),
     signal,
   });
@@ -48,7 +49,7 @@ export async function processEkasa(qrString: string, hash: string, signal: Abort
   try {
     const enrichmentResponse = await fetch('/api/ai/parse-receipt', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON },
       body: JSON.stringify({ ekasaData: govJson }),
       signal,
     });

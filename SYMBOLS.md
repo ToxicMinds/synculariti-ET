@@ -257,7 +257,29 @@
 - `Test File: src/app/api/whatsapp/process-outbox/route.test.ts` (5 tests): Valid INSERT auth, missing auth (401), wrong token (401), non-INSERT skip, exception handling (500).
 - `Test File: src/app/api/whatsapp/webhook/route.test.ts` (4 tests): Invalid HMAC (403), missing HMAC (401), valid poll vote with decision routing (200), missing outbox context (400).
 - `Test File: src/app/api/analytics/food-cost-variance/route.test.ts` (3 tests): Report generation with computeFCVReport, query params, error handling (500).
-- `function timingSafeEqual(a, b)`: Custom constant-time string comparison used in `cron/process-outbox/route.ts` (CRON_SECRET) and `whatsapp/process-outbox/route.ts` (webhook secret). XOR-based loop prevents timing side-channel attacks on secret comparison. Defined inline in each route. Replaces `!==` pattern.
+- `function timingSafeEqual(a, b)`: Custom constant-time string comparison defined in `src/lib/utils.ts`. XOR-based loop prevents timing side-channel attacks on secret comparison. Used by `cron/process-outbox/route.ts` (CRON_SECRET) and `whatsapp/process-outbox/route.ts` (webhook secret) via import. Replaces 2 inline duplications.
+
+## Phase 3: Code Quality Hardening (Test Files)
+- `Test File: src/app/api/auth/pin/route.test.ts` (7 tests): PIN auth endpoint — invalid PIN format, rate limit failure (503), rate limited (429), tenant not found (401), PIN mismatch (401), successful auth with tokens (200).
+- `Test File: src/app/api/groq/route.test.ts` (6 tests): Groq AI proxy — missing/non-array messages (400), successful response with custom/default model (200), Groq API failure (500).
+- `Test File: src/app/api/debug/backfill-neo4j/route.test.ts` (4 tests): Neo4j backfill — missing session (401), driver uninitialized (500), empty transactions (200), merge failure (500).
+- `Test File: src/app/api/debug/sync-neo4j/route.test.ts` (3 tests): Outbox sync — missing session (401), driver uninitialized (500), no pending events (200).
+- `Test File: src/app/api/ai/statement/route.test.ts` (4 tests): Bank statement parsing — missing/non-string text (400), successful extraction (200), Groq failure (500).
+- `Test File: src/app/api/ai/parse-receipt/route.test.ts` (4 tests): eKasa receipt enrichment — missing data (400), AI store inference (200), known store bypass (200), Groq failure (500).
+- `Test File: src/app/api/ai/parse-invoice/route.test.ts` (4 tests): AI invoice parsing — missing/non-string image (400), rejected triage (200), successful extraction (200), Groq failure (500).
+- `Test File: src/app/api/ai/forecast/route.test.ts` (5 tests): AI budget forecasting — missing field (400), early return with zero days (200), Zod negative validation (400), successful forecast (200), Groq failure (500).
+
+## Shared Constants (`src/lib/constants.ts`)
+- `CONTENT_TYPE_JSON`: `'application/json'` — replaces 14 inline occurrences.
+- `HEADER_CONTENT_TYPE`: `'Content-Type'` — replaces 14 inline occurrences.
+- `HEADER_API_KEY`: `'X-Api-Key'` — replaces 7 inline occurrences.
+- `QUEUE_SAVE_RECEIPT`: `'SAVE_RECEIPT'` — replaces 4 inline occurrences.
+- `DEFAULT_CURRENCY`: `'EUR'` — default for currency formatting.
+- `PAGE_SIZE = 1000`: Supabase pagination limit.
+- `SCANNER_TIMEOUT_MS = 15_000`: Scanner fetch timeout.
+- `NEO4J_BATCH_SIZE = 100`: AuraDB free tier batch limit.
+- `INSIGHT_CACHE_TTL_MS = 86_400_000`: 24h AI insight cache TTL.
+- Environment variable name constants: `ENV_GROQ_API_KEY`, `ENV_SUPABASE_URL`, `ENV_SUPABASE_ANON_KEY`, `ENV_SUPABASE_SERVICE_KEY`, `ENV_CRON_SECRET`, `ENV_BASE_URL`, `ENV_OPENWA_SESSION_ID`, `ENV_OPENWA_BASE_URL`, `ENV_OPENWA_API_KEY`, `ENV_OPENWA_WEBHOOK_SECRET`, `ENV_SUPABASE_WEBHOOK_SECRET`, `ENV_IMS_API_BASE_URL`, `ENV_IMS_API_KEY`, `ENV_SYNC_SECRET_KEY`, `ENV_PIN_DERIVATION_SECRET`, `ENV_ENABLE_BANKING_APP_ID`, `ENV_ENABLE_BANKING_APP_SECRET`, `ENV_ENABLE_BANKING_BASE_URL`, `ENV_NEXT_PUBLIC_APP_URL`.
 
 ## WhatsApp Types
 - `interface OutboxRecord`: Full type for `whatsapp_outbox` rows. Properties: `id`, `tenant_id`, `recipient_phone`, `payload` (`{ type: 'text' | 'poll', text?, name?, options?, metadata? }`), `webhook_url?`. Exported from `src/modules/whatsapp/types.ts`.

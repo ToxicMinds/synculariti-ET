@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { dispatchDecision } from '@/modules/whatsapp/actions/dispatchDecision';
+import { Logger } from '@/lib/logger';
 
 interface ActionClientProps {
   actionId: string;
@@ -34,7 +35,8 @@ export function ActionClient({ actionId, tenantName, payload }: ActionClientProp
         setErrorMsg(result.error || 'Failed to submit decision.');
       }
     } catch (e: unknown) {
-      console.warn('dispatchDecision failed:', e);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      Logger.system('ERROR', 'WhatsApp', 'dispatchDecision failed', { error: errMsg });
       setStatus('error');
       setErrorMsg('A network error occurred while submitting.');
     } finally {

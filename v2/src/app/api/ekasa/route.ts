@@ -4,6 +4,7 @@ import { apiError } from '@/lib/api-error-handler';
 import { EkasaRequestSchema } from '@/lib/validations/schemas';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
+import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
 
 /**
  * eKasa Regional Proxy (Next.js API Route)
@@ -51,8 +52,8 @@ const handler: SecureHandler = async (request: Request, context) => {
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
+        'Accept': CONTENT_TYPE_JSON,
+        [HEADER_CONTENT_TYPE]: CONTENT_TYPE_JSON,
         'User-Agent': 'Mozilla/5.0 (Synculariti B2B)'
       },
       body: JSON.stringify(payload),

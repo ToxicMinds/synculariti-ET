@@ -1,3 +1,5 @@
+import { HEADER_API_KEY } from '@/lib/constants';
+
 // ───── Types ─────
 
 export interface CachedRecipeIngredient {
@@ -189,7 +191,7 @@ export async function refreshRecipeCache(
   let response: Response;
   try {
     response = await fetcher(`${imsBaseUrl}/api/v1/recipes?tenant_id=${tenantId}`, {
-      headers: { 'X-Api-Key': apiKey },
+      headers: { [HEADER_API_KEY]: apiKey },
     });
   } catch {
     if (cached) {
@@ -259,7 +261,7 @@ export async function fetchPOSSales(options: FetchPOSSalesOptions): Promise<IMSP
   while (page <= totalPages) {
     const url = `${options.baseUrl}/api/v1/pos-sales?tenant_id=${options.tenantId}&location_id=${options.locationId}&from=${options.from}&to=${options.to}&page=${page}&per_page=${perPage}`;
     const response = await fetcher(url, {
-      headers: { 'X-Api-Key': options.apiKey },
+      headers: { [HEADER_API_KEY]: options.apiKey },
     });
 
     if (!response.ok) {
@@ -288,7 +290,7 @@ export async function fetchLocations(options: FetchLocationsOptions): Promise<IM
   const fetcher = options.fetch || globalThis.fetch;
   const url = `${options.baseUrl}/api/v1/locations?tenant_id=${options.tenantId}`;
   const response = await fetcher(url, {
-    headers: { 'X-Api-Key': options.apiKey },
+    headers: { [HEADER_API_KEY]: options.apiKey },
   });
 
   if (!response.ok) {
