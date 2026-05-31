@@ -40,10 +40,15 @@
 - **Tenant Isolation**: Every table has `FORCE ROW LEVEL SECURITY`. Policies must use `get_my_tenant()`.
 - **Server-Side Auth**: API routes use `createServerClient` from `@supabase/ssr`. Never trust `tenant_id` from a client payload.
 - **DB Function Hardening**: Every `SECURITY DEFINER` function MUST:
-    1. Include `SET search_path = public`.
+    1. Include `SET search_path TO 'public'` (not `'pg_catalog', 'public'` — exception for functions that query pg_catalog directly).
     2. Include `REVOKE EXECUTE ON FUNCTION ... FROM anon`.
+- **Anon Table Privilege Hardening**: Tables must NOT grant `ALL` to `anon`. Grant only the minimum privilege required:
+  - `api_keys`, `graph_sync_queue`, `whatsapp_outbox`: zero anon access
+  - `current_inventory`, `rate_limits`: SELECT only
+  - `whatsapp_inbox`: SELECT+INSERT (webhook inbound)
+  - `ALTER DEFAULT PRIVILEGES` must not grant INSERT to anon for future tables
 - **Security Verification**: Critical RPCs must be registered in `v2/src/lib/db-security-contract.ts` for automated catalog contract testing.
-- **Automated Catalog Contracts**: We validate database state in real-time with a live integration test suite (`db-security.test.ts`) that queries the PostgreSQL catalog using the `get_function_security_state` oracle RPC. This ensures every critical function strictly enforces injection protection (`search_path=public`) and completely revokes execution privileges from `public` and `anon` roles.
+- **Automated Catalog Contracts**: We validate database state in real-time with a live integration test suite (`db-security.test.ts`, `db-security-privileges.test.ts`) that queries the PostgreSQL catalog using the `get_function_security_state` oracle RPC and `get_table_privilege_state_v1` RPC. This ensures every critical function strictly enforces injection protection (`search_path=public`) and completely revokes execution privileges from `public` and `anon` roles.
 - **Migration Protocol**: Add new numbered files to `sql/b2b_evolution/`. Never alter applied migrations.
 - **Supabase Pagination**: Supabase `.select()` defaults to 1000 rows minimum. Any query on tables that may exceed 1000 rows MUST paginate with `.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)` using `PAGE_SIZE = 1000` and `.order('id')`. This applies to ETL scripts, backfill routes, and analytics queries.
 

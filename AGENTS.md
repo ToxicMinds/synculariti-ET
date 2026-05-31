@@ -62,7 +62,7 @@ Synculariti consists of two separate applications. They do NOT share a database.
 | Principle | Status | Standard |
 | :--- | :--- | :--- |
 | **ACID** | 🟢 **Hardened** | All ledger mutations (Finance/Logistics) use atomic Postgres RPCs. |
-| **Security** | 🟢 **Hardened** | RLS enforced on all tables. `search_path` and `REVOKE` policies verified via contract. |
+| **Security** | 🟢 **Hardened** | Phase 1: enqueue_graph_sync_internal hardened (SECURITY DEFINER + search_path), anon privilege lockdown on 6 tables, ALTER DEFAULT PRIVILEGES fixed, health endpoint simplified to static liveness, CRON_SECRET uses timingSafeEqual. Verified via 10 new automated tests (db-security-privileges, health, cron). |
 | **DRY** | 🟢 **Hardened** | AI prompts, Neo4j utilities, Auth components, `safeAmount()`, `createServiceClient()`, `createOpenWAClient()`, and error handling unified in `@/lib`. Strategy maps replace if-else chains (financeAudit, triggerWorkflow). |
 | **Type Safety** | 🟢 **Hardened** | **0** `: any` usages. Full interface coverage for external data (eKasa, Groq, Web Locks). All catch blocks typed `unknown` with `getErrorMessage()`. |
 | **SOLID** | 🟢 **Hardened** | Domain logic isolated in `modules/`. Business logic decoupled from UI via headless hooks. SRP extractions: scanner-client split into 3 (V-88), insight-queries types extracted (V-89), dispatchDecision split into 2 (V-90), webhook/route split into 4 utilities (V-54). OCP: decision-router accepts new handlers via registry (V-87). DIP: services injected via constructor pattern (V-85). |
@@ -79,12 +79,14 @@ Synculariti consists of two separate applications. They do NOT share a database.
 - **No Direct DML**: DB explicitly denies `INSERT/UPDATE/DELETE` to `authenticated` clients. Use canonical RPCs (e.g., `save_receipt_v4`).
 - **Data Integrity Contracts**: All ledger mutations MUST maintain strict compliance with schema contracts, including propagating `updated_at` timestamps to prevent `42703 undefined_column` crashes.
 - **Session-Based tenant_id**: `tenant_id` is resolved server-side from session via RLS — never passed as a param.
-- **search_path Safety**: All DB functions must include `SET search_path = public`.
+- **search_path Safety**: All `SECURITY DEFINER` DB functions must include `SET search_path TO 'public'` (not `'pg_catalog', 'public'` — exception only for functions that query pg_catalog directly).
 - **Auth Guard**: All sensitive API routes MUST be wrapped with `withAuth` middleware and use the `SecureContext` pattern for type-safe App Router compliance.
 - **Input Validation**: All API routes MUST use Zod schemas from the unified validation registry for request sanitization.
 - **Route Auth Pattern**: All internal API routes MUST use `withTestHandler(handler)` from `@/lib/withTestHandler` instead of the inline `process.env.NODE_ENV === 'test' ? handler : withAuth(handler)` pattern.
 - **Normalizing Washer**: Use the 'Washer' pattern (Zod transforms + defaults) for all routes handling external or nullable metadata to guarantee type safety without rejecting valid but incomplete data.
 - **Factory Pattern for Service Clients**: Use `createServiceClient()` from `@/lib/supabase-server` for all `service_role` Supabase clients. Uses `@supabase/supabase-js` `createClient` with `autoRefreshToken: false, persistSession: false`. Never instantiate `new createClient(URL, SERVICE_KEY)` inline.
+- **Timing-Safe Secret Comparison**: All secret/API-key comparisons in API routes MUST use constant-time comparison (`timingSafeEqual` — custom function or `crypto.timingSafeEqual`) to prevent timing side-channel attacks. Never use `!==` or `===` for secrets.
+- **Health Endpoint**: Health/liveness checks MUST be static `{ status: 'ok' }` with no database sessions, Neo4j queries, or infrastructure details. Health endpoints must not create connections or leak configuration.
 
 ### 4.3 Intelligence Strategy
 We use a deterministic AI pipeline for financial categorization:
@@ -666,4 +668,39 @@ Read this file before modifying any FCV logic to maintain formula consistency.
 - **Coverage**: The entire codebase (lib/, API routes, modules, actions) uses this single function. Any new code must follow suit.
 - **Why not `@synculariti/whatsapp-client`**: `getErrorMessage` also exists in the shared package, but ET-internal code must use `@/lib/utils` to avoid cross-package dependency chains during test resolution.
 
+---
+
+## 7. Phase 1 Security Hardening
+
+This section documents the Phase 1 security hardening campaign. All 4 issues have been fixed and verified via automated tests.
+
+### 7.1 Issues Found & Fixed
+
+| # | Issue | Severity | File/Location | Fix |
+|---|-------|----------|---------------|-----|
+| 1 | `enqueue_graph_sync_internal` missing SECURITY DEFINER | **CRITICAL** | `remote_schema.sql:400` | Added SECURITY DEFINER + `SET search_path TO 'public'` + REVOKE EXECUTE FROM anon |
+| 2 | `/api/health` created Supabase SSR + Neo4j sessions | **HIGH** | `health/route.ts` | Simplified to static `{ status: 'ok' }` |
+| 3 | CRON_SECRET compared with `!==` (timing attack) | **HIGH** | `cron/process-outbox/route.ts:10` | Replaced with constant-time `timingSafeEqual()` |
+| 4 | GRANT ALL TO anon on 6 tables + ALTER DEFAULT PRIVILEGES | **HIGH** | `remote_schema.sql:2525-2683` | REVOKE ALL, GRANT minimal (SELECT-only/zero), fixed default privileges |
+
+### 7.2 Migration Files
+
+| File | Purpose |
+|------|---------|
+| `20260530003_security_hardening_phase1.sql` | Test RPCs + enqueue fix + anon grants fix + default privileges fix |
+| `20260530004_fix_enqueue_searchpath.sql` | Corrected enqueue search_path syntax to `SET search_path TO 'public'` |
+
+### 7.3 New Test Files
+
+| Test File | Tests | What It Covers |
+|-----------|-------|----------------|
+| `src/lib/db-security-privileges.test.ts` | 7 | 6 table privilege assertions + ALTER DEFAULT PRIVILEGES check |
+| `src/app/api/health/route.test.ts` | 1 | Static liveness response, no infrastructure details |
+| `src/app/api/cron/process-outbox/route.test.ts` | 2 | Timing-safe comparison + CRON_SECRET missing gate |
+
+### 7.4 Verification
+
+- All 4 hardening issues fixed and verified via 10 new automated tests
+- 503 total tests passing, 3 pre-existing failures (pipeline-schema.test.ts — unrelated)
+- Zero regressions introduced
 

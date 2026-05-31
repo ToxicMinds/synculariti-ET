@@ -67,7 +67,15 @@ export const BATCH_1_SECURITY_CONTRACT: FunctionSecurityRequirement[] = [
     hasSearchPathPublic: true,
     isRevokedFromPublic: true,
     isGrantedToAuthenticated: true,
-  }
+  },
+  {
+    functionName: 'enqueue_graph_sync_internal',
+    args: 'uuid, text, uuid, text, jsonb',
+    exists: true,
+    hasSearchPathPublic: true,
+    isRevokedFromPublic: true,
+    isGrantedToAuthenticated: true,
+  },
 ];
 
 /**
@@ -84,7 +92,7 @@ export const BATCH_1_LANDMINE_CONTRACT: FunctionSecurityRequirement[] = [
     functionName: 'create_organization',
     args: 'text, text, text',
     exists: false
-  }
+  },
 ];
 
 /**

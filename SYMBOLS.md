@@ -139,6 +139,8 @@
 - `interface FunctionSecurityState`: Direct representation of live Postgres security catalog checks.
 - `const RPC_GET_SECURITY_STATE`: RPC name for Postgres catalog check function.
 - `RPC Function: public.get_function_security_state()`: Secure catalog inspector that queries pg_proc to verify search_path and EXECUTE privileges.
+- `RPC Function: public.get_table_privilege_state_v1(table_name)`: Catalog inspector for table-level privilege state per role. Returns anon SELECT/INSERT/UPDATE/DELETE/REFERENCES/TRIGGER + RLS status. Used by `db-security-privileges.test.ts`. (supabase/migrations/20260530003)
+- `RPC Function: public.check_default_privileges_v1()`: Checks whether ALTER DEFAULT PRIVILEGES grants INSERT to anon for future tables. Used by `db-security-privileges.test.ts`. (supabase/migrations/20260530003)
 - `function TenantDataProvider()`: Read-side context provider for tenant data.
 - `function useTenantData()`: Hook for consuming shared tenant state.
 - `function TenantMutationProvider()`: Write-side context provider for state mutations.
@@ -246,6 +248,12 @@
 - `function buildSyncPayload(txRow, items, options?): TransactionSyncPayload`: Constructs a `TransactionSyncPayload` from a database transaction row and its receipt items. Handles vendor name extraction, merchant ID building, item mapping via `mapToOntologyItem()`, date enrichment via `enrichDate()`, and optional category inference. Defined in `src/lib/neo4j-ontology.ts`. Eliminates 3 near-identical blocks. (V-47 fix)
 - `Zod Schema: BaseDecisionSchema`: Shared base Zod schema for webhook callback payloads (`type`, `outboxId`, `recipientPhone`, `tenantId`, `timestamp`). Extended by `POApprovalWebhookSchema`, `AuditWebhookSchema`, `POSDiscrepancyWebhookSchema` with domain-specific `decision` enums. Defined in `src/modules/whatsapp/lib/webhook-payloads.ts`. (V-48 fix)
 - `interface BaseDecisionPayload`: Inferred type from `BaseDecisionSchema`. Used by `dispatchDecision` server action for its constructed payload. (V-48 fix)
+
+## Phase 1 Security Hardening (Test Files)
+- `Test File: src/lib/db-security-privileges.test.ts` (7 tests): Verifies anon privilege lockdown on 6 tables (`api_keys`, `current_inventory`, `graph_sync_queue`, `rate_limits`, `whatsapp_inbox`, `whatsapp_outbox`) + ALTER DEFAULT PRIVILEGES does not grant INSERT to anon. Uses `get_table_privilege_state_v1` and `check_default_privileges_v1` RPCs.
+- `Test File: src/app/api/health/route.test.ts` (1 test): Verifies health endpoint returns `{ status: 'ok' }` without exposing Supabase or Neo4j infrastructure details.
+- `Test File: src/app/api/cron/process-outbox/route.test.ts` (2 tests): Verifies CRON_SECRET uses timing-safe comparison (not `!==`) and returns 401 when CRON_SECRET is missing.
+- `function timingSafeEqual(a, b)`: Custom constant-time string comparison used in `cron/process-outbox/route.ts`. XOR-based loop prevents timing side-channel attacks on secret comparison. Defined inline in the route. Replaces `!==` pattern.
 
 ## WhatsApp Types
 - `interface OutboxRecord`: Full type for `whatsapp_outbox` rows. Properties: `id`, `tenant_id`, `recipient_phone`, `payload` (`{ type: 'text' | 'poll', text?, name?, options?, metadata? }`), `webhook_url?`. Exported from `src/modules/whatsapp/types.ts`.
