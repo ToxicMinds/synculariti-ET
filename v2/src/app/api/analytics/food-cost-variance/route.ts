@@ -110,11 +110,11 @@ const handler: SecureHandler = async (req, context) => {
           && enriched.theoretical_grams.ingredients.length > 0;
 
         await supabase.from('pos_transaction_staging').update({
-          theoretical_grams: enriched.theoretical_grams,
+          theoretical_grams: enriched.theoretical_grams ?? null,
           recipe_found: hasGrams,
         }).eq('id', row.id);
 
-        row.theoretical_grams = enriched.theoretical_grams;
+        row.theoretical_grams = enriched.theoretical_grams ?? null;
         row.recipe_found = hasGrams;
       } catch (e: unknown) {
         await ServerLogger.system('WARN', 'FCV', 'Staging enrichment failed for individual row', {
