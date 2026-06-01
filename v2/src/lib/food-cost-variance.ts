@@ -71,46 +71,22 @@ interface Input {
   period: { start: string; end: string };
 }
 
-function dateOnly(iso: string): string {
-  return iso.slice(0, 10);
-}
+import { dateOnly, isoWeekKey, daysInPeriod } from './date-utils';
 
-function isoWeekKey(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
-}
-
-function daysInPeriod(start: string, end: string): number {
-  const s = new Date(start + 'T00:00:00Z');
-  const e = new Date(end + 'T00:00:00Z');
-  return Math.floor((e.getTime() - s.getTime()) / 86400000) + 1;
-}
-
-export function computeFCVReport(input: Input): FCVReport {
-  const { purchases, posStaging, period } = input;
+function computeAggregates(purchases: FCVPurchaseRow[], posStaging: FCVPOSRow[], period: { start: string; end: string }): {
+  headline: FCVHeadline;
+  dataCoverage: FCVReport['dataCoverage'];
+  direction: FCVHeadline['direction'];
+} {
   const { start, end } = period;
   const totalDays = daysInPeriod(start, end);
 
-  const filteredPurchases = purchases.filter(p => {
-    const pd = p.purchase_date;
-    return pd >= start && pd <= end;
-  });
-
-  const filteredPOS = posStaging.filter(p => {
-    const pd = dateOnly(p.transaction_time);
-    return pd >= start && pd <= end;
-  });
-
   // Actual spend
-  const actualSpend = filteredPurchases.reduce((sum, p) => sum + p.total_amount, 0);
+  const actualSpend = purchases.reduce((sum, p) => sum + p.total_amount, 0);
 
   // Theoretical COGS and revenue
-  const theoreticalCOGS = filteredPOS.reduce((sum, p) => sum + p.cost, 0);
-  const totalRevenue = filteredPOS.reduce((sum, p) => sum + p.revenue, 0);
+  const theoreticalCOGS = posStaging.reduce((sum, p) => sum + p.cost, 0);
+  const totalRevenue = posStaging.reduce((sum, p) => sum + p.revenue, 0);
 
   // Gap
   const gap = actualSpend - theoreticalCOGS;
@@ -123,7 +99,7 @@ export function computeFCVReport(input: Input): FCVReport {
   else if (gap < -threshold) direction = 'PROFITABLE';
 
   // Data coverage
-  const uniqueDays = new Set(filteredPOS.map(p => dateOnly(p.transaction_time)));
+  const uniqueDays = new Set(posStaging.map(p => dateOnly(p.transaction_time)));
   const daysWithPOSData = uniqueDays.size;
   const pctCovered = totalDays > 0 ? (daysWithPOSData / totalDays) * 100 : 0;
   let warning: string | null = null;
@@ -136,17 +112,40 @@ export function computeFCVReport(input: Input): FCVReport {
   const gapLower = gap * (1 - uncertaintyPct);
   const gapUpper = gap * (1 + uncertaintyPct);
 
-  // Per-ingredient
+  return {
+    direction,
+    dataCoverage: {
+      daysWithPOSData,
+      daysInPeriod: totalDays,
+      pctCovered: Math.round(pctCovered * 10) / 10,
+      warning,
+    },
+    headline: {
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      theoreticalCOGS: Math.round(theoreticalCOGS * 100) / 100,
+      actualSpend: Math.round(actualSpend * 100) / 100,
+      gap: Math.round(gap * 100) / 100,
+      gapPct: gapPct !== null ? Math.round(gapPct * 100) / 100 : null,
+      confidenceBands: {
+        gapLower: Math.round(gapLower * 100) / 100,
+        gapUpper: Math.round(gapUpper * 100) / 100,
+      },
+      direction,
+    },
+  };
+}
+
+function computePerIngredient(purchases: FCVPurchaseRow[], posStaging: FCVPOSRow[]): FCVIngredient[] {
   const ingMap = new Map<string, { theoreticalCost: number; actualCost: number }>();
 
-  for (const p of filteredPurchases) {
+  for (const p of purchases) {
     const key = p.ingredient_id;
     const entry = ingMap.get(key) || { theoreticalCost: 0, actualCost: 0 };
     entry.actualCost += p.total_amount;
     ingMap.set(key, entry);
   }
 
-  for (const p of filteredPOS) {
+  for (const p of posStaging) {
     const key = p.ingredient_id;
     const entry = ingMap.get(key) || { theoreticalCost: 0, actualCost: 0 };
     entry.theoreticalCost += p.cost;
@@ -156,12 +155,12 @@ export function computeFCVReport(input: Input): FCVReport {
   const totalAbsoluteGap = Array.from(ingMap.values())
     .reduce((sum, e) => sum + Math.abs(e.actualCost - e.theoreticalCost), 0);
 
-  const byIngredient: FCVIngredient[] = Array.from(ingMap.entries())
+  return Array.from(ingMap.entries())
     .map(([ingId, entry]) => {
       const ingGap = entry.actualCost - entry.theoreticalCost;
       const ingGapPct = entry.theoreticalCost > 0 ? ((ingGap / entry.theoreticalCost) * 100) : null;
-      const ingredientName = filteredPurchases.find(p => p.ingredient_id === ingId)?.ingredient_name
-        || filteredPOS.find(p => p.ingredient_id === ingId)?.ingredient_name
+      const ingredientName = purchases.find(p => p.ingredient_id === ingId)?.ingredient_name
+        || posStaging.find(p => p.ingredient_id === ingId)?.ingredient_name
         || ingId;
       return {
         ingredient: ingredientName,
@@ -173,11 +172,13 @@ export function computeFCVReport(input: Input): FCVReport {
       };
     })
     .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+}
 
+function computeTemporalAnalysis(purchases: FCVPurchaseRow[], posStaging: FCVPOSRow[]): { weeklyTrend: FCVWeeklyTrend[]; varianceSpikes: FCVSpike[] } {
   // Weekly trend
   const weekMap = new Map<string, { revenue: number; theoreticalCOGS: number; actualSpend: number }>();
 
-  for (const p of filteredPOS) {
+  for (const p of posStaging) {
     const wk = isoWeekKey(dateOnly(p.transaction_time));
     const entry = weekMap.get(wk) || { revenue: 0, theoreticalCOGS: 0, actualSpend: 0 };
     entry.revenue += p.revenue;
@@ -185,7 +186,7 @@ export function computeFCVReport(input: Input): FCVReport {
     weekMap.set(wk, entry);
   }
 
-  for (const p of filteredPurchases) {
+  for (const p of purchases) {
     const wk = isoWeekKey(p.purchase_date);
     const entry = weekMap.get(wk) || { revenue: 0, theoreticalCOGS: 0, actualSpend: 0 };
     entry.actualSpend += p.total_amount;
@@ -203,14 +204,14 @@ export function computeFCVReport(input: Input): FCVReport {
   // Variance spikes (per day)
   const dayMap = new Map<string, { actualSpend: number; theoreticalCOGS: number }>();
 
-  for (const p of filteredPOS) {
+  for (const p of posStaging) {
     const day = dateOnly(p.transaction_time);
     const entry = dayMap.get(day) || { actualSpend: 0, theoreticalCOGS: 0 };
     entry.theoreticalCOGS += p.cost;
     dayMap.set(day, entry);
   }
 
-  for (const p of filteredPurchases) {
+  for (const p of purchases) {
     const day = p.purchase_date;
     const entry = dayMap.get(day) || { actualSpend: 0, theoreticalCOGS: 0 };
     entry.actualSpend += p.total_amount;
@@ -231,29 +232,31 @@ export function computeFCVReport(input: Input): FCVReport {
       return { date, gap: dayGap, flag, likelyCause: null };
     });
 
+  return { weeklyTrend, varianceSpikes };
+}
+
+export function computeFCVReport(input: Input): FCVReport {
+  const { purchases, posStaging, period } = input;
+  const { start, end } = period;
+
+  const filteredPurchases = purchases.filter(p => {
+    const pd = p.purchase_date;
+    return pd >= start && pd <= end;
+  });
+
+  const filteredPOS = posStaging.filter(p => {
+    const pd = dateOnly(p.transaction_time);
+    return pd >= start && pd <= end;
+  });
+
+  const aggregates = computeAggregates(filteredPurchases, filteredPOS, period);
+  const temporal = computeTemporalAnalysis(filteredPurchases, filteredPOS);
+  const byIngredient = computePerIngredient(filteredPurchases, filteredPOS);
+
   return {
-    direction,
     period: { start, end },
-    dataCoverage: {
-      daysWithPOSData,
-      daysInPeriod: totalDays,
-      pctCovered: Math.round(pctCovered * 10) / 10,
-      warning,
-    },
-    headline: {
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      theoreticalCOGS: Math.round(theoreticalCOGS * 100) / 100,
-      actualSpend: Math.round(actualSpend * 100) / 100,
-      gap: Math.round(gap * 100) / 100,
-      gapPct: gapPct !== null ? Math.round(gapPct * 100) / 100 : null,
-      confidenceBands: {
-        gapLower: Math.round(gapLower * 100) / 100,
-        gapUpper: Math.round(gapUpper * 100) / 100,
-      },
-      direction,
-    },
+    ...aggregates,
+    ...temporal,
     byIngredient,
-    weeklyTrend,
-    varianceSpikes,
   };
 }

@@ -4,5 +4,11 @@
       "source": "/ekasa-proxy/:match*",
       "destination": "https://ekasa.financnasprava.sk/mdu/api/v1/opd/:match*"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/release-quarantines",
+      "schedule": "*/15 * * * *"
+    }
   ]
 }

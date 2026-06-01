@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { InfoTooltip } from './InfoTooltip';
 
 export function BentoCard({ 
@@ -20,12 +20,17 @@ export function BentoCard({
 }) {
   const [isMobile, setIsMobile] = useState(false);
 
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 640);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+  const checkMobile = useCallback(() => {
+    setIsMobile(window.innerWidth <= 640);
   }, []);
+
+  useEffect(() => {
+    checkMobile();
+    if (typeof window === 'undefined') return;
+    const ro = new ResizeObserver(checkMobile);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, [checkMobile]);
 
   return (
     <div 

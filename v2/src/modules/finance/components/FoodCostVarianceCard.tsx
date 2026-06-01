@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { VarianceSpikeDetail } from "./VarianceSpikeDetail";
 import { BentoCard } from '@/components/BentoCard';
 import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
@@ -61,8 +62,6 @@ export function FoodCostVarianceCard({ selectedMonth, colSpan = 6 }: FoodCostVar
   }
 
   const dir = report ? DirectionConfig[report.direction] : null;
-
-  const spikeCount = report?.varianceSpikes.filter(s => s.flag !== 'NORMAL').length ?? 0;
 
   return (
     <BentoCard
@@ -162,7 +161,10 @@ export function FoodCostVarianceCard({ selectedMonth, colSpan = 6 }: FoodCostVar
             </div>
           )}
 
-          {/* Coverage + spikes footer */}
+          {/* Spikes Detail */}
+          <VarianceSpikeDetail spikes={report.varianceSpikes} />
+
+          {/* Coverage footer */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--border-color)' }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
               Coverage: {report.dataCoverage.pctCovered.toFixed(0)}%
@@ -170,11 +172,6 @@ export function FoodCostVarianceCard({ selectedMonth, colSpan = 6 }: FoodCostVar
                 <span style={{ marginLeft: 4, color: 'var(--accent-warn)' }}>⚠</span>
               )}
             </span>
-            {spikeCount > 0 && (
-              <span style={{ fontSize: 11, color: 'var(--accent-danger)', fontWeight: 600 }}>
-                {spikeCount} spike{spikeCount > 1 ? 's' : ''}
-              </span>
-            )}
           </div>
         </div>
       )}

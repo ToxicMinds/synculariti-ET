@@ -221,21 +221,27 @@
 - `Table: public.cached_recipes`: ET's local cache of IMS recipe data. Refreshed every 24h. Not the source of truth — IMS is.
 - `Table: public.cached_ingredients`: ET's local cache of IMS ingredient data (cost, stock levels). Refreshed every 24h.
 
-## Food Cost Variance Pipeline
-- `Table: public.pos_transaction_staging`: Staging table for unverified POS data from IMS. Carries `flag` (PENDING/APPROVED/QUARANTINED), `anomaly_score`, `anomaly_reason`. Quarantined rows visible in `v_quarantine_audit`.
+## Food Cost Variance Pipeline (Postgres-based)
+- `Table: public.pos_transaction_staging`: Staging table for POS data from IMS. Carries `flag` (PENDING/APPROVED/QUARANTINED), `recipe_found` (boolean indexing flag for enrichment status), `theoretical_grams` (JSONB of per-ingredient consumption). Lazy-enriched by the FCV route on read.
 - `Table: public.pos_batch_uploads`: Metadata per IMS POS data pull. Tracks status (STAGED/PROCESSING/COMPLETED/FAILED), receipt counts, period covered.
-- `Table: public.pos_data_gaps`: Tracks calendar days without POS data. Detected by comparing IMS API responses against expected days. Triggers WhatsApp alert after 12h.
-- `Table: public.cached_recipes`: Local cache of IMS recipe data. Menu item → ingredient composition in grams.
-- `RPC Function: public.process_batch_v1(p_batch_id)`: Iterates staging rows, computes Z-scores against 90-day rolling baseline per item_sku, flags outliers as QUARANTINED. Auto-approves when baseline < 5 samples.
-- `View: public.v_quarantine_audit`: Human-readable view of all QUARANTINED rows across all batches. Used by operators to review and manually override.
-- `Neo4j Node: :Sale`: Represents a POS sale receipt. Properties: id, tenant_id, transaction_time, receipt_number, till_id, total_revenue, is_void, is_comp.
-- `Neo4j Node: :ConsumptionEstimate`: Represents theoretical ingredient consumption derived from POS sales × recipes. Properties: id, tenant_id, grams_consumed, cost_at_latest_price. Linked to `:Sale` via `[:ESTIMATES]` and to `:Ingredient` via `[:OF_INGREDIENT]`.
-- `Neo4j Relationship: [:ESTIMATES]`: Links a `:Sale` to its `:ConsumptionEstimate` nodes.
-- `Neo4j Relationship: [:OF_INGREDIENT]`: Links a `:ConsumptionEstimate` to the `:Ingredient` it consumed.
-- `function syncSalesWithConsumption(sales, tx)`: Neo4j sync function (Phase 4) that creates `:Sale` and `:ConsumptionEstimate` nodes after the existing 3-phase bulk merge. (lib/neo4j-temporal.ts, to be built)
-- `function generateFoodCostVarianceReport(tenantId, startDate, endDate)`: Generates the Food Cost Variance Report by querying Neo4j for Revenue (Sale), Theoretical COGS (ConsumptionEstimate × cost), and Actual Spend (Transaction). Returns `FoodCostVarianceReport` interface. (lib/food-cost-variance.ts, to be built)
-- `interface FoodCostVarianceReport`: Full report shape: `{ period, dataCoverage, headline: { totalRevenue, theoreticalCOGS, actualSpend, gap, gapPct, confidenceBands, direction }, topIngredients, weeklyTrend, varianceSpikes, recommendation }`.
-- `API Route: GET /api/analytics/food-cost-variance`: Returns the Food Cost Variance Report for the authenticated tenant's selected period. Cached server-side for 1 hour.
+- `Table: public.pos_data_gaps`: Tracks calendar days without POS data.
+- `Table: public.cached_recipes`: Local cache of IMS recipe data. Menu item → ingredient composition in grams. Populated by `refreshRecipeCache()`.
+- `Table: public.cached_ingredients`: Local cache of IMS ingredient data. Tracks cost_per_gram, perishability_days, current_stock_grams.
+- `Table: public.purchases`: Ingredient-linked purchase records. Carries `quarantine_status` (PENDING/APPROVED/REJECTED/AUTO_RELEASED/RELEASED), `ingredient_id`, `ingredient_name`. Source of actual spend.
+- `Table: public.purchase_anomaly_queue`: Anomaly flags triggered during batch processing. Carries `status` (OPEN/DISMISSED/ESCALATED/RESOLVED), `purchase_id`, `check_type`, `severity`.
+- `RPC Function: public.process_batch_v1(p_batch_id)`: Iterates staging rows, computes Z-scores against 90-day rolling baseline, flags outliers.
+- `RPC Function: public.release_expired_quarantines_v1()`: Releases purchases older than 30 days. Uses `GET DIAGNOSTICS ROW_COUNT` for multi-tenant accumulation. Called by cron route.
+- `RPC Function: public.resolve_purchase_quarantine_v1(p_purchase_id UUID, p_status TEXT)`: Directly resolves a purchase quarantine. Bulk-updates anomaly queue rows by `purchase_id`. SECURITY DEFINER. Called by `resolvePurchaseAction` server action.
+- `function refreshRecipeCache(supabase, tenantId)`: Exists in `src/lib/ims-client.ts`. 24h TTL + 3-day stale grace. Fetches from IMS API, uses `onConflict: 'tenant_id, menu_item_id'` for idempotent upserts. Degrades gracefully (no-op) if IMS is offline but cache is within stale grace.
+- `function enrichStagingRow(supabase, tenantId, row)`: Exists in `src/lib/ims-client.ts`. Pure transformation — reads from `cached_recipes`, maps `menu_item_id` + `quantity` → `theoretical_grams` ingredient array. Returns enriched row. Caller writes to DB.
+- `function resolveConsumption(posItem, recipes)`: Exists in `src/lib/ims-client.ts`. Pure function that resolves a POS item's menu_item_id against a `Map<string, CachedRecipe>`. Returns `{ consumptions, status }` where status is RESOLVED/PARTIAL/UNKNOWN.
+- `API Route: GET /api/analytics/food-cost-variance`: Returns the FCV Report for the authenticated tenant's selected period. **Lazy enrichment**: calls `refreshRecipeCache`, iterates `pos_transaction_staging` rows where `recipe_found IS NULL`, enriches via `enrichStagingRow`, writes back `theoretical_grams` + `recipe_found`. Non-idempotent on first request per date range. Per-row try/catch isolation.
+- `API Route: GET /api/cron/release-quarantines`: Serverless (nodejs) cron route. Authenticates via `x-cron-secret` with `timingSafeEqual`. Calls `release_expired_quarantines_v1` RPC.
+- `function computeFCVReport({ purchases, posStaging, period })`: Exists in `src/lib/food-cost-variance.ts`. SRP-extracted into `computeAggregates`, `computePerIngredient`, `computeTemporalAnalysis`.
+- `Server Action: resolvePurchaseAction(purchaseId, decision)`: Exists in `src/modules/finance/actions/resolvePurchaseAction.ts`. `'use server'` action. Calls `resolve_purchase_quarantine_v1` RPC, uses `createClient()` from `@/lib/supabase-server`, logs via `ServerLogger`, revalidates paths.
+- `Component: VarianceSpikeDetail`: Exists in `src/modules/finance/components/VarianceSpikeDetail.tsx`. Pure render — receives `spikes: FCVSpike[]` as prop. Renders last 3 non-NORMAL spikes with `↑ Spike` / `↓ Dip` indicators. No `useNavigation`, no data fetching.
+- `Component: NeedsAttentionCard`: Exists in `src/modules/finance/components/NeedsAttentionCard.tsx`. Pending purchases chip opens review modal. Modal fetches rows from `purchases WHERE quarantine_status = 'PENDING'`. Approve/Reject buttons call `resolvePurchaseAction`.
+- `interface FoodCostVarianceReport`: `{ period, dataCoverage, headline: { totalRevenue, theoreticalCOGS, actualSpend, gap, gapPct, confidenceBands, direction }, byIngredient, weeklyTrend, varianceSpikes }`.
 
 ## Shared Utilities
 - `function getErrorMessage(e: unknown): string`: Single error-to-string function used across the entire codebase. Defined in `src/lib/utils.ts`. Replaces 30+ inline `e instanceof Error ? e.message : String(e)` duplications. Also exported from `@synculariti/whatsapp-client` but ET-internal code must use `@/lib/utils`.

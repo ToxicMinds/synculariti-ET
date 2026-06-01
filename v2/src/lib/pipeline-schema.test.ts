@@ -4,7 +4,7 @@ import { resolveFixtures, TestFixtures, skipIfNoFixtures } from './test-fixtures
 
 interface ReleaseQuarantineResult {
   released_purchases: number;
-  released_queue: number;
+  released_pending: number;
 }
 
 describe('Phase 0: Two-Table Architecture Schema Contract', () => {
@@ -79,7 +79,7 @@ describe('Phase 0: Two-Table Architecture Schema Contract', () => {
 
       test('quarantine_status accepts all valid values', async () => {
         if (skipIfNoFixtures(fx)) return;
-        const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'AUTO_RELEASED'];
+        const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'AUTO_RELEASED', 'RELEASED'];
         for (const status of validStatuses) {
           const { error } = await supabase.from('purchases').insert({
             tenant_id: fx.tenantId, location_id: fx.locationId, account_id: fx.accountId,
@@ -397,13 +397,13 @@ describe('Phase 0: Two-Table Architecture Schema Contract', () => {
 
   // ───── release_expired_quarantines_v1 behavior ─────
   describe('release_expired_quarantines_v1 behavior', () => {
-    test('returns typed result with released_purchases and released_queue', async () => {
+    test('returns typed result with released_purchases and released_pending', async () => {
       const { data, error } = await supabase.rpc('release_expired_quarantines_v1');
       expect(error).toBeNull();
       const result = data as unknown as ReleaseQuarantineResult[];
       expect(result).not.toBeNull();
       expect(typeof result[0].released_purchases).toBe('number');
-      expect(typeof result[0].released_queue).toBe('number');
+      expect(typeof result[0].released_pending).toBe('number');
     });
 
     test('returns zero when no pending quarantines exist', async () => {
@@ -411,7 +411,7 @@ describe('Phase 0: Two-Table Architecture Schema Contract', () => {
       expect(error).toBeNull();
       const result = data as unknown as ReleaseQuarantineResult[];
       expect(result[0].released_purchases).toBe(0);
-      expect(result[0].released_queue).toBe(0);
+      expect(result[0].released_pending).toBe(0);
     });
 
     test('idempotent: calling twice returns same zero result', async () => {
@@ -420,7 +420,7 @@ describe('Phase 0: Two-Table Architecture Schema Contract', () => {
       const a = first as unknown as ReleaseQuarantineResult[];
       const b = second as unknown as ReleaseQuarantineResult[];
       expect(a[0].released_purchases).toBe(b[0].released_purchases);
-      expect(a[0].released_queue).toBe(b[0].released_queue);
+      expect(a[0].released_pending).toBe(b[0].released_pending);
     });
   });
 

@@ -139,7 +139,21 @@
 - **Logger over console**: All production code MUST use `Logger.system()` / `Logger.user()` from `@/lib/logger`. Zero `console.log` / `console.warn` / `console.error` allowed outside the logger implementation itself.
 - **Single `timingSafeEqual`**: The constant-time comparison function lives in `@/lib/utils.ts` as `timingSafeEqual(a, b)`. All routes requiring timing-safe comparison MUST import from there, not re-implement inline.
 
-## 11. AI Insights Caching & Concurrency
+## 11. FCV Lazy Enrichment (Non-Idempotent GET)
+- The `GET /api/analytics/food-cost-variance` route performs a **read-through cache backfill** as a deliberate side-effect. Subsequent requests find `recipe_found IS NOT NULL` and behave as pure reads.
+- Per-row isolation: a single corrupt ingredient mapping must NOT crash the dashboard. Each enrichment attempt is wrapped in `try/catch` with `ServerLogger.system('WARN', ...)` and marks the row `recipe_found = false` to prevent infinite re-enrichment loops.
+- Use `recipe_found` flag for skip detection, not JSONB null check — boolean column is indexable and avoids JSONB parse overhead.
+- `enrichStagingRow` is a **pure transformation** that reads from `cached_recipes` and returns an enriched row. It does NOT write to the database — the caller decides persistence.
+
+## 12. Direct Purchase Resolution (Server Action)
+- `resolvePurchaseAction(purchaseId, decision)` is a `'use server'` action that calls `resolve_purchase_quarantine_v1` RPC. It bypasses WhatsApp/Sidecar for direct dashboard approvals.
+- The RPC performs a **bulk update on purchase_anomaly_queue** by `purchase_id`, not by individual row ID — because a single purchase can trigger multiple anomaly types.
+
+## 13. Environment Variable CI Contract
+- All env vars the application reads at runtime MUST be declared in `.env.example` with a default placeholder.
+- A Jest test (`env-contract.test.ts`) asserts that every var in a centrally-maintained `REQUIRED_ENV_VARS` array has a corresponding entry in `.env.example`. This test runs in the `backend` project (node context) and must only use `fs` and `path`.
+
+## 14. AI Insights Caching & Concurrency
 - **Session Isolation**: Never share a Neo4j session across concurrent `session.run()` calls. Use separate sessions per query when running in parallel.
 - **Caching**: Winning insight is cached in `tenants.config.ai_insight` with a 24-hour TTL. Bypass cache via `?force=1` query parameter.
 - **Fallback**: If any part of the pipeline fails (Neo4j disconnect, LLM 503, malformed data), fall back gracefully to `articulateFinding()` and never throw a 500 to the client. Return the "still syncing" status until valid data is produced.

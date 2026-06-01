@@ -7,11 +7,15 @@ import { OrgAccessForm } from '@/components/OrgAccessForm';
 import { Suspense, useState } from 'react';
 import { ItemCatalog } from '@/modules/logistics/components/ItemCatalog';
 import { NewItemModal } from '@/modules/logistics/components/NewItemModal';
+import { CreatePOModal } from '@/modules/logistics/components/CreatePOModal';
+import { useRouter } from 'next/navigation';
 
 function LogisticsDashboard() {
   const { session, tenant, loading: hLoading } = useTenant();
   const { items, categories, stock, loading: lLoading, addItem } = useLogistics(tenant?.tenant_id);
   const [showNewItem, setShowNewItem] = useState(false);
+  const [showCreatePO, setShowCreatePO] = useState(false);
+  const router = useRouter();
 
   const loading = hLoading || lLoading;
 
@@ -32,6 +36,10 @@ function LogisticsDashboard() {
           onSave={addItem} 
         />
       )}
+      
+      {showCreatePO && (
+        <CreatePOModal onClose={() => setShowCreatePO(false)} />
+      )}
 
       <header className="flex-between" style={{ padding: '24px 0' }}>
         <div>
@@ -39,6 +47,8 @@ function LogisticsDashboard() {
           <p className="card-subtitle">Manage catalog, stock levels, and procurement.</p>
         </div>
         <div className="flex-row gap-2">
+          <button className="btn btn-secondary" onClick={() => router.push('/logistics/history')}>View History</button>
+          <button className="btn btn-primary" onClick={() => setShowCreatePO(true)}>➕ Create PO</button>
           <button className="btn btn-primary" onClick={() => setShowNewItem(true)}>➕ New Item</button>
         </div>
       </header>

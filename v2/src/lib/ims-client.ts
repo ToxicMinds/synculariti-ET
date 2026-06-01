@@ -300,3 +300,52 @@ export async function fetchLocations(options: FetchLocationsOptions): Promise<IM
   const data: IMSLocationsResponse = await response.json();
   return data.locations || [];
 }
+
+// ───── enrichStagingRow ─────
+
+export interface POSStagingRow {
+  id: string;
+  tenant_id?: string;
+  menu_item_id: string;
+  menu_item_name?: string;
+  quantity: number;
+  revenue?: number;
+  theoretical_grams?: {
+    ingredients?: Array<{ ingredient_id: string; ingredient_name: string; grams: number; cost: number }>;
+  } | null;
+  [key: string]: any;
+}
+
+export async function enrichStagingRow(
+  supabase: { from: (table: string) => any },
+  tenantId: string,
+  row: POSStagingRow
+): Promise<POSStagingRow> {
+  const { data: recipe } = await supabase
+    .from('cached_recipes')
+    .select('ingredients')
+    .eq('tenant_id', tenantId)
+    .eq('menu_item_id', row.menu_item_id)
+    .maybeSingle();
+
+  if (!recipe || !recipe.ingredients || !Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
+    return { ...row, theoretical_grams: row.theoretical_grams || null };
+  }
+
+  const safeQty = Math.max(0, row.quantity || 0);
+  const resolved = recipe.ingredients.filter((i: any) => (i.grams_per_portion ?? 0) > 0);
+
+  const ingredients = resolved.map((i: any) => ({
+    ingredient_id: i.ingredient_id,
+    ingredient_name: i.ingredient_name,
+    grams: safeQty * (i.grams_per_portion ?? 0),
+    cost: safeQty * (i.grams_per_portion ?? 0) * (i.cost_per_gram ?? 0),
+  }));
+
+  return {
+    ...row,
+    theoretical_grams: {
+      ingredients,
+    },
+  };
+}

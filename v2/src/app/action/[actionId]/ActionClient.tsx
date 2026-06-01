@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { dispatchDecision } from '@/modules/whatsapp/actions/dispatchDecision';
+import { resolvePurchaseAction } from '@/modules/finance/actions/resolvePurchaseAction';
 import { Logger } from '@/lib/logger';
 
 interface ActionClientProps {
@@ -11,6 +12,7 @@ interface ActionClientProps {
     title: string;
     description: string;
     options: string[];
+    metadata?: Record<string, any>;
   };
 }
 
@@ -20,19 +22,38 @@ export function ActionClient({ actionId, tenantName, payload }: ActionClientProp
   const [errorMsg, setErrorMsg] = useState('');
   const [selectedOption, setSelectedOption] = useState('');
 
-  const handleOptionClick = async (option: string) => {
+  const isPurchaseQuarantine = payload.metadata?.purchase_id != null;
+  const purchaseId = payload.metadata?.purchase_id as string | undefined;
+
+  const handleOptionClick = async (option: string, directResolve: boolean = false) => {
     if (submitting) return;
     setSubmitting(true);
-    setSelectedOption(option);
+    setSelectedOption(option + (directResolve ? '_direct' : ''));
     setStatus('idle');
 
     try {
-      const result = await dispatchDecision(actionId, option);
-      if (result.success) {
-        setStatus('success');
+      if (directResolve && purchaseId) {
+        // Direct resolve using UI dashboard action
+        const decision = option === 'Approve' ? 'RELEASED' : 'REJECTED';
+        const result = await resolvePurchaseAction(purchaseId, decision);
+        
+        if (result.success) {
+          // Best effort mark the outbox as completed
+          await dispatchDecision(actionId, option).catch(() => {});
+          setStatus('success');
+        } else {
+          setStatus('error');
+          setErrorMsg(result.error || 'Failed to submit decision.');
+        }
       } else {
-        setStatus('error');
-        setErrorMsg(result.error || 'Failed to submit decision.');
+        // Default WhatsApp workflow
+        const result = await dispatchDecision(actionId, option);
+        if (result.success) {
+          setStatus('success');
+        } else {
+          setStatus('error');
+          setErrorMsg(result.error || 'Failed to submit decision.');
+        }
       }
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -50,7 +71,7 @@ export function ActionClient({ actionId, tenantName, payload }: ActionClientProp
         <div style={{ fontSize: '48px', animation: 'scaleUp 0.3s ease' }}>✅</div>
         <h2 className="card-title text-gradient">Response Submitted</h2>
         <p className="card-subtitle" style={{ maxWidth: '320px' }}>
-          Thank you. Your selection of <strong>"{selectedOption}"</strong> has been securely logged and processed by {tenantName}.
+          Thank you. Your selection has been securely logged and processed by {tenantName}.
         </p>
         <a href="/" className="btn btn-primary" style={{ marginTop: 16, padding: '12px 24px', textDecoration: 'none' }}>
           ← Back to Dashboard
@@ -77,27 +98,73 @@ export function ActionClient({ actionId, tenantName, payload }: ActionClientProp
 
       <div className="flex-col gap-3">
         {payload.options.map((option) => (
-          <button
-            key={option}
-            disabled={submitting}
-            onClick={() => handleOptionClick(option)}
-            className={`btn ${selectedOption === option && submitting ? 'btn-primary' : 'btn-secondary'}`}
-            style={{
-              width: '100%',
-              justifyContent: 'space-between',
-              padding: '14px 20px',
-              borderRadius: '14px',
-              opacity: submitting && selectedOption !== option ? 0.6 : 1,
-              position: 'relative'
-            }}
-          >
-            <span>{option}</span>
-            {submitting && selectedOption === option ? (
-              <span className="spinner-small" />
+          <div key={option} className="flex-col gap-2">
+            {isPurchaseQuarantine && option === 'Approve' ? (
+              <>
+                <button
+                  disabled={submitting}
+                  onClick={() => handleOptionClick(option, true)}
+                  className={`btn ${selectedOption === option + '_direct' && submitting ? 'btn-primary' : 'btn-primary'}`}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'space-between',
+                    padding: '14px 20px',
+                    borderRadius: '14px',
+                    opacity: submitting && selectedOption !== option + '_direct' ? 0.6 : 1,
+                    position: 'relative'
+                  }}
+                >
+                  <span>{option} (Direct)</span>
+                  {submitting && selectedOption === option + '_direct' ? (
+                    <span className="spinner-small" />
+                  ) : (
+                    <span style={{ fontSize: '18px' }}>→</span>
+                  )}
+                </button>
+                <button
+                  disabled={submitting}
+                  onClick={() => handleOptionClick(option, false)}
+                  className={`btn ${selectedOption === option && submitting ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'space-between',
+                    padding: '14px 20px',
+                    borderRadius: '14px',
+                    opacity: submitting && selectedOption !== option ? 0.6 : 1,
+                    position: 'relative'
+                  }}
+                >
+                  <span>{option} via WhatsApp</span>
+                  {submitting && selectedOption === option ? (
+                    <span className="spinner-small" />
+                  ) : (
+                    <span style={{ fontSize: '18px' }}>→</span>
+                  )}
+                </button>
+              </>
             ) : (
-              <span style={{ fontSize: '18px' }}>→</span>
+              <button
+                disabled={submitting}
+                onClick={() => handleOptionClick(option, false)}
+                className={`btn ${selectedOption === option && submitting ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  width: '100%',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  borderRadius: '14px',
+                  opacity: submitting && selectedOption !== option ? 0.6 : 1,
+                  position: 'relative'
+                }}
+              >
+                <span>{option}</span>
+                {submitting && selectedOption === option ? (
+                  <span className="spinner-small" />
+                ) : (
+                  <span style={{ fontSize: '18px' }}>→</span>
+                )}
+              </button>
             )}
-          </button>
+          </div>
         ))}
       </div>
 

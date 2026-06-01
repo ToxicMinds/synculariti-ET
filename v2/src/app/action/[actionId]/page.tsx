@@ -170,6 +170,7 @@ export async function ActionPageLoader({ actionId }: { actionId: string }) {
     title: record.payload?.name || 'Action Required',
     description: meta.description || (meta.amount ? formatCurrency(safeAmount(meta.amount), typeof meta.currency === 'string' ? meta.currency : 'EUR') : ''),
     options: record.payload?.options || [],
+    metadata: meta,
   };
 
   return (

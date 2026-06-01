@@ -4,6 +4,8 @@ import { withTestHandler } from '@/lib/withTestHandler';
 import { ServerLogger } from '@/lib/logger-server';
 import { SecureHandler } from '@/lib/types/api';
 import { computeFCVReport, type FCVPurchaseRow, type FCVPOSRow } from '@/lib/food-cost-variance';
+import { refreshRecipeCache, enrichStagingRow } from '@/lib/ims-client';
+import { getErrorMessage } from '@/lib/utils';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 function defaultPeriod(): { start: string; end: string } {
@@ -54,9 +56,13 @@ interface StagingRow {
   transaction_time: string;
   revenue: number;
   location_id: string;
+  menu_item_id: string;
+  quantity_sold: number;
+  recipe_found: boolean | null;
   theoretical_grams: {
     ingredients?: Array<{ ingredient_id: string; ingredient_name: string; grams: number; cost: number }>;
   } | null;
+  flag?: string;
 }
 
 interface PurchaseRow {
@@ -78,15 +84,46 @@ const handler: SecureHandler = async (req, context) => {
   await ServerLogger.system('INFO', 'API', 'FCV report request', { tenantId, start, end });
 
   try {
-    // Fetch approved POS staging rows
+    // Warm up recipe cache (graceful degradation if IMS is offline)
+    await refreshRecipeCache(supabase, tenantId).catch((e: unknown) => {
+      ServerLogger.system('WARN', 'FCV', 'Recipe cache refresh failed', { tenantId, error: getErrorMessage(e) });
+    });
+
+    // Fetch approved POS staging rows (including rows needing enrichment)
     const stagingRows = await fetchAll<StagingRow>(
       supabase, 'pos_transaction_staging',
-      'id, transaction_time, revenue, location_id, theoretical_grams',
+      'id, transaction_time, revenue, location_id, menu_item_id, quantity_sold, recipe_found, theoretical_grams, flag',
       { tenant_id: tenantId },
       [['transaction_time', start]],
       [['transaction_time', end + 'T23:59:59Z']],
       'transaction_time',
     );
+
+    // Lazy enrichment: backfill theoretical_grams for rows that haven't been processed yet
+    for (const row of stagingRows) {
+      if (row.recipe_found === true || row.recipe_found === false) continue;
+      if (row.flag !== 'APPROVED' && row.flag !== undefined) continue;
+
+      try {
+        const enriched = await enrichStagingRow(supabase, tenantId, row as any);
+        const hasGrams = enriched.theoretical_grams?.ingredients != null
+          && enriched.theoretical_grams.ingredients.length > 0;
+
+        await supabase.from('pos_transaction_staging').update({
+          theoretical_grams: enriched.theoretical_grams,
+          recipe_found: hasGrams,
+        }).eq('id', row.id);
+
+        row.theoretical_grams = enriched.theoretical_grams;
+        row.recipe_found = hasGrams;
+      } catch (e: unknown) {
+        await ServerLogger.system('WARN', 'FCV', 'Staging enrichment failed for individual row', {
+          rowId: row.id, error: getErrorMessage(e),
+        });
+        await supabase.from('pos_transaction_staging').update({ recipe_found: false }).eq('id', row.id);
+        row.recipe_found = false;
+      }
+    }
 
     // Explode theoretical_grams into per-ingredient FCVPOSRow entries
     const posRows: FCVPOSRow[] = [];
