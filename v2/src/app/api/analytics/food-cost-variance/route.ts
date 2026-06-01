@@ -56,8 +56,8 @@ interface StagingRow {
   transaction_time: string;
   revenue: number;
   location_id: string;
-  menu_item_id: string;
-  quantity_sold: number;
+  item_sku: string | null;
+  quantity: number | null;
   recipe_found: boolean | null;
   theoretical_grams: {
     ingredients?: Array<{ ingredient_id: string; ingredient_name: string; grams: number; cost: number }>;
@@ -92,7 +92,7 @@ const handler: SecureHandler = async (req, context) => {
     // Fetch approved POS staging rows (including rows needing enrichment)
     const stagingRows = await fetchAll<StagingRow>(
       supabase, 'pos_transaction_staging',
-      'id, transaction_time, revenue, location_id, menu_item_id, quantity_sold, recipe_found, theoretical_grams, flag',
+      'id, transaction_time, revenue, location_id, item_sku, quantity, recipe_found, theoretical_grams, flag',
       { tenant_id: tenantId },
       [['transaction_time', start]],
       [['transaction_time', end + 'T23:59:59Z']],
@@ -105,7 +105,8 @@ const handler: SecureHandler = async (req, context) => {
       if (row.flag !== 'APPROVED' && row.flag !== undefined) continue;
 
       try {
-        const enriched = await enrichStagingRow(supabase, tenantId, row as any);
+        const enrichmentInput = { ...row, menu_item_id: row.item_sku || '', quantity: row.quantity || 0 };
+        const enriched = await enrichStagingRow(supabase, tenantId, enrichmentInput as any);
         const hasGrams = enriched.theoretical_grams?.ingredients != null
           && enriched.theoretical_grams.ingredients.length > 0;
 
