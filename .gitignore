@@ -17,3 +17,5 @@ scratch/
 .system_generated/
 .agents/logs/
 supabase/.temp/
+.gemini/
+

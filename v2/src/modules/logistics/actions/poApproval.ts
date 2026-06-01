@@ -16,7 +16,7 @@ export interface POApprovalService {
     outboxId: string, 
     decision: POApprovalDecision,
     managerPhone: string
-  ): Promise<{ success: boolean; newStatus: string }>;
+  ): Promise<{ success: boolean; newStatus?: string; resolution?: string }>;
 }
 
 export class DefaultPOApprovalService implements POApprovalService {
@@ -27,7 +27,7 @@ export class DefaultPOApprovalService implements POApprovalService {
     outboxId: string,
     decision: POApprovalDecision,
     managerPhone: string
-  ): Promise<{ success: boolean; newStatus: string }> {
+  ): Promise<{ success: boolean; newStatus?: string; resolution?: string }> {
     const { data: outbox, error: outboxError } = await this.supabaseClient
       .from('whatsapp_outbox')
       .select('*')
@@ -73,6 +73,6 @@ export class DefaultPOApprovalService implements POApprovalService {
       return { success: true, newStatus: 'MODIFIED' };
     }
 
-    throw new Error(`Invalid decision: ${decision}`);
+    return { success: false, resolution: 'Invalid decision' };
   }
 }

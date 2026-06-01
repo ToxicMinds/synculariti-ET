@@ -123,4 +123,29 @@ describe('FinanceAuditService Contract', () => {
       p_id: 'tx-1042',
     });
   });
+
+  it('should return failure for an invalid decision rather than throwing (LSP compliant)', async () => {
+    mockSingle.mockResolvedValue({
+      data: {
+        id: 'outbox-123',
+        tenant_id: 'tenant-123',
+        payload: {
+          metadata: {
+            transactionId: 'tx-1042',
+          },
+        },
+      },
+      error: null,
+    });
+
+    const service = new DefaultFinanceAuditService();
+    const result = await service.processDecision(
+      'tenant-123',
+      'outbox-123',
+      'InvalidDecision' as any,
+      '421904855155'
+    );
+    expect(result.success).toBe(false);
+    expect(result.resolution).toBe('Invalid decision');
+  });
 });

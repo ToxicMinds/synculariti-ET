@@ -54,19 +54,21 @@
 - `type ScannerStep`: `'scan' | 'processing' | 'review'` — step state for `useScannerState`.
 - `interface UseScannerStateReturn`: Contract for useScannerState: `{ step, receipt, payerId, isProcessing, isSaving, isVerified, error, setPayerId, updateReceiptItem, process, confirmAndSave, reset }`.
 - `function useScannerState()`: Simplified hook in `modules/finance/hooks/useScannerState.ts`. Single `process(input: string | File)` method routes internally via `processScannerInput()`. State-only — no intelligence logic.
-- `function calcBudgetStatus()`: Calculates budget vs. actual spend variance.
-- `function calcCategoryTotals()`: Aggregates transaction totals grouped by category.
-- `function calcMonthDelta()`: Calculates the financial difference between current and previous months.
-- `function calcNetSavings()`: Computes total net savings (income minus expenses).
-- `function calcOperatingMargin()`: Calculates a mathematically sound B2B Operating Margin against benchmarks.
-- `function calcPerUserSpend()`: Computes spending distribution across team members.
-- `function calcTimeBoundForecast()`: Calculates a time-aware velocity projection forecast with zero budget safety constraints.
-- `function calcTotals()`: Calculates absolute aggregate transaction totals.
-- `function isAdjustment()`: Utility to flag balance-adjustment transactions.
-- `function isSavings()`: Utility to flag savings-related transactions.
-- `function normalizeUserId()`: Normalizes user IDs, casting light mock IDs (like 'u2') to mock UUIDs.
-- `interface Transaction`: Core ledger entity representing a financial event. Includes strict `created_at` and `updated_at` audit trails.
-- `type Expense`: Legacy alias for Transaction (deprecated in V2).
+- `function calcBudgetStatus()`: Calculates budget vs. actual spend variance. (v2/src/modules/finance/lib/margins.ts)
+- `function calcCategoryTotals()`: Aggregates transaction totals grouped by category. (v2/src/modules/finance/lib/aggregation.ts)
+- `function calcMonthDelta()`: Calculates the financial difference between current and previous months. (v2/src/modules/finance/lib/aggregation.ts)
+- `function calcNetSavings()`: Computes total net savings (income minus expenses). (v2/src/modules/finance/lib/aggregation.ts)
+- `function calcOperatingMargin()`: Calculates a mathematically sound B2B Operating Margin against benchmarks. (v2/src/modules/finance/lib/margins.ts)
+- `function calcPerUserSpend()`: Computes spending distribution across team members. (v2/src/modules/finance/lib/aggregation.ts)
+- `function calcTimeBoundForecast()`: Calculates a time-aware velocity projection forecast with zero budget safety constraints. (v2/src/modules/finance/lib/forecast.ts)
+- `function calcTotals()`: Calculates absolute aggregate transaction totals. (v2/src/modules/finance/lib/aggregation.ts)
+- `function isAdjustment()`: Utility to flag balance-adjustment transactions. (v2/src/modules/finance/lib/filters.ts)
+- `function isSavings()`: Utility to flag savings-related transactions. (v2/src/modules/finance/lib/filters.ts)
+- `function normalizeUserId()`: Normalizes user IDs, casting light mock IDs (like 'u2') to mock UUIDs. (v2/src/modules/finance/lib/aggregation.ts)
+- `Facade finance: v2/src/modules/finance/lib/finance.ts`: Pure facade exporting the above deconstructed calculation utilities and types to preserve backward compatibility.
+- `interface Transaction`: Core ledger entity representing a financial event. Includes strict `created_at` and `updated_at` audit trails. (v2/src/modules/finance/lib/types.ts)
+- `type Expense`: Legacy alias for Transaction (deprecated in V2). (v2/src/modules/finance/lib/types.ts)
+
 
 ## Logistics & Inventory
 - `function useInventory()`: Read-only hook for fetching the current physical stock ledger.
@@ -193,12 +195,13 @@
 - `Server Action: notifyLargeInvoice()`: Triggers WhatsApp notification for invoices exceeding configurable threshold. Writes to `whatsapp_outbox` directly rather than calling the sidecar directly.
 - `Route Page: /action/[actionId]`: Dynamic App Router page that loads context and renders the web-bridge interactive interface for WhatsApp action links. Generates OG meta tags for WhatsApp link previews.
 - `Component: ActionClient`: Client component implementing user selection buttons, loading states, and submitting decisions to the server action.
-- `interface POApprovalService`: Service contract for handling Purchase Order approval decisions from WhatsApp/web.
-- `class DefaultPOApprovalService`: Implementation of POApprovalService mapping Approve/Reject/Modify decisions to receive_purchase_order_v1 RPC and table mutations.
-- `interface FinanceAuditService`: Service contract for processing audit anomaly decisions (Approve Anyway, Request Re-upload, Reject Expense).
-- `class DefaultFinanceAuditService`: Implementation of FinanceAuditService. Accepts optional `supabaseClient` constructor param (defaults to browser client, pass service-role client to bypass RLS in API/script context).
-- `interface POSDiscrepancyService`: Service contract for resolving POS cash discrepancy actions (Log as Shrinkage, Recount Required, Deduct from Register).
-- `class DefaultPOSDiscrepancyService`: Implementation of POSDiscrepancyService logging ledger adjustments via add_transaction_v3 RPC. Accepts optional `supabaseClient` constructor param.
+- `interface POApprovalService`: Service contract for handling Purchase Order approval decisions from WhatsApp/web. Conforms to LSP: returns standard failure/success objects instead of throwing raw exceptions.
+- `class DefaultPOApprovalService`: Implementation of POApprovalService mapping Approve/Reject/Modify decisions to receive_purchase_order_v1 RPC and table mutations. Returns standard success/failure structures.
+- `interface FinanceAuditService`: Service contract for processing audit anomaly decisions (Approve Anyway, Request Re-upload, Reject Expense). Conforms to LSP.
+- `class DefaultFinanceAuditService`: Implementation of FinanceAuditService. Accepts optional `supabaseClient` constructor param. Returns standard success/failure structures.
+- `interface POSDiscrepancyService`: Service contract for resolving POS cash discrepancy actions (Log as Shrinkage, Recount Required, Deduct from Register). Conforms to LSP.
+- `class DefaultPOSDiscrepancyService`: Implementation of POSDiscrepancyService logging ledger adjustments. Accepts optional `supabaseClient` constructor param. Returns standard success/failure structures.
+
 - `Script: trigger_workflow.ts`: CLI development utility for queueing test WhatsApp workflows. Usage: `npx tsx src/scripts/trigger_workflow.ts <po|audit|pos> [phone_number]`. Creates real DB entities (POs, transactions, discrepancies) and inserts outbox records for end-to-end testing without a live UI flow.
 - `interface WorkflowConfig`: Per-workflow configuration shape in `tenants.config.workflows`. Fields: `enabled: boolean`, `threshold?: number` (bill_approval), `threshold_pct?: number` (low_stock_alert), `time?: string` (daily_summary), `recipients: ('owner'|'manager')[]`. (modules/whatsapp/types.ts)
 - `type WorkflowKey`: Union type `'bill_approval' | 'low_stock_alert' | 'daily_summary'` identifying supported automated workflows. (modules/whatsapp/types.ts)

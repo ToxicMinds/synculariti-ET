@@ -106,4 +106,29 @@ describe('POSDiscrepancyService Contract', () => {
     expect(result.success).toBe(true);
     expect(result.resolution).toBe('REGISTER_DEDUCTED');
   });
+
+  it('should return failure for an invalid decision rather than throwing (LSP compliant)', async () => {
+    mockSingle.mockResolvedValue({
+      data: {
+        id: 'outbox-123',
+        tenant_id: 'tenant-123',
+        payload: {
+          metadata: {
+            amount: 150,
+          },
+        },
+      },
+      error: null,
+    });
+
+    const service = new DefaultPOSDiscrepancyService();
+    const result = await service.processDecision(
+      'tenant-123',
+      'outbox-123',
+      'InvalidDecision' as any,
+      '421904855155'
+    );
+    expect(result.success).toBe(false);
+    expect(result.resolution).toBe('Invalid decision');
+  });
 });

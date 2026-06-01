@@ -120,4 +120,29 @@ describe('POApprovalService Contract', () => {
     expect(result.newStatus).toBe('MODIFIED');
     expect(supabase.from).toHaveBeenCalledWith('purchase_orders');
   });
+
+  it('should return failure for an invalid decision rather than throwing (LSP compliant)', async () => {
+    mockSingle.mockResolvedValue({
+      data: {
+        id: 'outbox-123',
+        tenant_id: 'tenant-123',
+        payload: {
+          metadata: {
+            poId: 'po-1042',
+          },
+        },
+      },
+      error: null,
+    });
+
+    const service = new DefaultPOApprovalService();
+    const result = await service.processDecision(
+      'tenant-123',
+      'outbox-123',
+      'InvalidDecision' as any,
+      '421904855155'
+    );
+    expect(result.success).toBe(false);
+    expect(result.resolution).toBe('Invalid decision');
+  });
 });

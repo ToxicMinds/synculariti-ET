@@ -62,6 +62,6 @@ export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
       return { success: true, resolution: 'REGISTER_DEDUCTED' };
     }
 
-    throw new Error(`Invalid decision: ${decision}`);
+    return { success: false, resolution: 'Invalid decision' };
   }
 }

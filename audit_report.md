@@ -5,7 +5,7 @@
 
 ---
 
-## Fixed (W-01, V-34, V-38, V-45, V-71, W-02, V-70, W-03, V-72, V-49, V-46, V-48, V-47, V-73)
+### Fixed (W-01, V-34, V-38, V-45, V-71, W-02, V-70, W-03, V-72, V-49, V-46, V-48, V-47, V-73, V-52, V-58)
 
 | ID | File | Issue | Fix Applied |
 | :--- | :--- | :--- | :--- |
@@ -22,23 +22,27 @@
 | V-46 | `neo4j.ts:37`, `rebuild-neo4j-graph.ts:165`, `sync-neo4j:91`, `backfill-neo4j:74` | `merchant-${name.toLowerCase().replace(...)}` merchant ID construction in 4 locations | Extracted `buildMerchantId(name)` to `src/lib/neo4j-ontology.ts` |
 | V-48 | `poApproval.ts`, `financeAudit.ts`, `posDiscrepancy.ts` | Near-identical `{ type, outboxId, recipientPhone, tenantId, decision, timestamp }` Zod schemas in 3 files | Extracted `BaseDecisionSchema` to `src/modules/whatsapp/lib/webhook-payloads.ts` |
 | V-47 | `sync-neo4j`, `backfill-neo4j`, `rebuild-neo4j-graph` | `ReceiptItemSyncPayload` + `TransactionSyncPayload` construction duplicated across 3 files | Extracted `buildSyncPayload(txRow, items, opts?)` to `src/lib/neo4j-ontology.ts` |
-| V-73 | ~33 occurrences across 17 files | `€{Number(x).toFixed(2)}` / `€{x.toLocaleString('en-US', ...)}` — hardcoded currency formatting | Replaced with `formatCurrency(amount, currency?)` from `@/lib/utils`
+| V-73 | ~33 occurrences across 17 files | `€{Number(x).toFixed(2)}` / `€{x.toLocaleString('en-US', ...)}` — hardcoded currency formatting | Replaced with `formatCurrency(amount, currency?)` from `@/lib/utils` |
+| V-37 | `logistics/page.tsx` | "Create PO" and "View History" buttons have no `onClick` — shipped inert | Implemented navigation routing |
+| V-54 | `webhook/route.ts` | 4 concerns in one handler: signature verification, outbox resolution, inbox insertion, business action routing | Split into `verifySignature`, `resolveOutbox`, `routeDecision` via `DecisionRouter` |
+| V-51 | `scanner-client.ts` | 7 distinct concerns in one large file | Split into domain-specific files (`scanner-cache`, `scanner-ekasa`, `scanner-vision`, etc.) |
+| V-55 | `ekasa-protocols.ts` | `switch (status)` for eKasa HTTP error codes — identical logic duplicated in `scanner-client.ts` | Duplication removed; `scanner-client.ts` uses unified errors |
+| V-50 | `finance.ts` | `Number(e.amount) \|\| 0` repeated multiple times (also V-69) | Extracted and used `safeAmount(val): number` |
+| V-69 | `finance.ts` | `Number(e.amount) \|\| 0` appears 12 times | Fixed via `safeAmount(val)` extraction |
+| V-65 | `login/page.tsx` | `useRouter()` without `<Suspense>` boundary | Wrapped consumers in `<Suspense>` |
+| V-67 | `UserAvatarToggle.tsx`, `TenantSelector.tsx` | Exported but never imported anywhere | Removed unused file; integrated `TenantSelector.tsx` |
+| V-52 | `finance.ts` | God File of 289 lines containing 12+ independent calculation functions | Deconstructed into `filters.ts`, `aggregation.ts`, `margins.ts`, and `forecast.ts` with `finance.ts` acting as a backward-compatible facade |
+| V-58 | 3 action services | `DefaultPOApprovalService`, `DefaultFinanceAuditService`, `DefaultPOSDiscrepancyService` threw raw exceptions rather than returning `{ success: false }` | Redefined interfaces and service implementations to return formatted failure objects gracefully (LSP compliant) |
 
 ---
 
 ## Critical (Runtime Risk)
 
-| ID | File | Issue | Fix |
-| :--- | :--- | :--- | :--- |
-| V-37 | `logistics/page.tsx` | "Create PO" and "View History" buttons have no `onClick` — shipped inert | Implement navigation or remove buttons |
-
 ---
 
 ## High
 
-| ID | File | Issue | Fix |
-| :--- | :--- | :--- | :--- |
-| V-54 | `webhook/route.ts` (159 lines) | 4 concerns in one handler: signature verification, outbox resolution (3 strategies), inbox insertion, business action routing | Split into `verifySignature`, `resolveOutbox`, `routeDecision` |
+None at this time.
 
 ---
 
@@ -49,17 +53,10 @@
 | V-22 | `BentoCard.tsx` | N instances = N resize listeners (unbounded) | Shared `useWindowSize` hook |
 | V-35 | `useTransactionFilter.ts` | Dead `limit`, `offset`, `setLimit`, `setOffset` | Remove or implement pagination |
 | V-19 | `MonthlyPerformance.tsx` | Calc mixed with rendering (lines 41-56) | Extract pure function |
-| V-50 | `finance.ts` | `Number(e.amount) \|\| 0` repeated 12 times in 289-line mono-utility file | Extract `safeAmount(val): number` |
-| V-51 | `scanner-client.ts` (317 lines) | 7 distinct concerns: hashing, base64, fetch wrapper, router, eKasa processing, raw gov extraction, AI vision, image preprocessing, confidence scoring, cache | Split into `hash-utils.ts`, `scanner-router.ts`, `ekasa-client.ts`, `vision-client.ts` |
-| V-52 | `finance.ts` (289 lines) | 12+ independent calculation functions in one file: `isSavings`, `isAdjustment`, `calcTotals`, `calcForecast`, `calcPerUserSpend`, `calcNetSavings`, `calcBudgetStatus`, `calcMonthDelta`, `calcCategoryTotals`, `normalizeUserId`, `calcOperatingMargin`, `calcTimeBoundForecast` | Split into `filters.ts`, `aggregation.ts`, `forecast.ts`, `margins.ts` |
 | V-53 | `BudgetHealth.tsx` | `useEffect` at line 26 makes its own `fetch('/api/ai/forecast')` — component mixes data fetching with rendering | Lift to `useForecast()` hook |
 | V-57 | `finance.ts:270-279` | If-else chain for status tiers: `IN_DANGER` → `WARNING` → `STABLE` → `EXCELLENT`. New tier → modify chain | Replace with status threshold map |
-| V-55 | `ekasa-protocols.ts:68-79` | `switch (status)` for eKasa HTTP error codes — identical logic to `scanner-client.ts:91-98` (also a DRY violation) | Extract shared `parseEkasaStatus(status, detail)` |
 | V-56 | `processOutboxQueue.ts:63-70` | `if/else if` on `record.payload.type` (`'text'` vs `'poll'`). New message type → add branch | Replace with payload handler registry |
-| V-58 | 3 action services | `DefaultPOApprovalService`, `DefaultFinanceAuditService`, `DefaultPOSDiscrepancyService` all throw `new Error('Invalid decision')` outside declared return contract `{ success, resolution }`. Callers must know about throw to handle it (LSP) | Return `{ success: false, resolution: 'Invalid decision' }` instead of throwing |
-| V-65 | `ProfileMenu.tsx:16`, `login/page.tsx:12` | `useRouter()` without `<Suspense>` boundary — can trigger Next.js static bailout | Wrap consumers in `<Suspense>` |
-| V-66 | 10+ candidate components, 0 memoized | Zero `React.memo` usage. `CategoryPill`, `TransactionRow`, `CalendarGrid`, `FilterBar`, `InfoTooltip`, `BrandHeader`, `UserAvatarToggle`, `ProcessingStep`, `BentoCard` are all pure presentational | Add `React.memo` to each |
-| V-67 | `UserAvatarToggle.tsx`, `TenantSelector.tsx` | Exported but never imported anywhere in codebase | Remove or integrate |
+| V-66 | 10+ candidate components, 0 memoized | Zero `React.memo` usage. `CategoryPill`, `TransactionRow`, `CalendarGrid`, `FilterBar`, `InfoTooltip`, `BrandHeader`, `ProcessingStep`, `BentoCard` are all pure presentational | Add `React.memo` to each |
 | V-68 | 429 inline `style={{ }}` occurrences | Pervasive inline styles across 20+ files. Only `ReceiptScanner.tsx` and `NavBar.tsx` use CSS Modules properly | Migrate inline styles to CSS Modules systematically |
 | V-44 | 4 components | Missing `React.memo` on presentational components (original V-44, pre-existing) | Add `React.memo` |
 | V-26 | 6+ components | `€ + Number(x).toFixed(2)` hardcoded (original V-26, now expanded to V-73) | Shared `formatCurrency()` utility |
@@ -77,7 +74,6 @@
 | V-62 | 3 action services | `constructor(private supabaseClient = supabase)` — defaults to module-level concrete import at load time (DIP) | Accept client via injection only, no default |
 | V-63 | `InvoiceManager.tsx:4` | Directly imports `supabase` from `@/lib/supabase` and calls it inline (lines 29-35) | Accept data/callbacks via props |
 | V-64 | `ReceiptScanner.tsx:57` | `new Html5QrcodeScanner(...)` instantiated directly inside `ScanStep` — no interface abstraction for scanner hardware | Accept scanner factory via prop or DI |
-| V-69 | `finance.ts` | `Number(e.amount) \|\| 0` appears 12 times across 289-line file | Extract `safeAmount(val): number` |
 | V-70b | `rebuild-neo4j-graph.ts:83-95` | Bulk insert with batch fallback — no transaction wrapping | Wrap batch in Supabase transaction |
 
 ---
@@ -99,13 +95,13 @@
 
 **Security:** All 17 API routes secured. 6 without `withAuth` use documented alternative auth (HMAC, API key, cron secret). No `localStorage` outside OfflineQueue.
 
-**SOLID:** 18 issues (7 SRP, 8 OCP, 3 LSP, 3 ISP, 5 DIP). Top SRP: `scanner-client.ts` (317 lines, 7 concerns), `finance.ts` (289 lines, 12 functions). Top OCP: `webhook/route.ts` decision routing chain, `enablebanking` 5-action switch, `triggerWorkflow.ts` dual chains.
+**SOLID:** 16 issues (5 SRP, 7 OCP, 3 LSP, 3 ISP, 5 DIP). Top SRP: `finance.ts` (289 lines, 12 functions). Top OCP: `enablebanking` 5-action switch, `triggerWorkflow.ts` dual chains.
 
-**DRY:** 6 issues. Top: `scanner-client.ts` 7 concerns, `finance.ts` 12 functions, ekasa status double, payload handler registry, 3-DIP services, webhook decision routing chain.
+**DRY:** 3 issues. Top: `finance.ts` 12 functions, payload handler registry, 3-DIP services.
 
 **Observability:** All API routes have `ServerLogger`. Health endpoint intentionally surfaces errors in HTTP response — acceptable.
 
-**React Hygiene:** 2 missing Suspense boundaries. 429 inline style objects. 0 `React.memo` used. 2 dead exports. 0 missing `useEffect` cleanups.
+**React Hygiene:** 1 missing Suspense boundary (`ProfileMenu.tsx` usage of `useRouter` is safe without params but noted). 429 inline style objects. 0 `React.memo` used. 0 dead exports. 0 missing `useEffect` cleanups.
 
 ---
 

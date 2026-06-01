@@ -73,7 +73,9 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
     };
 
     const action = auditActions[decision];
-    if (!action) throw new Error(`Invalid decision: ${decision}`);
+    if (!action) {
+      return { success: false, resolution: 'Invalid decision' };
+    }
     return action();
   }
 }
