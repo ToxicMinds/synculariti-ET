@@ -158,5 +158,16 @@
 - **Caching**: Winning insight is cached in `tenants.config.ai_insight` with a 24-hour TTL. Bypass cache via `?force=1` query parameter.
 - **Fallback**: If any part of the pipeline fails (Neo4j disconnect, LLM 503, malformed data), fall back gracefully to `articulateFinding()` and never throw a 500 to the client. Return the "still syncing" status until valid data is produced.
 
+## 15. AI Insight Actionable Narration
+- **Lead with the action, never with a day name**: The LLM system prompt must produce actionable advice, not raw statistics. Example: *"Biggest opportunity: weekend shopping costs 19% more than weekdays. Schedule purchases on Monday to save ~€23/trip."* Not: *"On Saturdays, the average spend is 141.54€."*
+- **Temperature 0.7**: Use higher temperature for more natural, less robotic LLM output.
+- **Trivial timing filter**: Timing-only findings with `impact < 50` skip LLM narration entirely — fall back to `articulateFinding()` to avoid wasting tokens on minor day-of-week variance.
+- **Per-type format guidance**: Price, timing, and waste findings each have their own recommended phrasing in the prompt to ensure appropriate output structure.
+
+## 16. Top Purchased Items Data Flow
+- **Data source**: `ItemAnalytics` (`src/modules/finance/components/ItemAnalytics.tsx`) queries `supabase.from('receipt_items')` with a join on `transactions` via the browser-side Supabase client. NOT Neo4j.
+- **No category filter**: The component queries ALL receipt items regardless of category. The `"(OPEX)"` label was removed from the BentoCard title because it was misleading — the card never filtered for OPEX items.
+- **Aggregation**: Items grouped by UPPERCASED name, sorted by `total_amount DESC`, sliced to top 5. Includes `last_store` and `last_date` from the most recent transaction per item.
+
 
 

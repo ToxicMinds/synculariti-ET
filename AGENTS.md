@@ -822,3 +822,65 @@ This section documents the Phase 1 security hardening campaign. All 4 issues hav
 - **Database migrations applied**: `20260531001` (ROW_COUNT fix) + `20260531002` (check constraints + resolve RPC)
 - **Check constraints fixed**: `purchases.quarantine_status` + `purchase_anomaly_queue.status` now accept `RELEASED` / `RESOLVED`
 - **Zero regressions**
+
+## 11. Phase 4 Corrigendum (June 2026)
+
+### 11.1 Tenant Mismatch Discovery
+
+Two separate demo tenant records existed with near-identical handles:
+
+| Handle | UUID | Data state |
+|--------|------|-----------|
+| `@demo-2026` (with `@`) | `e3b20277-a2c2-4bee-a69d-aa9f945486d3` | All seed FCV data (5221 POS staging, 210 purchases, 6 cached recipes, 10 cached ingredients) |
+| `demo-2026` (no `@`) | `f039714b-8276-4733-8172-58b049bd9163` | 8504 existing transactions, 1000 Neo4j nodes, **zero** FCV infrastructure |
+
+The seed script `seed_demo_2026.ts` queries by handle `'@demo-2026'` and loaded data into `e3b20277`. The user (`nikshanbhag@gmail.com`) logged into `demo-2026` (no `@`, UUID `f039714b`) — hence FCV showed blank.
+
+**Fix**: Migration `20260601004_copy_fcv_seed_data_to_user_tenant.sql` copies all FCV tables across using `INSERT ... SELECT` with changed `tenant_id`:
+- `pos_transaction_staging` (5221), `purchases` (210), `purchase_anomaly_queue` (2)
+- `cached_recipes` (6), `cached_ingredients` (10)
+- `chart_of_accounts` (14, merged with existing 9), `locations` (4, merged with existing 1)
+- Also clears stale `tenants.config.ai_insight` for the user tenant
+
+### 11.2 RLS Fix (pos_transaction_staging)
+
+| # | Issue | Severity | File/Location | Fix |
+|---|-------|----------|---------------|-----|
+| 26 | `pos_transaction_staging`, `pos_batch_uploads`, `pos_data_gaps` have RLS enabled but zero policies | **CRITICAL** | `20260529001_two_table_quarantine.sql` | Added tenant-isolation policies via migration `20260601003_fix_pos_rls_policies.sql` |
+
+All three POS tables had `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` (set in `20260529001`) but no `CREATE POLICY` statements. Postgres default-deny kicked in for `authenticated` role users, returning 0 rows from the FCV route. The `purchases` table already had its policy — only POS tables were missing.
+
+**Fix** (migration `20260601003`):
+```sql
+CREATE POLICY "Tenant isolation" ON pos_transaction_staging
+  FOR ALL TO authenticated
+  USING (tenant_id = public.get_my_tenant())
+  WITH CHECK (tenant_id = public.get_my_tenant());
+-- Same for pos_batch_uploads, pos_data_gaps
+```
+
+### 11.3 AI Insight Prompt Redesign
+
+The original LLM prompt produced raw-statistics narration (e.g., *"On Saturdays, the average spend at our Slovak restaurant is 141.54€..."*). The user found this unhelpful — it read like a stats report, not actionable advice.
+
+**Changes to `src/app/api/ai/insight/route.ts`**:
+- System prompt recast from *"Be specific with numbers... Just state the finding naturally"* → *"Lead with the action, never with a day name... Sound like you're across the table giving advice, not reading a spreadsheet"*
+- Temperature increased from `0.4` → `0.7` for more natural language
+- Timing-only findings with `impact < 50` skip LLM entirely (fall back to `articulateFinding()`) — prevents minor day-of-week variance from triggering LLM calls
+- Added per-type output format guidance (price, timing, waste each have a recommended phrasing)
+
+### 11.4 Top Purchased Items Card Fix
+
+`src/app/page.tsx:165`: BentoCard titled `"Top Purchased Items (OPEX)"` rendered `ItemAnalytics` — which queries **all** receipt_items from Supabase with **zero category filtering**. The `"(OPEX)"` label was a misnomer.
+
+**Fix**: Renamed to `"Top Purchased Items"`.
+
+**Data source**: `ItemAnalytics` (`src/modules/finance/components/ItemAnalytics.tsx`) queries `supabase.from('receipt_items').select(...)` with a join on `transactions`. Item names are aggregated by uppercase name, sorted by total amount DESC, sliced to top 5. This is a direct Supabase query, **not** Neo4j.
+
+### 11.5 Documentation Updates
+
+| File | Changes |
+|------|---------|
+| `AGENTS.md §11` | This section — tenant mismatch, RLS fix, AI prompt redesign, Top Items fix |
+| `RULES.md §15-16` | AI prompt guidelines, ItemAnalytics data flow |
+| `SYMBOLS.md` | Added `ItemAnalytics`, `migration 20260601003`, `migration 20260601004` |
