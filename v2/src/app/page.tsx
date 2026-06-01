@@ -162,7 +162,7 @@ function DashboardContent() {
 
             {/* ROW 2: SPEND COMPARISON + TOP ITEMS */}
             <MonthlyPerformance transactions={activeTransactions} selectedMonth={selectedMonth} colSpan={8} />
-            <BentoCard colSpan={4} title="Top Purchased Items (OPEX)">
+            <BentoCard colSpan={4} title="Top Purchased Items">
               <ItemAnalytics tenantId={tenant.tenant_id} selectedMonth={selectedMonth} isDemo={isDemo} />
             </BentoCard>
 
