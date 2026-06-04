@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withTestHandler } from '@/lib/withTestHandler';
 import { z } from 'zod';
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { SecureHandler } from '@/lib/types/api';
 import { getErrorMessage } from '@/lib/utils';
 import { HEADER_CONTENT_TYPE, CONTENT_TYPE_JSON } from '@/lib/constants';
@@ -103,6 +104,16 @@ const handler: SecureHandler = async (req, context) => {
       return NextResponse.json({ 
         error: errMsg
       }, { status: response.status });
+    }
+
+    if (action === 'start_session') {
+      void recordEventServer({
+        tenantId,
+        action: 'bank_sync.session_started',
+        whoType: 'user',
+        metadata: { institutionId: institution_id },
+        description: `Started bank sync session with ${institution_id}`,
+      }).catch(() => {});
     }
 
     return NextResponse.json(data);

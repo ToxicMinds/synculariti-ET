@@ -3,6 +3,7 @@ export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { createServiceClient } from '@/lib/supabase-server';
 import { verifyWebhookRequest } from '@/modules/whatsapp/lib/verify-webhook';
 import { resolveOutboxContext } from '@/modules/whatsapp/lib/resolve-outbox';
@@ -41,6 +42,14 @@ export async function POST(req: Request) {
       messageType: body.type,
       content: decision,
     });
+
+    void recordEventServer({
+      tenantId,
+      action: 'whatsapp.response.received',
+      whoType: 'system',
+      entityId: outboxId || undefined,
+      entityType: outboxId ? 'whatsapp_outbox' : undefined,
+    }).catch(() => {}); // Fire and forget
 
     if (outboxRecord && outboxId && decision) {
       const supabase = createServiceClient();

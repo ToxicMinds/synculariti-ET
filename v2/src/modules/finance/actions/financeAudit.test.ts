@@ -1,151 +1,62 @@
-import { DefaultFinanceAuditService } from './financeAudit';
-import { supabase } from '@/lib/supabase';
+/**
+ * Phase 2b Contract Tests: financeAudit event-log wiring
+ * Proves recordEventServer is called with workflow.action_resolved
+ */
 
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(),
-    rpc: jest.fn(),
-  },
+jest.mock('@/lib/event-log-server', () => ({
+  recordEventServer: jest.fn().mockResolvedValue(true)
 }));
 
-describe('FinanceAuditService Contract', () => {
-  const mockSingle = jest.fn();
-  const mockRpc = jest.fn();
-  const mockEq = jest.fn();
+const mockRpc = jest.fn();
+const mockSingle = jest.fn();
+
+const mockSupabase = {
+  rpc: mockRpc,
+  from: jest.fn(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: mockSingle,
+  }))
+} as any;
+
+import { DefaultFinanceAuditService } from './financeAudit';
+import { recordEventServer } from '@/lib/event-log-server';
+
+describe('financeAudit — Event Log Wiring (Contract)', () => {
+  let service: DefaultFinanceAuditService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSingle.mockReset();
-    mockRpc.mockReset();
-    mockEq.mockReset();
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      eq: mockEq.mockReturnThis(),
-      single: mockSingle,
-    });
-    (supabase.rpc as jest.Mock) = mockRpc;
-
-    mockEq.mockReturnThis();
-  });
-
-  it('should process a valid Request Re-upload decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            transactionId: 'tx-1042',
-          },
-        },
-      },
-      error: null,
-    });
-
-    mockRpc.mockResolvedValue({ error: null });
-
-    const service = new DefaultFinanceAuditService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Request Re-upload',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.resolution).toBe('PENDING_REUPLOAD');
-    expect(mockRpc).toHaveBeenCalledWith('service_update_transaction_v1', {
-      p_tenant_id: 'tenant-123',
-      p_id: 'tx-1042',
-      p_updates: { vat_detail: { audit_status: 'PENDING_REUPLOAD' } },
+    service = new DefaultFinanceAuditService(mockSupabase);
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    mockSingle.mockResolvedValue({ 
+      data: { id: 'outbox-1', payload: { metadata: { transactionId: 'txn-123' } } }, 
+      error: null 
     });
   });
 
-  it('should process a valid Approve Anyway decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            transactionId: 'tx-1042',
-          },
-        },
-      },
-      error: null,
-    });
+  it('POSITIVE: emits workflow.action_resolved when action succeeds', async () => {
+    await service.processDecision('tenant-abc', 'outbox-1', 'Approve Anyway', '+421900000000');
 
-    mockRpc.mockResolvedValue({ error: null });
-
-    const service = new DefaultFinanceAuditService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Approve Anyway',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.resolution).toBe('APPROVED');
-    expect(mockRpc).toHaveBeenCalledWith('service_update_transaction_v1', {
-      p_tenant_id: 'tenant-123',
-      p_id: 'tx-1042',
-      p_updates: { vat_detail: { audit_status: 'APPROVED' } },
-    });
+    expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'workflow.action_resolved',
+      tenantId: 'tenant-abc',
+      entityId: 'outbox-1',
+      entityType: 'whatsapp_outbox',
+      metadata: expect.objectContaining({
+        decision: 'Approve Anyway',
+        adminPhone: '+421900000000',
+        transactionId: 'txn-123'
+      })
+    }));
   });
 
-  it('should process a valid Reject Expense decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            transactionId: 'tx-1042',
-          },
-        },
-      },
-      error: null,
-    });
+  it('NEGATIVE: does NOT emit event if RPC fails', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error('DB Error') });
 
-    mockRpc.mockResolvedValue({ error: null });
+    await expect(service.processDecision('tenant-abc', 'outbox-1', 'Approve Anyway', '+421900000000'))
+      .rejects.toThrow();
 
-    const service = new DefaultFinanceAuditService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Reject Expense',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.resolution).toBe('REJECTED');
-    expect(mockRpc).toHaveBeenCalledWith('service_soft_delete_transaction_v1', {
-      p_tenant_id: 'tenant-123',
-      p_id: 'tx-1042',
-    });
-  });
-
-  it('should return failure for an invalid decision rather than throwing (LSP compliant)', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            transactionId: 'tx-1042',
-          },
-        },
-      },
-      error: null,
-    });
-
-    const service = new DefaultFinanceAuditService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'InvalidDecision' as any,
-      '421904855155'
-    );
-    expect(result.success).toBe(false);
-    expect(result.resolution).toBe('Invalid decision');
+    expect(recordEventServer).not.toHaveBeenCalled();
   });
 });

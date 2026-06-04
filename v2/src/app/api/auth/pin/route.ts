@@ -1,4 +1,5 @@
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { getErrorMessage } from '@/lib/utils';
 import { createServiceClient } from '@/lib/supabase-server';
 import { NextResponse } from 'next/server';
@@ -136,6 +137,13 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ error: 'Virtual account not provisioned' }, { status: 403 });
     }
+
+    void recordEventServer({
+      tenantId,
+      action: 'pin.verified',
+      whoType: 'user',
+      description: 'Tenant authenticated via PIN',
+    }).catch(() => {});
 
     return NextResponse.json({
       access_token: authData.session.access_token,

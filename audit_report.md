@@ -1,11 +1,11 @@
 # Synculariti-ET: Full Audit Report
 
-**Last Update:** 2026-05-27
+**Last Update:** 2026-06-04
 **Deep-dive:** Full codebase scan covering type safety, ACID, security, SOLID, DRY, observability, dead code, React hygiene.
 
 ---
 
-### Fixed (W-01, V-34, V-38, V-45, V-71, W-02, V-70, W-03, V-72, V-49, V-46, V-48, V-47, V-73, V-52, V-58)
+### Fixed (W-01, V-34, V-38, V-45, V-71, W-02, V-70, W-03, V-72, V-49, V-46, V-48, V-47, V-73, V-52, V-58, C1, C2, C3, B1, B2a, A1, A3, D1)
 
 | ID | File | Issue | Fix Applied |
 | :--- | :--- | :--- | :--- |
@@ -33,6 +33,14 @@
 | V-67 | `UserAvatarToggle.tsx`, `TenantSelector.tsx` | Exported but never imported anywhere | Removed unused file; integrated `TenantSelector.tsx` |
 | V-52 | `finance.ts` | God File of 289 lines containing 12+ independent calculation functions | Deconstructed into `filters.ts`, `aggregation.ts`, `margins.ts`, and `forecast.ts` with `finance.ts` acting as a backward-compatible facade |
 | V-58 | 3 action services | `DefaultPOApprovalService`, `DefaultFinanceAuditService`, `DefaultPOSDiscrepancyService` threw raw exceptions rather than returning `{ success: false }` | Redefined interfaces and service implementations to return formatted failure objects gracefully (LSP compliant) |
+| **C1** | `event-log.ts` | Mixed read (`useEventLog` hook) + write (`recordEvent`) in one file — SRP violation | Split into `event-log.ts` (write) + `event-log-read.ts` (read) |
+| **C2** | `event-log-types.ts` | `RecordEventPayload` had optional `tenantId` — server callers had no compile-time enforcement — ISP violation | Split into `BaseEventPayload` + `RecordEventPayload` (no tenantId) + `RecordEventServerPayload` (requires tenantId) |
+| **C3** | `event-log.ts`, `event-log-server.ts` | `recordEvent`/`recordEventServer` returned unused `boolean` — all callers ignored it | Changed to `Promise<void>` with `void` call pattern |
+| **B1** | `EventTimeline.tsx`, `EventFeed.tsx` | `resolveActorName` duplicated in both components — DRY violation | Extracted to `event-log-display.ts`, both import from shared source |
+| **B2a** | `EventTimeline.tsx`, `EventFeed.tsx` | Display registry duplicated as `ACTION_DISPLAY` (label+color) + `ACTION_ICON` — 2 registries | Merged into single `ACTION_DISPLAY` in `event-log-display.ts` with 3 fields per action |
+| **A1** | `useTransactionSync.ts` | `ingestion.failed` event never emitted on retry exhaustion | Added `void recordEvent({ action: 'ingestion.failed', ... })` alongside Logger |
+| **A3** | `src/lib/utils.ts` | `formatRelativeTime` used `Math.abs(diff)` which stripped sign — future dates incorrectly rendered as past | Changed to `sign = diffMs <= 0 ? 1 : -1` — future dates now show "in N hours" |
+| **D1** | `40_event_log.sql` | SQL CHECK constraint on `event_log.action` duplicated TypeScript enforcement | Migration 46 drops the redundant constraint |
 
 ---
 
@@ -60,6 +68,7 @@ None at this time.
 | V-68 | 429 inline `style={{ }}` occurrences | Pervasive inline styles across 20+ files. Only `ReceiptScanner.tsx` and `NavBar.tsx` use CSS Modules properly | Migrate inline styles to CSS Modules systematically |
 | V-44 | 4 components | Missing `React.memo` on presentational components (original V-44, pre-existing) | Add `React.memo` |
 | V-26 | 6+ components | `€ + Number(x).toFixed(2)` hardcoded (original V-26, now expanded to V-73) | Shared `formatCurrency()` utility |
+| B2b | `event-log-display.ts` | `ACTION_COLORS` object can be derived from `ACTION_DISPLAY` — minor DRY gap | Deferred — 3-field object compact enough, deriving adds runtime overhead |
 
 ---
 
@@ -75,6 +84,8 @@ None at this time.
 | V-63 | `InvoiceManager.tsx:4` | Directly imports `supabase` from `@/lib/supabase` and calls it inline (lines 29-35) | Accept data/callbacks via props |
 | V-64 | `ReceiptScanner.tsx:57` | `new Html5QrcodeScanner(...)` instantiated directly inside `ScanStep` — no interface abstraction for scanner hardware | Accept scanner factory via prop or DI |
 | V-70b | `rebuild-neo4j-graph.ts:83-95` | Bulk insert with batch fallback — no transaction wrapping | Wrap batch in Supabase transaction |
+| D2 | `event_log` RPC params | Same `tenant_id` param named differently across event action RPCs (`p_tenant_id` vs `p_tenant`) | Accepted — minor inconsistency, not worth breaking change |
+| C4 | `event-log.ts`, `event-log-server.ts` | No abstraction interface between Logger and ServerLogger | Accepted — only 4 call sites, stable dependency, interface adds no value |
 
 ---
 
@@ -95,11 +106,11 @@ None at this time.
 
 **Security:** All 17 API routes secured. 6 without `withAuth` use documented alternative auth (HMAC, API key, cron secret). No `localStorage` outside OfflineQueue.
 
-**SOLID:** 16 issues (5 SRP, 7 OCP, 3 LSP, 3 ISP, 5 DIP). Top SRP: `finance.ts` (289 lines, 12 functions). Top OCP: `enablebanking` 5-action switch, `triggerWorkflow.ts` dual chains.
+**SOLID:** 16 issues → 13 after Phase 5 (C1 SRP, C2 ISP fixed). Top SRP: `finance.ts` (289 lines, 12 functions). Top OCP: `enablebanking` 5-action switch, `triggerWorkflow.ts` dual chains.
 
-**DRY:** 3 issues. Top: `finance.ts` 12 functions, payload handler registry, 3-DIP services.
+**DRY:** 3 issues → 1 after Phase 5 (B1, B2a fixed). Residual: B2b — ACTION_COLORS derivation from ACTION_DISPLAY (deferred).
 
-**Observability:** All API routes have `ServerLogger`. Health endpoint intentionally surfaces errors in HTTP response — acceptable.
+**Observability:** All API routes have `ServerLogger`. Health endpoint intentionally surfaces errors in HTTP response — acceptable. `ingestion.failed` event now emitted on retry exhaustion (A1 fix).
 
 **React Hygiene:** 1 missing Suspense boundary (`ProfileMenu.tsx` usage of `useRouter` is safe without params but noted). 429 inline style objects. 0 `React.memo` used. 0 dead exports. 0 missing `useEffect` cleanups.
 

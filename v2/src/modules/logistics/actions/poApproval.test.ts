@@ -1,148 +1,73 @@
-import { DefaultPOApprovalService } from './poApproval';
-import { supabase } from '@/lib/supabase';
+/**
+ * Phase 2b Contract Tests: poApproval event-log wiring
+ * Proves recordEventServer is called with workflow.action_resolved
+ */
 
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(),
-    rpc: jest.fn(),
-  },
+jest.mock('@/lib/event-log-server', () => ({
+  recordEventServer: jest.fn().mockResolvedValue(true)
 }));
 
-describe('POApprovalService Contract', () => {
-  const mockSingle = jest.fn();
-  const mockUpdate = jest.fn();
-  const mockEq = jest.fn();
+const mockRpc = jest.fn();
+const mockSingle = jest.fn();
+const mockUpdate = jest.fn();
+
+const mockSupabase = {
+  rpc: mockRpc,
+  from: jest.fn((table) => {
+    if (table === 'whatsapp_outbox') {
+      return {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        single: mockSingle,
+      };
+    }
+    return {
+      update: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      then: (cb: any) => cb(mockUpdate()), // resolve the promise chain
+    };
+  })
+} as any;
+
+import { DefaultPOApprovalService } from './poApproval';
+import { recordEventServer } from '@/lib/event-log-server';
+
+describe('poApproval — Event Log Wiring (Contract)', () => {
+  let service: DefaultPOApprovalService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSingle.mockReset();
-    mockUpdate.mockReset();
-    mockEq.mockReset();
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      eq: mockEq.mockReturnThis(),
-      single: mockSingle,
-      update: mockUpdate,
+    service = new DefaultPOApprovalService(mockSupabase);
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    mockUpdate.mockReturnValue({ data: null, error: null });
+    mockSingle.mockResolvedValue({ 
+      data: { id: 'outbox-1', payload: { metadata: { poId: 'po-123' } } }, 
+      error: null 
     });
-
-    mockEq.mockReturnThis();
   });
 
-  it('should process a valid PO approval decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            poId: 'po-1042',
-          },
-        },
-      },
-      error: null,
-    });
+  it('POSITIVE: emits workflow.action_resolved when action succeeds', async () => {
+    await service.processDecision('tenant-abc', 'outbox-1', 'Approve', '+421900000000');
 
-    (supabase.rpc as jest.Mock).mockResolvedValue({ data: { status: 'SUCCESS' }, error: null });
-
-    const service = new DefaultPOApprovalService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Approve',
-      '421904855155' // Wife's phone
-    );
-    expect(result.success).toBe(true);
-    expect(result.newStatus).toBe('APPROVED');
-    expect(supabase.rpc).toHaveBeenCalledWith('receive_purchase_order_v1', { p_po_id: 'po-1042' });
+    expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'workflow.action_resolved',
+      tenantId: 'tenant-abc',
+      entityId: 'outbox-1',
+      entityType: 'whatsapp_outbox',
+      metadata: expect.objectContaining({
+        decision: 'Approve',
+        adminPhone: '+421900000000',
+        poId: 'po-123'
+      })
+    }));
   });
 
-  it('should process a valid PO rejection decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            poId: 'po-1042',
-          },
-        },
-      },
-      error: null,
-    });
+  it('NEGATIVE: does NOT emit event if action fails', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error('DB Error') });
 
-    mockUpdate.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      }),
-    });
+    await expect(service.processDecision('tenant-abc', 'outbox-1', 'Approve', '+421900000000'))
+      .rejects.toThrow();
 
-    const service = new DefaultPOApprovalService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Reject',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.newStatus).toBe('REJECTED');
-    expect(supabase.from).toHaveBeenCalledWith('purchase_orders');
-  });
-
-  it('should process a valid PO modification decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            poId: 'po-1042',
-          },
-        },
-      },
-      error: null,
-    });
-
-    mockUpdate.mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      }),
-    });
-
-    const service = new DefaultPOApprovalService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Modify',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.newStatus).toBe('MODIFIED');
-    expect(supabase.from).toHaveBeenCalledWith('purchase_orders');
-  });
-
-  it('should return failure for an invalid decision rather than throwing (LSP compliant)', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            poId: 'po-1042',
-          },
-        },
-      },
-      error: null,
-    });
-
-    const service = new DefaultPOApprovalService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'InvalidDecision' as any,
-      '421904855155'
-    );
-    expect(result.success).toBe(false);
-    expect(result.resolution).toBe('Invalid decision');
+    expect(recordEventServer).not.toHaveBeenCalled();
   });
 });

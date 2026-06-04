@@ -5,6 +5,7 @@ import { getErrorMessage } from '@synculariti/whatsapp-client';
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 
 export interface NotifyRequestBody {
   tenant_id?: string;
@@ -148,6 +149,17 @@ export const POST = async (req: Request) => {
       tenantId: resolvedTenantId,
       source: resolvedSource ?? 'api_key',
     });
+
+    void recordEventServer({
+      tenantId: resolvedTenantId,
+      action: 'whatsapp.notification.sent',
+      whoType: 'system',
+      metadata: {
+        recipientPhone: parsed.recipientPhone,
+        type: parsed.payload.type,
+      },
+      description: `Queued WhatsApp notification to ${parsed.recipientPhone}`,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true }, { status: 202 });
   } catch (e: unknown) {

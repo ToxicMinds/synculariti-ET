@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase-server';
 import { Logger } from '@/lib/logger';
+import { recordEventServer } from '@/lib/event-log-server';
 import { getErrorMessage, formatCurrency, safeAmount } from '@/lib/utils';
 
 interface InvoiceItem {
@@ -59,6 +60,17 @@ export async function notifyLargeInvoice(
     Logger.system('INFO', 'WhatsApp', 'Large invoice notification queued', {
       tenantId, count: largeItems.length,
     });
+
+    void recordEventServer({
+      tenantId,
+      action: 'whatsapp.notification.sent',
+      whoType: 'system',
+      metadata: {
+        recipientPhone: ownerPhone,
+        source: 'large_invoice_auto',
+      },
+      description: `Auto-queued large invoice alert for ${largeItems.length} item(s)`,
+    }).catch(() => {});
 
     return { success: true, sent: true };
   } catch (e: unknown) {

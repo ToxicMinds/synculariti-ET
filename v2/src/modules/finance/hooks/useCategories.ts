@@ -1,5 +1,6 @@
 import { useTenantContext } from '@/context/TenantContext';
 import { Logger } from '@/lib/logger';
+import { recordEvent } from '@/lib/event-log';
 import { getErrorMessage } from '@/lib/utils';
 
 export function useCategories() {
@@ -28,7 +29,7 @@ export function useCategories() {
         budgets: newBudgets,
         categories: newCategories
       });
-      Logger.user(tenant.tenant_id, 'CATEGORY_ADDED', `Added new category: ${cleanName}`, 'System');
+      void recordEvent({ action: 'category.created', description: `Added new category: ${cleanName}` });
     } catch (e: unknown) {
       Logger.system('ERROR', 'Finance', 'Failed to add category', { error: getErrorMessage(e) });
       throw e;

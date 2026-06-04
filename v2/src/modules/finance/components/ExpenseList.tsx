@@ -2,6 +2,8 @@
 
 import { Transaction } from '../lib/finance';
 import { useTransactionFilter } from '../hooks/useTransactionFilter';
+import { useEventCreation } from '@/modules/identity/hooks/useEventCreation';
+import { useTenant } from '@/modules/identity/hooks/useTenant';
 
 import { FilterBar } from './expense-list/FilterBar';
 import { TransactionRow } from './expense-list/TransactionRow';
@@ -27,6 +29,10 @@ export function ExpenseList({ transactions, onDelete, onEdit }: ExpenseListProps
     uniqueCategories,
     uniqueWhos
   } = useTransactionFilter({ transactions });
+
+  const { tenant } = useTenant();
+  const txIds = filteredTransactions.map(t => t.id).filter(Boolean) as string[];
+  const { eventsByEntityId } = useEventCreation(tenant?.tenant_id, 'transaction', txIds);
 
   return (
     <div>
@@ -55,11 +61,12 @@ export function ExpenseList({ transactions, onDelete, onEdit }: ExpenseListProps
             </div>
           ) : (
             filteredTransactions.map(tx => (
-              <TransactionRow 
-                key={tx.id} 
-                tx={tx} 
-                onDelete={onDelete} 
-                onEdit={onEdit} 
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                creationEvent={tx.id ? eventsByEntityId[tx.id] : null}
               />
             ))
           )}

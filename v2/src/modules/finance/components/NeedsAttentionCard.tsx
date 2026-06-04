@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import { getErrorMessage, formatCurrency } from '@/lib/utils';
 import { resolvePurchaseAction } from '@/modules/finance/actions/resolvePurchaseAction';
+import { EventTimeline } from '@/components/EventTimeline';
 
 interface NeedsAttentionCardProps {
   tenantId: string | undefined;
@@ -273,6 +274,14 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
                         </button>
                       </div>
                     </div>
+                    {tenantId && (
+                      <EventTimeline
+                        entityType="purchase"
+                        entityId={row.id}
+                        tenantId={tenantId}
+                        limit={3}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

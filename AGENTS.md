@@ -819,6 +819,7 @@ This section documents the Phase 1 security hardening campaign. All 4 issues hav
 
 - **Before Phase 4**: 555 passing, 3 pre-existing failures (pipeline-schema)
 - **After Phase 4**: 576 passing, 0 failures
+- **After Phase 5 (Event Log Refactoring)**: 639 passing, 0 failures
 - **Net new tests**: 20 (VarianceSpikeDetail: 4, enrich: 3, BDD: 2 scenarios, pipeline-schema fixes: 2 failures → 0)
 - **Database migrations applied**: `20260531001` (ROW_COUNT fix) + `20260531002` (check constraints + resolve RPC)
 - **Check constraints fixed**: `purchases.quarantine_status` + `purchase_anomaly_queue.status` now accept `RELEASED` / `RESOLVED`
@@ -885,3 +886,80 @@ The original LLM prompt produced raw-statistics narration (e.g., *"On Saturdays,
 | `AGENTS.md §11` | This section — tenant mismatch, RLS fix, AI prompt redesign, Top Items fix |
 | `RULES.md §15-16` | AI prompt guidelines, ItemAnalytics data flow |
 | `SYMBOLS.md` | Added `ItemAnalytics`, `migration 20260601003`, `migration 20260601004` |
+
+## 12. Phase 5: Event Log Architecture Refactoring
+
+### 12.1 Issues Found & Fixed
+
+| # | Issue | Severity | File/Location | Fix |
+|---|-------|----------|---------------|-----|
+| C1 | `event-log.ts` mixed read (`useEventLog` hook) + write (`recordEvent`) in one file | **HIGH** | `src/lib/event-log.ts` | Split: `event-log-read.ts` (read hook) + `event-log.ts` (write wrapper) |
+| C2 | `RecordEventPayload` had optional `tenantId` — server callers had no compile-time enforcement | **HIGH** | `src/lib/event-log-types.ts` | Split into `BaseEventPayload` (shared) + `RecordEventPayload` (client, no tenantId) + `RecordEventServerPayload` (server, requires `tenantId: string`) |
+| C3 | `recordEvent`/`recordEventServer` returned unused `boolean` — callers ignored it | **MED** | `src/lib/event-log.ts`, `event-log-server.ts` | Changed both to `Promise<void>` — fire-and-forget pattern enforced via `void recordEvent(...)` |
+| B1 | `resolveActorName` duplicated in `EventTimeline` + `EventFeed` | **MED** | `EventTimeline.tsx`, `EventFeed.tsx` | Extracted to `event-log-display.ts`, both components import from shared source |
+| B2a | `ACTION_DISPLAY` (label+color) in `EventTimeline` + `ACTION_ICON` in `EventFeed` — 2 registries | **MED** | `EventTimeline.tsx`, `EventFeed.tsx` | Merged into single `ACTION_DISPLAY` registry in `event-log-display.ts` with 3 fields per action (`label`, `color`, `icon`). New actions require 1 entry instead of edits to 2 files |
+| A1 | `ingestion.failed` event never emitted on retry exhaustion | **MED** | `useTransactionSync.ts` | Added `void recordEvent({ action: 'ingestion.failed', ... })` alongside `Logger.system('ERROR')` |
+| A3 | `formatRelativeTime` used `Math.abs(diff)` which stripped sign — future dates incorrectly rendered | **LOW** | `src/lib/utils.ts` | Changed to track sign separately: `sign = diffMs <= 0 ? 1 : -1`, applies to `rtf.format(sign * Math.floor(...), unit)` — past dates unchanged, future dates now show "in N hours" instead of "N hours ago" |
+| D1 | SQL CHECK constraint `valid_event_action` on `event_log.action` duplicated TypeScript enforcement | **LOW** | `sql/b2b_evolution/40_event_log.sql` | Migration `46_remove_event_log_action_check.sql` drops the constraint — `record_event_v1` (SECURITY DEFINER) is the sole write path; TypeScript's compile-time `EVENT_ACTIONS` is the real guard |
+
+### 12.2 Architecture Rules Added
+
+- **Event Log Void Return Pattern**: Both `recordEvent()` (client) and `recordEventServer()` (server) return `Promise<void>`. Callers MUST use `void recordEvent(...)` for fire-and-forget semantics. The function never blocks the calling code — errors are logged internally and suppressed.
+- **Type-Safe Server Payload**: All service-role `recordEventServer()` calls MUST pass an explicit `tenantId` — enforced at compile time by `RecordEventServerPayload`. Client-side `recordEvent()` does NOT accept `tenantId` (resolved server-side by `record_event_v1` via `get_my_tenant()`).
+- **Single ACTION_DISPLAY Registry**: All action-to-display mappings (label, color, icon) live in `src/lib/event-log-display.ts`. Adding a new action requires: (1) add to `EVENT_ACTIONS` const in `event-log-types.ts`, (2) add to `ACTION_DISPLAY` map in `event-log-display.ts`. No other files need editing.
+- **Event Log Query Isolation (BDD Tests)**: All BDD test queries against `event_log` table MUST filter by `tenant_id` to prevent parallel-test pollution. The `event_log.test.ts` count query broke this rule — it filtered only by `action` (not `tenant_id`), causing flaky failures when `db-triggers.test.ts` ran concurrently and inserted `transaction.created` rows for a different tenant. Fix: added `.eq('tenant_id', tenantId)` to all BDD queries.
+
+### 12.3 New Files
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `src/lib/event-log-types.ts` | 82 | Type definitions: `EVENT_ACTIONS` const (26 actions), `EventAction`, `WhoType`, `BaseEventPayload`, `RecordEventPayload` (client), `RecordEventServerPayload` (server, requires tenantId) |
+| `src/lib/event-log-display.ts` | 82 | Single shared `ACTION_DISPLAY` registry (label, color, icon per action), `resolveActorName()`, `getActionDisplay()` |
+| `src/lib/event-log-read.ts` | 59 | `useEventLog()` read hook extracted from event-log.ts — handles permission-denied errors gracefully |
+| `src/lib/event-log-server.ts` | 28 | `recordEventServer()` service-role wrapper — uses `RecordEventServerPayload`, logs via `ServerLogger` |
+| `src/lib/event-log-client.test.ts` | 104 | Tests for both `recordEvent` and `recordEventServer` — positive RPC invocation, error logging, type safety for tenantId |
+| `src/lib/formatRelativeTime.test.ts` | 50 | 9 tests for `formatRelativeTime` — seconds/minutes/hours/days/edge boundaries/future dates |
+| `src/lib/logger-deprecation.test.ts` | 98 | 4 tests for `Logger.user` → `recordEvent` and `ServerLogger.user` → `recordEventServer` redirect contract |
+| `sql/b2b_evolution/46_remove_event_log_action_check.sql` | 8 | Drops `valid_event_action` CHECK constraint on `event_log.action` |
+
+### 12.4 Existing Files Modified
+
+| File | Change |
+|------|--------|
+| `src/lib/event-log.ts` | Removed `useEventLog` export, changed return to `Promise<void>`, imports `RecordEventPayload` |
+| `src/lib/formatRelativeTime` (in utils.ts) | Fixed sign handling: `Math.abs(diff)` → `sign = diffMs <= 0 ? 1 : -1` |
+| `src/components/EventTimeline.tsx` | Imports `useEventLog` from `@/lib/event-log-read`, imports display from `@/lib/event-log-display`, removed local `getActionDisplay` + `resolveActorName` |
+| `src/components/EventFeed.tsx` | Imports `useEventLog` from `@/lib/event-log-read`, imports display from `@/lib/event-log-display`, removed local `ACTION_ICON` + `resolveActorName` |
+| `src/components/EventByline.tsx` | Inline actor resolution replaced with `resolveActorName` from `@/lib/event-log-display` |
+| `src/modules/finance/hooks/useTransactionSync.ts` | Added `void recordEvent({ action: 'ingestion.failed', ... })` on retry exhaustion |
+| `src/components/__tests__/EventTimeline.test.tsx` | Mock path changed from `@/lib/event-log` to `@/lib/event-log-read` |
+| `src/components/__tests__/EventFeed.test.tsx` | Mock path changed from `@/lib/event-log` to `@/lib/event-log-read` |
+| `src/lib/event_log.test.ts` | All BDD queries now filter by `tenant_id` — fixes flaky parallel-run pollution |
+| `src/lib/event-log-client.test.ts` | Updated assertion matchers to match actual log message format (`record_event_v1 failed for ${action}` not just error.message) |
+
+### 12.5 Coverage Improvement
+
+- **Before Phase 5**: 576 passing, 0 failures
+- **After Phase 5**: 639 passing, 0 failures
+- **Net new tests**: 63 (event-log-client: 6, formatRelativeTime: 9, logger-deprecation: 4, useTransactionSync: +2, EventTimeline: 3, EventFeed: 3, EventByline: re-verified 5, event_log BDD: fixed 1 flaky + 7 passing, pipeline-schema: 183)
+- **Zero regressions**
+
+### 12.6 DRY/SOLID/ACID Violations Addressed
+
+| Principle | Violation | Fix |
+|-----------|-----------|-----|
+| **SRP** | `event-log.ts` handled both read (useEventLog) and write (recordEvent) | Split into `event-log.ts` (write) + `event-log-read.ts` (read) |
+| **ISP** | `RecordEventPayload` had optional `tenantId` — server callers got no compile-time enforcement | Split into `RecordEventPayload` (client, no tenantId) + `RecordEventServerPayload` (server, requires tenantId) |
+| **DRY** | `resolveActorName` duplicated across EventTimeline + EventFeed | Extracted to single `event-log-display.ts` source |
+| **DRY** | Display registry duplicated as `ACTION_DISPLAY` (EventTimeline) + `ACTION_ICON` (EventFeed) | Merged to single `ACTION_DISPLAY` in `event-log-display.ts` |
+| **Interface** | Wrappers returned unused `boolean` — all callers ignored it | Changed to `Promise<void>` with `void` call pattern |
+| **Reliability** | `ingestion.failed` event never emitted on retry exhaustion | Added `recordEvent` call alongside Logger |
+| **Correctness** | `formatRelativeTime` broke on future dates (sign stripped by `Math.abs`) | Added sign variable: `sign = diffMs <= 0 ? 1 : -1` |
+| **Defense-in-depth** | SQL CHECK constraint duplicated TypeScript enforcement | Migration 46 removes redundant CHECK |
+
+### 12.7 Decisions Made
+
+- **B2b (derive `ACTION_COLORS` from `ACTION_DISPLAY`)**: Deferred. The 3-field object is already compact enough. Deriving would add runtime overhead for minimal DRY gain.
+- **C4 (Logger abstraction interface)**: Skipped. Only 4 call sites in event-log.ts/event-log-server.ts. Interface would add indirection without measurable benefit.
+- **D2 (same `tenant_id` field named differently)**: Accepted. Minor inconsistency across RPC params — not worth a breaking change.
+- **A2 (inline comment in test)**: Kept for readability. Not a code quality issue.

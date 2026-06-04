@@ -23,6 +23,7 @@ export type LogComponent =
   | 'Usage'
   | 'Camera'
   | 'WhatsApp'
-  | 'UI';
+  | 'UI'
+  | 'EventLog';
 
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG' | 'PERF';

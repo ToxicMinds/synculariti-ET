@@ -171,5 +171,17 @@
 - **No category filter**: The component queries ALL receipt items regardless of category. The `"(OPEX)"` label was removed from the BentoCard title because it was misleading — the card never filtered for OPEX items.
 - **Aggregation**: Items grouped by UPPERCASED name, sorted by `total_amount DESC`, sliced to top 5. Includes `last_store` and `last_date` from the most recent transaction per item.
 
+## 17. Event Log Architecture
+- **Void Return Pattern**: Both `recordEvent()` (client) and `recordEventServer()` (server) return `Promise<void>`. Callers MUST use `void recordEvent(...)` for fire-and-forget semantics. Never await — the function never blocks and errors are logged internally.
+- **Type-Safe Server Payload**: All service-role `recordEventServer()` calls MUST pass an explicit `tenantId` — enforced at compile time by `RecordEventServerPayload`. Client-side `recordEvent()` does NOT accept `tenantId` (resolved server-side by `record_event_v1` via `get_my_tenant()`).
+- **Single ACTION_DISPLAY Registry**: All action-to-display mappings (label, color, icon) live in `src/lib/event-log-display.ts`. Never create a second registry in a component file.
+- **No SQL CHECK on event_log.action**: The sole write path is `record_event_v1` (SECURITY DEFINER). TypeScript's compile-time `EVENT_ACTIONS` const is the real guard. The DB CHECK constraint was dropped in migration 46.
+- **BDD Query Isolation**: All BDD queries against `event_log` MUST filter by `tenant_id`. Jest runs test files in parallel — queries without `tenant_id` filters double-count rows from concurrent test suites.
+
+## 18. formatRelativeTime Sign Handling
+- `formatRelativeTime(isoDate)` MUST NOT use `Math.abs()` directly in the `rtf.format()` call — it strips the sign, making future dates render as past.
+- Track sign separately: `const sign = diffMs <= 0 ? 1 : -1; return rtf.format(sign * Math.floor(diff / unit), unit)`.
+- Future dates correctly produce "in N minutes/hours/days". Past dates produce "N minutes/hours/days ago".
+
 
 

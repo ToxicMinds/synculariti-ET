@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ServerLogger } from '@/lib/logger-server'
+import { recordEventServer } from '@/lib/event-log-server'
 import { formatCurrency } from '@/lib/utils'
 import type { TriggerParams, TriggerResult, TenantConfig, WorkflowConfig } from '../types'
 
@@ -87,6 +88,7 @@ export async function triggerWorkflow(
   if (strategy) {
     const thresholdReason = strategy.checkThreshold(params, workflowConfig)
     if (thresholdReason) {
+      void recordEventServer({ tenantId, action: 'workflow.skipped', whoType: 'system', metadata: { workflowKey, reason: thresholdReason } })
       return { fired: false, reason: thresholdReason, outboxIds: [] }
     }
   }
@@ -143,5 +145,6 @@ export async function triggerWorkflow(
     return { fired: false, reason: 'no recipients resolved', outboxIds: [] }
   }
 
+  void recordEventServer({ tenantId, action: 'workflow.triggered', whoType: 'system', metadata: { workflowKey, outboxIds } })
   return { fired: true, outboxIds }
 }

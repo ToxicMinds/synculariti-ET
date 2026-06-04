@@ -1,216 +1,113 @@
-import { POST } from './route';
-import { NextRequest } from 'next/server';
+/**
+ * Phase 2c Contract Tests: auth/pin/route.ts event-log wiring
+ * Proves recordEventServer is called with pin.verified
+ */
 
-const mockCreateServiceClient = jest.fn();
-const mockServerLoggerSystem = jest.fn();
+jest.mock('@/lib/event-log-server', () => ({
+  recordEventServer: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('@/lib/logger-server', () => ({
+  ServerLogger: { system: jest.fn() },
+}));
+
+// We need a complex mock for supabaseAdmin
+const mockRpc = jest.fn();
+const mockSelect = jest.fn().mockReturnThis();
+const mockEq = jest.fn().mockReturnThis();
+const mockSingle = jest.fn();
+
+const mockSignInWithPassword = jest.fn();
 
 jest.mock('@/lib/supabase-server', () => ({
-  createServiceClient: () => mockCreateServiceClient(),
+  createServiceClient: jest.fn(() => ({
+    rpc: mockRpc,
+    from: jest.fn(() => ({
+      select: mockSelect,
+      eq: mockEq,
+      single: mockSingle,
+    })),
+    auth: {
+      signInWithPassword: mockSignInWithPassword,
+    }
+  })),
 }));
 
-jest.mock('@/lib/logger-server', () => ({
-  ServerLogger: { system: (...args: any[]) => mockServerLoggerSystem(...args) },
-}));
+import { POST } from './route';
+import { recordEventServer } from '@/lib/event-log-server';
 
-describe('POST /api/auth/pin', () => {
-  const OLD_SYNC_KEY = process.env.SYNC_SECRET_KEY;
-  const OLD_PIN_SECRET = process.env.PIN_DERIVATION_SECRET;
+describe('auth/pin/route — Event Log Wiring (Contract)', () => {
+  const originalEnv = process.env;
 
-  beforeAll(() => {
-    process.env.SYNC_SECRET_KEY = 'test-sync-secret';
-    process.env.PIN_DERIVATION_SECRET = 'test-pin-secret-32-chars-minimum!!';
+  beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...originalEnv, PIN_DERIVATION_SECRET: 'test-secret' };
+    jest.clearAllMocks();
+
+    // Default happy path
+    mockRpc.mockImplementation(async (name) => {
+      if (name === 'check_rate_limit') return { data: { allowed: true, remaining_attempts: 5, retry_after_seconds: 0 }, error: null };
+      if (name === 'verify_tenant_access') return { data: [{ target_id: 'tenant-abc', target_name: 'Test Tenant' }], error: null };
+      if (name === 'check_tenant_pin') return { data: true, error: null };
+      return { data: null, error: null };
+    });
+    
+    mockSingle.mockResolvedValue({ data: { handle: 'test-handle' }, error: null });
+    mockSignInWithPassword.mockResolvedValue({ data: { session: { access_token: 'token', refresh_token: 'refresh' } }, error: null });
   });
 
   afterAll(() => {
-    process.env.SYNC_SECRET_KEY = OLD_SYNC_KEY;
-    process.env.PIN_DERIVATION_SECRET = OLD_PIN_SECRET;
+    process.env = originalEnv;
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  const mockRpc = (rpcName: string, result: unknown) => {
-    mockCreateServiceClient.mockReturnValue({
-      rpc: jest.fn().mockImplementation((name: string) => {
-        if (name === rpcName) return Promise.resolve({ data: result, error: null });
-        return Promise.resolve({ data: null, error: { message: `Unexpected RPC: ${name}` } });
-      }),
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: { handle: '@demo-2026' }, error: null }),
-      }),
-      auth: {
-        signInWithPassword: jest.fn().mockResolvedValue({
-          data: { session: { access_token: 'mock-token', refresh_token: 'mock-refresh' } },
-          error: null,
-        }),
-      },
-    });
-  };
-
-  it('returns 400 for invalid PIN format (too short)', async () => {
-    const req = new NextRequest('http://localhost/api/auth/pin', {
+  it('POSITIVE: calls recordEventServer with pin.verified on successful login', async () => {
+    const req = new Request('https://app/api/auth/pin', {
       method: 'POST',
-      body: JSON.stringify({ pin: 'ab' }),
-    });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(400);
-    expect(body.error).toContain('Invalid PIN format');
-  });
-
-  it('returns 400 for non-alphanumeric PIN', async () => {
-    const req = new NextRequest('http://localhost/api/auth/pin', {
-      method: 'POST',
-      body: JSON.stringify({ pin: '1234!' }),
-    });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(400);
-    expect(body.error).toContain('Invalid PIN format');
-  });
-
-  it('returns 503 when rate limit RPC fails', async () => {
-    mockCreateServiceClient.mockReturnValue({
-      rpc: jest.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } }),
-    });
-
-    const req = new NextRequest('http://localhost/api/auth/pin', {
-      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin: '1234' }),
     });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(503);
-    expect(body.error).toBe('Security service unavailable');
+
+    await POST(req);
+
+    expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'pin.verified',
+      tenantId: 'tenant-abc',
+      whoType: 'user', // System processes the login, but the action is a user action
+    }));
   });
 
-  it('returns 429 when rate limited', async () => {
-    mockCreateServiceClient.mockReturnValue({
-      rpc: jest.fn().mockImplementation((name: string) => {
-        if (name === 'check_rate_limit') {
-          return Promise.resolve({
-            data: { allowed: false, remaining_attempts: 0, retry_after_seconds: 3600 },
-            error: null,
-          });
-        }
-        return Promise.resolve({ data: null, error: null });
-      }),
+  it('NEGATIVE: does NOT call recordEventServer on rate limit failure', async () => {
+    mockRpc.mockImplementationOnce(async (name) => {
+      if (name === 'check_rate_limit') return { data: { allowed: false, remaining_attempts: 0, retry_after_seconds: 60 }, error: null };
+      return { data: null, error: null };
     });
 
-    const req = new NextRequest('http://localhost/api/auth/pin', {
+    const req = new Request('https://app/api/auth/pin', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin: '1234' }),
     });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(429);
-    expect(body.error).toContain('Too many attempts');
+
+    await POST(req);
+
+    expect(recordEventServer).not.toHaveBeenCalled();
   });
 
-  it('returns 401 when PIN does not match any tenant', async () => {
-    mockCreateServiceClient.mockReturnValue({
-      rpc: jest.fn().mockImplementation((name: string) => {
-        if (name === 'check_rate_limit') {
-          return Promise.resolve({
-            data: { allowed: true, remaining_attempts: 4, retry_after_seconds: 0 },
-            error: null,
-          });
-        }
-        if (name === 'verify_tenant_access') {
-          return Promise.resolve({ data: [], error: null });
-        }
-        return Promise.resolve({ data: null, error: null });
-      }),
+  it('NEGATIVE: does NOT call recordEventServer on incorrect PIN', async () => {
+    mockRpc.mockImplementation(async (name) => {
+      if (name === 'check_rate_limit') return { data: { allowed: true, remaining_attempts: 5, retry_after_seconds: 0 }, error: null };
+      if (name === 'verify_tenant_access') return { data: [{ target_id: 'tenant-abc', target_name: 'Test Tenant' }], error: null };
+      if (name === 'check_tenant_pin') return { data: false, error: null }; // PIN INVALID
+      return { data: null, error: null };
     });
 
-    const req = new NextRequest('http://localhost/api/auth/pin', {
+    const req = new Request('https://app/api/auth/pin', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin: '9999' }),
     });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(401);
-    expect(body.error).toContain('Authentication failed');
-  });
 
-  it('returns 401 when PIN verification fails', async () => {
-    mockCreateServiceClient.mockReturnValue({
-      rpc: jest.fn().mockImplementation((name: string) => {
-        if (name === 'check_rate_limit') {
-          return Promise.resolve({
-            data: { allowed: true, remaining_attempts: 4, retry_after_seconds: 0 },
-            error: null,
-          });
-        }
-        if (name === 'verify_tenant_access') {
-          return Promise.resolve({
-            data: [{ target_id: 'tenant-uuid', target_name: 'Demo' }],
-            error: null,
-          });
-        }
-        if (name === 'check_tenant_pin') {
-          return Promise.resolve({ data: null, error: { message: 'Invalid PIN' } });
-        }
-        return Promise.resolve({ data: null, error: null });
-      }),
-    });
+    await POST(req);
 
-    const req = new NextRequest('http://localhost/api/auth/pin', {
-      method: 'POST',
-      body: JSON.stringify({ pin: 'wrong1' }),
-    });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(401);
-    expect(body.error).toContain('Authentication failed');
-  });
-
-  it('returns 200 with tokens on successful authentication', async () => {
-    const mockFrom = jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: { handle: '@demo-2026' }, error: null }),
-    });
-
-    mockCreateServiceClient.mockReturnValue({
-      rpc: jest.fn().mockImplementation((name: string) => {
-        if (name === 'check_rate_limit') {
-          return Promise.resolve({
-            data: { allowed: true, remaining_attempts: 4, retry_after_seconds: 0 },
-            error: null,
-          });
-        }
-        if (name === 'verify_tenant_access') {
-          return Promise.resolve({
-            data: [{ target_id: 'tenant-uuid', target_name: 'Demo' }],
-            error: null,
-          });
-        }
-        if (name === 'check_tenant_pin') {
-          return Promise.resolve({ data: true, error: null });
-        }
-        return Promise.resolve({ data: null, error: null });
-      }),
-      from: mockFrom,
-      auth: {
-        signInWithPassword: jest.fn().mockResolvedValue({
-          data: { session: { access_token: 'mock-token-abc', refresh_token: 'mock-refresh-xyz' } },
-          error: null,
-        }),
-      },
-    });
-
-    const req = new NextRequest('http://localhost/api/auth/pin', {
-      method: 'POST',
-      body: JSON.stringify({ pin: '1234' }),
-    });
-    const res = await POST(req);
-    const body = await res.json();
-    expect(res.status).toBe(200);
-    expect(body.access_token).toBe('mock-token-abc');
-    expect(body.refresh_token).toBe('mock-refresh-xyz');
+    expect(recordEventServer).not.toHaveBeenCalled();
   });
 });

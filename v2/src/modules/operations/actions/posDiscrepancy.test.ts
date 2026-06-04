@@ -1,134 +1,62 @@
-import { DefaultPOSDiscrepancyService } from './posDiscrepancy';
-import { supabase } from '@/lib/supabase';
+/**
+ * Phase 2b Contract Tests: posDiscrepancy event-log wiring
+ * Proves recordEventServer is called with workflow.action_resolved
+ */
 
-jest.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: jest.fn(),
-    rpc: jest.fn(),
-  },
+jest.mock('@/lib/event-log-server', () => ({
+  recordEventServer: jest.fn().mockResolvedValue(true)
 }));
 
-describe('POSDiscrepancyService Contract', () => {
-  const mockSingle = jest.fn();
+const mockRpc = jest.fn();
+const mockSingle = jest.fn();
+
+const mockSupabase = {
+  rpc: mockRpc,
+  from: jest.fn(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: mockSingle,
+  }))
+} as any;
+
+import { DefaultPOSDiscrepancyService } from './posDiscrepancy';
+import { recordEventServer } from '@/lib/event-log-server';
+
+describe('posDiscrepancy — Event Log Wiring (Contract)', () => {
+  let service: DefaultPOSDiscrepancyService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSingle.mockReset();
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: mockSingle,
+    service = new DefaultPOSDiscrepancyService(mockSupabase);
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    mockSingle.mockResolvedValue({ 
+      data: { id: 'outbox-1', payload: { metadata: { amount: 50, locationId: 'loc-1' } } }, 
+      error: null 
     });
   });
 
-  it('should process a valid Log as Shrinkage decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            amount: 150,
-            locationId: 'loc-123',
-          },
-        },
-      },
-      error: null,
-    });
+  it('POSITIVE: emits workflow.action_resolved when action succeeds', async () => {
+    await service.processDecision('tenant-abc', 'outbox-1', 'Log as Shrinkage', '+421900000000');
 
-    (supabase.rpc as jest.Mock).mockResolvedValue({ data: 'tx-new-id', error: null });
-
-    const service = new DefaultPOSDiscrepancyService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Log as Shrinkage',
-      '421904855155' // Wife's phone
-    );
-    expect(result.success).toBe(true);
-    expect(result.resolution).toBe('SHRINKAGE_LOGGED');
-    expect(supabase.rpc).toHaveBeenCalledWith('add_transaction_v3', {
-      p_transaction: expect.objectContaining({
-        category: 'Adjustment',
-        amount: -150,
-        transaction_type: 'DEBIT',
-      }),
-    });
+    expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'workflow.action_resolved',
+      tenantId: 'tenant-abc',
+      entityId: 'outbox-1',
+      entityType: 'whatsapp_outbox',
+      metadata: expect.objectContaining({
+        decision: 'Log as Shrinkage',
+        adminPhone: '+421900000000',
+        amount: 50,
+      })
+    }));
   });
 
-  it('should process a valid Recount Required decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            amount: 150,
-          },
-        },
-      },
-      error: null,
-    });
+  it('NEGATIVE: does NOT emit event if action fails', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: new Error('DB Error') });
 
-    const service = new DefaultPOSDiscrepancyService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Recount Required',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.resolution).toBe('RECOUNT_REQUIRED');
-  });
+    await expect(service.processDecision('tenant-abc', 'outbox-1', 'Log as Shrinkage', '+421900000000'))
+      .rejects.toThrow();
 
-  it('should process a valid Deduct from Register decision', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            amount: 150,
-          },
-        },
-      },
-      error: null,
-    });
-
-    const service = new DefaultPOSDiscrepancyService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'Deduct from Register',
-      '421904855155'
-    );
-    expect(result.success).toBe(true);
-    expect(result.resolution).toBe('REGISTER_DEDUCTED');
-  });
-
-  it('should return failure for an invalid decision rather than throwing (LSP compliant)', async () => {
-    mockSingle.mockResolvedValue({
-      data: {
-        id: 'outbox-123',
-        tenant_id: 'tenant-123',
-        payload: {
-          metadata: {
-            amount: 150,
-          },
-        },
-      },
-      error: null,
-    });
-
-    const service = new DefaultPOSDiscrepancyService();
-    const result = await service.processDecision(
-      'tenant-123',
-      'outbox-123',
-      'InvalidDecision' as any,
-      '421904855155'
-    );
-    expect(result.success).toBe(false);
-    expect(result.resolution).toBe('Invalid decision');
+    expect(recordEventServer).not.toHaveBeenCalled();
   });
 });

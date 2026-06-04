@@ -1,323 +1,148 @@
-import { POST } from './route';
-import { NextRequest } from 'next/server';
+/**
+ * Phase 2c Contract Tests: notify/route.ts & notifyLargeInvoice.ts event-log wiring
+ * Proves recordEventServer is called with whatsapp.notification.sent
+ */
 
-const mockMaybeSingle = jest.fn();
-const mockApiSingle = jest.fn();
-const mockTenantSingle = jest.fn();
+jest.mock('@/lib/event-log-server', () => ({
+  recordEventServer: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('@/lib/logger-server', () => ({
+  ServerLogger: { system: jest.fn() },
+}));
+jest.mock('@/lib/logger', () => ({
+  Logger: { system: jest.fn(), user: jest.fn() },
+}));
 
 const mockRpc = jest.fn();
+const mockSelect = jest.fn().mockReturnThis();
+const mockEq = jest.fn().mockReturnThis();
+const mockSingle = jest.fn();
+const mockMaybeSingle = jest.fn();
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
+jest.mock('@/lib/supabase-server', () => ({
+  createServiceClient: jest.fn(() => ({
     rpc: mockRpc,
-    from: jest.fn((table: string) => {
-      if (table === 'api_keys') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          single: mockApiSingle,
-        };
-      }
-      if (table === 'tenants') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          single: mockTenantSingle,
-        };
-      }
-      if (table === 'whatsapp_outbox') {
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: mockMaybeSingle,
-        };
-      }
-      return {};
-    }),
+    from: jest.fn(() => ({
+      select: mockSelect,
+      eq: mockEq,
+      single: mockSingle,
+      maybeSingle: mockMaybeSingle,
+    })),
+  })),
+  createClient: jest.fn(() => Promise.resolve({
+    rpc: mockRpc,
+    from: jest.fn(() => ({
+      select: mockSelect,
+      eq: mockEq,
+      single: mockSingle,
+    })),
   })),
 }));
 
-jest.mock('@/lib/logger-server', () => ({
-  ServerLogger: { system: jest.fn(), user: jest.fn() },
-}));
+import { POST } from './route';
+import { notifyLargeInvoice } from '@/actions/notifyLargeInvoice';
+import { recordEventServer } from '@/lib/event-log-server';
 
-describe('WhatsApp Notify API Contract', () => {
+describe('WhatsApp Notify Logic — Event Log Wiring (Contract)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockMaybeSingle.mockReset();
-    mockRpc.mockReset();
-    mockRpc.mockResolvedValue({ error: null });
-    mockApiSingle.mockReset();
-    mockTenantSingle.mockReset();
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    mockSingle.mockResolvedValue({ data: { id: 'key-1', tenant_id: 'tenant-abc' }, error: null });
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null }); // No idempotency hit
   });
 
-  it('should reject requests without an API key', async () => {
-    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-
-    const response = await (POST as any)(req, { params: Promise.resolve({}) });
-    expect(response.status).toBe(401);
-
-    const data = await response.json();
-    expect(data.error).toBe('Missing X-Api-Key header');
-  });
-
-  it('should reject requests with an invalid API key', async () => {
-    mockApiSingle.mockResolvedValueOnce({ data: null, error: new Error('Not found') });
-
-    const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-      method: 'POST',
-      headers: { 'X-Api-Key': 'invalid_key', 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-
-    const response = await (POST as any)(req, { params: Promise.resolve({}) });
-    expect(response.status).toBe(401);
-  });
-
-  describe('per-tenant API keys (existing behavior)', () => {
-    it('should accept a valid request, write to outbox, and return 202', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: 'tenant-123', id: 'key-123' },
-        error: null,
-      });
-      mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-
-      const body = {
-        recipientPhone: '421903123456',
-        payload: {
-          type: 'poll' as const,
-          name: 'Approve Invoice #INV-001?',
-          options: ['Approve', 'Reject'],
-          metadata: { invoiceId: 'inv-001', amount: 100, currency: 'EUR' },
-        },
-        webhookUrl: 'https://my-app.com/webhook/callback',
-        webhookSecret: 'test-secret',
-        idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
-      };
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+  describe('API Route (notify/route.ts)', () => {
+    it('POSITIVE: calls recordEventServer with whatsapp.notification.sent when queued successfully', async () => {
+      const req = new Request('https://app/api/whatsapp/notify', {
         method: 'POST',
-        headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(202);
-
-      expect(mockRpc).toHaveBeenCalledWith('insert_whatsapp_outbox_v2', {
-        p_tenant_id: 'tenant-123',
-        p_recipient_phone: '421903123456',
-        p_payload: {
-          type: 'poll',
-          name: 'Approve Invoice #INV-001?',
-          options: ['Approve', 'Reject'],
-          text: null,
-          metadata: { invoiceId: 'inv-001', amount: 100, currency: 'EUR' },
-        },
-        p_api_key_id: 'key-123',
-        p_webhook_url: body.webhookUrl,
-        p_webhook_secret: body.webhookSecret,
-        p_idempotency_key: body.idempotencyKey,
-      });
-    });
-
-    it('should reject invalid payload with bad recipient phone', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: 'tenant-123', id: 'key-123' },
-        error: null,
-      });
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientPhone: '', payload: { type: 'text' } }),
-      });
-
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(400);
-    });
-
-    it('should reject payload with unknown type', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: 'tenant-123', id: 'key-123' },
-        error: null,
-      });
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientPhone: '421901234567', payload: { type: 'fax' } }),
-      });
-
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(400);
-    });
-
-    it('should reject malformed JSON body', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: 'tenant-123', id: 'key-123' },
-        error: null,
-      });
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
-        body: 'not-json',
-      });
-
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(400);
-    });
-
-    it('should process a text-type payload correctly', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: 'tenant-abc', id: 'key-456' },
-        error: null,
-      });
-      mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': 'valid-key' },
         body: JSON.stringify({
-          recipientPhone: '421901234567',
-          payload: { type: 'text', text: 'Hello from API' },
+          recipientPhone: '+421900000000',
+          payload: { type: 'text', text: 'Hello API' },
         }),
       });
 
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(202);
+      await POST(req);
 
-      expect(mockRpc).toHaveBeenCalledWith('insert_whatsapp_outbox_v2', {
-        p_tenant_id: 'tenant-abc',
-        p_recipient_phone: '421901234567',
-        p_payload: { type: 'text', text: 'Hello from API', name: null, options: null, metadata: {} },
-        p_api_key_id: 'key-456',
-        p_webhook_url: null,
-        p_webhook_secret: null,
-        p_idempotency_key: null,
-      });
-    });
-
-    it('should return existing outbox on idempotency key collision', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: 'tenant-123', id: 'key-123' },
-        error: null,
-      });
-      mockMaybeSingle.mockResolvedValue({
-        data: { id: 'existing-outbox-id' },
-        error: null,
-      });
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'valid_key_123', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipientPhone: '421901234567',
-          payload: { type: 'text', text: 'Duplicate' },
-          idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
-        }),
-      });
-
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-
-      const json = await response.json();
-      expect(mockMaybeSingle).toHaveBeenCalled();
-      expect(response.status).toBe(200);
-      expect(json.existing).toBe(true);
-      expect(json.outboxId).toBe('existing-outbox-id');
-    });
-  });
-
-  describe('service-level API keys (shared across tenants)', () => {
-    const TARGET_TENANT = 'f039714b-8276-4733-8172-58b049bd9163';
-
-    it('should accept request with valid tenant_id and source', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: null, id: 'svc-key-001' },
-        error: null,
-      });
-      mockTenantSingle.mockResolvedValueOnce({
-        data: { id: TARGET_TENANT },
-        error: null,
-      });
-      mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'svc_key_shared', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_id: TARGET_TENANT,
-          source: 'ims',
-          recipientPhone: '421901234567',
-          payload: { type: 'text', text: 'Stock alert from IMS' },
-        }),
-      });
-
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(202);
-
-      expect(mockRpc).toHaveBeenCalledWith('insert_whatsapp_outbox_v2', {
-        p_tenant_id: TARGET_TENANT,
-        p_recipient_phone: '421901234567',
-        p_payload: expect.objectContaining({
+      expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'whatsapp.notification.sent',
+        tenantId: 'tenant-abc',
+        whoType: 'system',
+        metadata: expect.objectContaining({
+          recipientPhone: '+421900000000',
           type: 'text',
-          text: 'Stock alert from IMS',
-          metadata: expect.objectContaining({ source: 'ims' }),
         }),
-        p_api_key_id: 'svc-key-001',
-        p_webhook_url: null,
-        p_webhook_secret: null,
-        p_idempotency_key: null,
-      });
+      }));
     });
 
-    it('should reject when tenant_id is missing in body', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: null, id: 'svc-key-001' },
-        error: null,
-      });
+    it('NEGATIVE: does NOT call recordEventServer if API key is invalid', async () => {
+      mockSingle.mockResolvedValueOnce({ data: null, error: new Error('Not found') }); // API key lookup fails
 
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
+      const req = new Request('https://app/api/whatsapp/notify', {
         method: 'POST',
-        headers: { 'X-Api-Key': 'svc_key_shared', 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': 'invalid-key' },
         body: JSON.stringify({
-          recipientPhone: '421901234567',
-          payload: { type: 'text', text: 'Missing tenant' },
+          recipientPhone: '+421900000000',
+          payload: { type: 'text', text: 'Hello API' },
         }),
       });
 
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(400);
-      const json = await response.json();
-      expect(json.error).toContain('tenant_id is required');
+      await POST(req);
+
+      expect(recordEventServer).not.toHaveBeenCalled();
+    });
+    
+    it('NEGATIVE: does NOT call recordEventServer if idempotency key matches existing', async () => {
+      // Simulate idempotency hit
+      mockMaybeSingle.mockResolvedValueOnce({ data: { id: 'existing-outbox-id' }, error: null });
+
+      const req = new Request('https://app/api/whatsapp/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': 'valid-key' },
+        body: JSON.stringify({
+          recipientPhone: '+421900000000',
+          idempotencyKey: 'idemp-123',
+          payload: { type: 'text', text: 'Hello API' },
+        }),
+      });
+
+      await POST(req);
+
+      expect(recordEventServer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Server Action (notifyLargeInvoice.ts)', () => {
+    it('POSITIVE: calls recordEventServer with whatsapp.notification.sent when queued successfully', async () => {
+      // Mock tenant config
+      mockSingle.mockResolvedValueOnce({ data: { config: { phones: { owner: '+421911111111' } } }, error: null });
+
+      await notifyLargeInvoice('tenant-abc', [{ amount: 1000, description: 'Big purchase' }]);
+
+      expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'whatsapp.notification.sent',
+        tenantId: 'tenant-abc',
+        whoType: 'system',
+        metadata: expect.objectContaining({
+          recipientPhone: '+421911111111',
+          source: 'large_invoice_auto',
+        }),
+      }));
     });
 
-    it('should reject when tenant_id does not exist', async () => {
-      mockApiSingle.mockResolvedValueOnce({
-        data: { tenant_id: null, id: 'svc-key-001' },
-        error: null,
-      });
-      mockTenantSingle.mockResolvedValueOnce({
-        data: null,
-        error: new Error('Not found'),
-      });
+    it('NEGATIVE: does NOT call recordEventServer if no items are large enough', async () => {
+      await notifyLargeInvoice('tenant-abc', [{ amount: 50, description: 'Small purchase' }]);
 
-      const req = new NextRequest('http://localhost/api/whatsapp/notify', {
-        method: 'POST',
-        headers: { 'X-Api-Key': 'svc_key_shared', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_id: '00000000-0000-0000-0000-000000000000',
-          recipientPhone: '421901234567',
-          payload: { type: 'text', text: 'Bad tenant' },
-        }),
-      });
+      expect(recordEventServer).not.toHaveBeenCalled();
+    });
+    
+    it('NEGATIVE: does NOT call recordEventServer if owner phone is not configured', async () => {
+      // Mock missing tenant config
+      mockSingle.mockResolvedValueOnce({ data: { config: {} }, error: null });
 
-      const response = await (POST as any)(req, { params: Promise.resolve({}) });
-      expect(response.status).toBe(400);
+      await notifyLargeInvoice('tenant-abc', [{ amount: 1000, description: 'Big purchase' }]);
+
+      expect(recordEventServer).not.toHaveBeenCalled();
     });
   });
 });

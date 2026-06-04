@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase-server';
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { getErrorMessage } from '@/lib/utils';
 import { revalidatePath } from 'next/cache';
 
@@ -27,6 +28,19 @@ export async function resolvePurchaseAction(
     await ServerLogger.system('INFO', 'Finance', 'Purchase quarantine resolved directly', {
       purchaseId, decision,
     });
+
+    const eventAction = decision === 'RELEASED' ? 'purchase_quarantine.released' : 'purchase_quarantine.rejected';
+    const { data: tenantId } = await supabase.rpc('get_my_tenant');
+    if (tenantId) {
+      void recordEventServer({
+        tenantId: tenantId as string,
+        action: eventAction,
+        whoType: 'user',
+        entityId: purchaseId,
+        entityType: 'purchase',
+        description: `Purchase quarantine ${decision.toLowerCase()}`,
+      }).catch(() => {/* fire and forget */});
+    }
 
     revalidatePath('/');
     revalidatePath('/action/[actionId]', 'page');

@@ -1,6 +1,7 @@
 import { OpenWAClient } from '@synculariti/whatsapp-client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { getErrorMessage } from '@/lib/utils';
 import type { OutboxRecord } from '../types';
 
@@ -73,12 +74,14 @@ export async function processOutboxQueue(
 
       if (success) {
         processed++;
+        void recordEventServer({ tenantId: record.tenant_id, action: 'whatsapp.delivered', whoType: 'system', entityId: record.id, entityType: 'whatsapp_outbox' });
         await ServerLogger.system('INFO', 'WhatsApp', `Delivered to ${record.recipient_phone}`, {
           outboxId: record.id,
           tenantId: record.tenant_id,
         });
       } else {
         failed++;
+        void recordEventServer({ tenantId: record.tenant_id, action: 'whatsapp.delivery_failed', whoType: 'system', entityId: record.id, entityType: 'whatsapp_outbox' });
         await ServerLogger.system('WARN', 'WhatsApp', `Delivery failed for ${record.recipient_phone}`, {
           outboxId: record.id,
           tenantId: record.tenant_id,
@@ -86,6 +89,7 @@ export async function processOutboxQueue(
       }
     } catch (err: unknown) {
       failed++;
+      void recordEventServer({ tenantId: record.tenant_id, action: 'whatsapp.delivery_failed', whoType: 'system', entityId: record.id, entityType: 'whatsapp_outbox', metadata: { error: getErrorMessage(err) } });
       await ServerLogger.system('WARN', 'WhatsApp', 'Delivery exception', {
         outboxId: record.id,
         error: getErrorMessage(err),

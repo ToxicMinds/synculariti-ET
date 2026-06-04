@@ -3,16 +3,20 @@
 import React from 'react';
 import { Transaction } from '../../lib/finance';
 import { CategoryPill } from '@/components/CategoryPill';
+import { EventByline } from '@/components/EventByline';
 import { useSwipeable } from '@/hooks/useSwipeable';
 import { formatCurrency, safeAmount } from '@/lib/utils';
+import type { EventLogRecord } from '@/lib/event-log-types';
 
 interface TransactionRowProps {
   tx: Transaction;
   onDelete: (id: string) => void;
   onEdit: (tx: Transaction) => void;
+  /** Pre-fetched creation event from parent list via useEventCreation — no extra DB query. */
+  creationEvent?: EventLogRecord | null;
 }
 
-export function TransactionRow({ tx, onDelete, onEdit }: TransactionRowProps) {
+export function TransactionRow({ tx, onDelete, onEdit, creationEvent }: TransactionRowProps) {
   const { offset, isDragging, handlers, reset } = useSwipeable(-140);
 
   const handleDelete = (): void => {
@@ -68,9 +72,10 @@ export function TransactionRow({ tx, onDelete, onEdit }: TransactionRowProps) {
               {tx.description || 'Unnamed Transaction'}
             </span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', gap: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             <span>{tx.date}</span>
             {tx.who && <><span>·</span><span>{tx.who}</span></>}
+            {creationEvent && <><span aria-hidden>·</span><EventByline event={creationEvent} prefix="Added by" /></>}
           </div>
         </div>
 

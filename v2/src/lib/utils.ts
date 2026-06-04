@@ -69,3 +69,19 @@ export function timingSafeEqual(a: string, b: string): boolean {
   }
   return result === 0;
 }
+
+/**
+ * Formats an ISO date string as a human-readable relative time string.
+ * Uses native Intl.RelativeTimeFormat — no date-fns dependency.
+ * Examples: "3 hours ago", "yesterday", "2 days ago"
+ */
+export function formatRelativeTime(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const diff = Math.abs(diffMs);
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  const sign = diffMs <= 0 ? 1 : -1;
+  if (diff < 60_000)     return rtf.format(sign * Math.floor(diff / 1_000), 'second');
+  if (diff < 3_600_000)  return rtf.format(sign * Math.floor(diff / 60_000), 'minute');
+  if (diff < 86_400_000) return rtf.format(sign * Math.floor(diff / 3_600_000), 'hour');
+  return rtf.format(sign * Math.floor(diff / 86_400_000), 'day');
+}

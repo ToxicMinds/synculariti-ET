@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { withTestHandler } from '@/lib/withTestHandler';
 import { ServerLogger } from '@/lib/logger-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { SecureHandler } from '@/lib/types/api';
 import { HEADER_CONTENT_TYPE } from '@/lib/constants';
 
@@ -32,6 +33,13 @@ const handler: SecureHandler = async (req, context) => {
     await ServerLogger.system('ERROR', 'API', 'Export query failed', { error: error.message, tenantId });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void recordEventServer({
+    tenantId,
+    action: 'tenant.data_exported',
+    whoType: 'user',
+    description: `Exported transactions to ${format.toUpperCase()}`,
+  }).catch(() => {});
 
   if (format === 'csv') {
     const header = 'Date,Description,Category,Amount,Currency,Type,Person\n';

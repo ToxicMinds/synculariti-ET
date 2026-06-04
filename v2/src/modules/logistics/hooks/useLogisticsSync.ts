@@ -2,6 +2,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { recordEvent } from '@/lib/event-log';
 import { getErrorMessage } from '@/lib/utils';
 
 /** Shape expected by the create_inventory_item_v1 RPC */
@@ -32,7 +33,7 @@ export function useLogisticsSync(tenantId: string | undefined, onRefresh?: () =>
       if (error) throw error;
 
       Logger.system('INFO', 'Logistics', 'PO received atomically via RPC', { poId, result: data });
-      Logger.user(tenantId, 'PO_RECEIVED', `Purchase Order received — stock updated`, 'Logistics Manager');
+      void recordEvent({ action: 'purchase_order.received', entityId: poId, entityType: 'purchase', description: 'Purchase Order received — stock updated' });
 
       if (onRefresh) onRefresh();
       return { success: true, data };
@@ -53,7 +54,7 @@ export function useLogisticsSync(tenantId: string | undefined, onRefresh?: () =>
       if (error) throw error;
 
       Logger.system('INFO', 'Logistics', 'Item created via RPC', { name: itemData.name });
-      Logger.user(tenantId, 'ITEM_CREATED', `New SKU added: ${itemData.name}`, 'Logistics Manager');
+      void recordEvent({ action: 'inventory_item.created', entityType: 'inventory_item', description: `New SKU added: ${itemData.name}` });
 
       if (onRefresh) onRefresh();
       return { success: true, data };

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { BaseDecisionSchema } from '@/modules/whatsapp/lib/webhook-payloads';
+import { recordEventServer } from '@/lib/event-log-server';
 
 export type AuditDecision = 'Approve Anyway' | 'Request Re-upload' | 'Reject Expense';
 
@@ -76,6 +77,24 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
     if (!action) {
       return { success: false, resolution: 'Invalid decision' };
     }
-    return action();
+
+    const result = await action();
+    if (result.success) {
+      void recordEventServer({
+        tenantId,
+        action: 'workflow.action_resolved',
+        whoType: 'system',
+        entityId: outboxId,
+        entityType: 'whatsapp_outbox',
+        metadata: {
+          decision,
+          adminPhone,
+          transactionId,
+        },
+        description: `Finance audit decision processed: ${decision}`,
+      }).catch(() => {});
+    }
+
+    return result;
   }
 }

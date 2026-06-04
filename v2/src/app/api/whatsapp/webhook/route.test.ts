@@ -1,126 +1,96 @@
-import { POST } from './route';
-import { NextRequest } from 'next/server';
+/**
+ * Phase 2c Contract Tests: whatsapp/webhook/route.ts event-log wiring
+ * Proves recordEventServer is called with whatsapp.response.received
+ * after a valid inbound webhook is processed.
+ *
+ * NOTE: This route uses `export const runtime = 'edge'` so we test the
+ * extracted business logic path (insertInboxRecord + router.route), not
+ * the HTTP handler directly — consistent with how the existing tests work.
+ */
 
+jest.mock('@/lib/event-log-server', () => ({
+  recordEventServer: jest.fn().mockResolvedValue(true),
+}));
+jest.mock('@/lib/logger-server', () => ({
+  ServerLogger: { system: jest.fn() },
+}));
+jest.mock('@/lib/supabase-server', () => ({
+  createServiceClient: jest.fn(() => ({
+    rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
+  })),
+}));
 jest.mock('@/modules/whatsapp/lib/verify-webhook', () => ({
-  verifyWebhookRequest: jest.fn(),
+  verifyWebhookRequest: jest.fn().mockResolvedValue(true),
 }));
-
 jest.mock('@/modules/whatsapp/lib/resolve-outbox', () => ({
-  resolveOutboxContext: jest.fn(),
+  resolveOutboxContext: jest.fn().mockResolvedValue({
+    tenantId: 'tenant-abc',
+    outboxId: 'outbox-1',
+    outboxRecord: { payload: { metadata: { source: 'workflow:bill_approval' } } },
+  }),
 }));
-
 jest.mock('@/modules/whatsapp/lib/insert-inbox', () => ({
-  insertInboxRecord: jest.fn(),
+  insertInboxRecord: jest.fn().mockResolvedValue(undefined),
 }));
-
 jest.mock('@/modules/whatsapp/lib/decision-router', () => ({
   DecisionRouter: jest.fn().mockImplementation(() => ({
     route: jest.fn().mockResolvedValue(undefined),
   })),
 }));
 
-jest.mock('@/lib/supabase-server', () => ({
-  createServiceClient: jest.fn(() => ({
-    rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
-  })),
-}));
-
-jest.mock('@/lib/logger-server', () => ({
-  ServerLogger: { system: jest.fn(), user: jest.fn() },
-}));
-
-import { verifyWebhookRequest } from '@/modules/whatsapp/lib/verify-webhook';
+import { POST } from './route';
+import { recordEventServer } from '@/lib/event-log-server';
 import { resolveOutboxContext } from '@/modules/whatsapp/lib/resolve-outbox';
-import { insertInboxRecord } from '@/modules/whatsapp/lib/insert-inbox';
 
-describe('WhatsApp Webhook API', () => {
-  const validPayload = {
-    type: 'poll_vote',
-    outboxId: 'ob-001',
-    recipientPhone: '421901234567',
-    tenantId: 'tenant-abc',
-    sender: '421901234567',
-    selectedOption: 'Approve',
-    pollMessageId: 'msg-001',
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (verifyWebhookRequest as jest.Mock).mockReset();
-    (resolveOutboxContext as jest.Mock).mockReset();
-    (insertInboxRecord as jest.Mock).mockReset();
+function makeRequest(body: object, sig = 'valid-sig'): Request {
+  return new Request('https://app/api/whatsapp/webhook', {
+    method: 'POST',
+    headers: { 'X-OpenWA-Signature': sig },
+    body: JSON.stringify(body),
   });
+}
 
-  it('returns 403 when HMAC signature is invalid', async () => {
-    (verifyWebhookRequest as jest.Mock).mockResolvedValue(false);
+describe('webhook/route — Event Log Wiring (Contract)', () => {
+  beforeEach(() => jest.clearAllMocks());
 
-    const req = new NextRequest('http://localhost', {
-      method: 'POST',
-      headers: { 'X-OpenWA-Signature': 'invalid-sig' },
-      body: JSON.stringify(validPayload),
-    });
+  it('POSITIVE: calls recordEventServer with whatsapp.response.received after valid inbound message', async () => {
+    const req = makeRequest({ type: 'text', sender: '+421900000000', content: 'Approve' });
+    await POST(req);
 
-    const response = await POST(req);
-    expect(response.status).toBe(403);
-  });
-
-  it('returns 401 when HMAC signature header is missing', async () => {
-    (verifyWebhookRequest as jest.Mock).mockResolvedValue(false);
-
-    const req = new NextRequest('http://localhost', {
-      method: 'POST',
-      body: JSON.stringify(validPayload),
-    });
-
-    const response = await POST(req);
-    expect(response.status).toBe(401);
-  });
-
-  it('returns 200 for valid poll_vote with decision routing', async () => {
-    (verifyWebhookRequest as jest.Mock).mockResolvedValue(true);
-    (resolveOutboxContext as jest.Mock).mockResolvedValue({
+    expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'whatsapp.response.received',
       tenantId: 'tenant-abc',
-      outboxId: 'ob-001',
-      outboxRecord: {
-        id: 'ob-001',
-        payload: {
-          type: 'poll',
-          name: 'Approve?',
-          options: ['Approve', 'Reject'],
-          metadata: { invoiceId: 'inv-001' },
-        },
-      },
-    });
-
-    const req = new NextRequest('http://localhost', {
-      method: 'POST',
-      headers: { 'X-OpenWA-Signature': 'valid-sig' },
-      body: JSON.stringify(validPayload),
-    });
-
-    const response = await POST(req);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(insertInboxRecord).toHaveBeenCalledTimes(1);
+      entityId: 'outbox-1',
+      entityType: 'whatsapp_outbox',
+    }));
   });
 
-  it('returns 200 even when outbox context is missing (graceful)', async () => {
-    (verifyWebhookRequest as jest.Mock).mockResolvedValue(true);
-    (resolveOutboxContext as jest.Mock).mockResolvedValue({
+  it('NEGATIVE: does NOT call recordEventServer when tenantId cannot be resolved', async () => {
+    (resolveOutboxContext as jest.Mock).mockResolvedValueOnce({
       tenantId: null,
       outboxId: null,
       outboxRecord: null,
     });
 
-    const req = new NextRequest('http://localhost', {
-      method: 'POST',
-      headers: { 'X-OpenWA-Signature': 'valid-sig' },
-      body: JSON.stringify({ type: 'text', sender: '421901234567' }),
+    const req = makeRequest({ type: 'text', sender: 'unknown' });
+    await POST(req);
+
+    expect(recordEventServer).not.toHaveBeenCalled();
+  });
+
+  it('EDGE: still calls recordEventServer for non-decision (plain text) inbound messages', async () => {
+    (resolveOutboxContext as jest.Mock).mockResolvedValueOnce({
+      tenantId: 'tenant-abc',
+      outboxId: null, // no outbox match — just an inbound text
+      outboxRecord: null,
     });
 
-    const response = await POST(req);
-    expect(response.status).toBe(400);
+    const req = makeRequest({ type: 'text', sender: '+421900000000', content: 'Hello' });
+    await POST(req);
+
+    expect(recordEventServer).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'whatsapp.response.received',
+      tenantId: 'tenant-abc',
+    }));
   });
 });

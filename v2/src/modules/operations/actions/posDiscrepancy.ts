@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 import { BaseDecisionSchema } from '@/modules/whatsapp/lib/webhook-payloads';
+import { recordEventServer } from '@/lib/event-log-server';
 
 export type DiscrepancyDecision = 'Log as Shrinkage' | 'Recount Required' | 'Deduct from Register';
 
@@ -55,10 +56,41 @@ export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
       });
 
       if (error) throw new Error(`Failed to log shrinkage adjustment: ${error.message}`);
+      
+      void recordEventServer({
+        tenantId,
+        action: 'workflow.action_resolved',
+        whoType: 'system',
+        entityId: outboxId,
+        entityType: 'whatsapp_outbox',
+        metadata: { decision, adminPhone: managerPhone, amount },
+        description: `POS Discrepancy decision processed: ${decision}`,
+      }).catch(() => {});
+      
       return { success: true, resolution: 'SHRINKAGE_LOGGED' };
     } else if (decision === 'Recount Required') {
+      void recordEventServer({
+        tenantId,
+        action: 'workflow.action_resolved',
+        whoType: 'system',
+        entityId: outboxId,
+        entityType: 'whatsapp_outbox',
+        metadata: { decision, adminPhone: managerPhone, amount },
+        description: `POS Discrepancy decision processed: ${decision}`,
+      }).catch(() => {});
+      
       return { success: true, resolution: 'RECOUNT_REQUIRED' };
     } else if (decision === 'Deduct from Register') {
+      void recordEventServer({
+        tenantId,
+        action: 'workflow.action_resolved',
+        whoType: 'system',
+        entityId: outboxId,
+        entityType: 'whatsapp_outbox',
+        metadata: { decision, adminPhone: managerPhone, amount },
+        description: `POS Discrepancy decision processed: ${decision}`,
+      }).catch(() => {});
+      
       return { success: true, resolution: 'REGISTER_DEDUCTED' };
     }
 

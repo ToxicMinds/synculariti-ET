@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import { Transaction } from '../lib/finance';
 import { Logger } from '@/lib/logger';
+import { recordEvent } from '@/lib/event-log';
 import { useTenantContext } from '@/context/TenantContext';
 import { OfflineQueue } from '@/lib/offlineQueue';
-import { formatCurrency, safeAmount } from '@/lib/utils';
+import { formatCurrency, safeAmount, getErrorMessage } from '@/lib/utils';
 import { notifyLargeInvoice } from '@/actions/notifyLargeInvoice';
 import { QUEUE_SAVE_RECEIPT } from '@/lib/constants';
 
@@ -56,7 +57,7 @@ export function useTransactionSync(tenantId: string | undefined) {
       throw error;
     }
 
-    Logger.user(tenantId, 'TRANSACTION_ADDED', `Added ${items.length} manual transaction(s)`, 'Tenant Member');
+    void recordEvent({ action: 'transaction.created', description: `Added ${items.length} manual transaction(s)` });
     triggerRefresh();
 
     const largeItems = items.filter(t => safeAmount(t.amount) > 500);
@@ -131,7 +132,7 @@ export function useTransactionSync(tenantId: string | undefined) {
 
         if (error) throw error;
 
-        Logger.user(tenantId, 'TRANSACTION_ADDED', `Scanned receipt from ${receipt.store} (${formatCurrency(totalAmount)})`, whoName);
+        void recordEvent({ action: 'receipt.scanned', whoId, description: `Scanned receipt from ${receipt.store} (${formatCurrency(totalAmount)})`, entityId: transactionId, entityType: 'transaction' });
         triggerRefresh();
 
         return data;
@@ -144,6 +145,7 @@ export function useTransactionSync(tenantId: string | undefined) {
           await new Promise(resolve => setTimeout(resolve, delay));
         } else {
           Logger.system('ERROR', 'Sync', 'saveReceipt failed after max retries', { error: err }, tenantId);
+          void recordEvent({ action: 'ingestion.failed', entityId: transactionId, entityType: 'transaction', metadata: { error: getErrorMessage(err), store: receipt.store } });
         }
       }
     }
@@ -160,7 +162,7 @@ export function useTransactionSync(tenantId: string | undefined) {
       throw error;
     }
 
-    Logger.user(tenantId, 'TRANSACTION_DELETED', `Removed a transaction record`, 'Tenant Member');
+    void recordEvent({ action: 'transaction.deleted', entityId: id, entityType: 'transaction', description: 'Removed a transaction record' });
     triggerRefresh();
   };
 
@@ -176,7 +178,7 @@ export function useTransactionSync(tenantId: string | undefined) {
 
     if (error) throw error;
 
-    Logger.user(tenantId, 'TRANSACTION_UPDATED', `Updated details for ${transaction.description || 'a transaction'}`, 'Tenant Member');
+    void recordEvent({ action: 'transaction.updated', entityId: id, entityType: 'transaction', description: `Updated details for ${transaction.description || 'a transaction'}` });
     triggerRefresh();
   };
 
