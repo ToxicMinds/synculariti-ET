@@ -183,5 +183,21 @@
 - Track sign separately: `const sign = diffMs <= 0 ? 1 : -1; return rtf.format(sign * Math.floor(diff / unit), unit)`.
 - Future dates correctly produce "in N minutes/hours/days". Past dates produce "N minutes/hours/days ago".
 
+## 19. Date Format Standard
+- All user-visible dates MUST use `formatDate()` from `@/lib/utils` with MM-DD-YYYY output.
+- `formatDate(dateStr: string)` parses via `new Date(dateStr + 'T12:00:00')` to avoid timezone offset issues, and returns `MM-DD-YYYY`.
+- Never render raw ISO date strings (`tx.date`) directly in JSX — always pass through `formatDate()`.
+- Components maintaining dates: `TransactionRow`, `StatementScanner`, `ReceiptScanner`, `NeedsAttentionCard`, `VarianceSpikeDetail`, `ItemAnalytics`.
+
+## 20. Transaction Sort Default
+- `useTransactionFilter` defaults to `sortBy: 'created_at'` with `sortOrder: 'desc'` so newly added transactions appear at the top of the list.
+- This overrides the previous `date DESC` default which buried recent manual entries under seed data.
+- The `'created_at'` sort option must be declared in the `sortBy` union type in `useTransactionFilter.types.ts`.
+
+## 21. Merchant Field Preservation
+- The `transactions` table has no `merchant` column — the field is silently dropped by `add_transactions_bulk_v1` RPC.
+- When saving a `ManualEntryPayload` with both `merchant` and `description`, `handleManualSave` in `page.tsx` MUST combine them as `"${merchant} - ${description}"` into the `description` field.
+- The `ManualEntryPayload` type retains separate `merchant`/`description` fields for the form — the merge happens only at save time.
+
 
 

@@ -963,3 +963,36 @@ The original LLM prompt produced raw-statistics narration (e.g., *"On Saturdays,
 - **C4 (Logger abstraction interface)**: Skipped. Only 4 call sites in event-log.ts/event-log-server.ts. Interface would add indirection without measurable benefit.
 - **D2 (same `tenant_id` field named differently)**: Accepted. Minor inconsistency across RPC params — not worth a breaking change.
 - **A2 (inline comment in test)**: Kept for readability. Not a code quality issue.
+
+---
+
+## 13. Phase 6: UI Date Format & Sort Fixes
+
+### 13.1 Issues Found & Fixed
+
+| # | Issue | Severity | File/Location | Fix |
+|---|-------|----------|---------------|-----|
+| 1 | Transaction dates displayed as raw ISO strings (`YYYY-MM-DD`) | **LOW** | `TransactionRow.tsx:76`, `StatementScanner.tsx:94`, `ReceiptScanner.tsx:134`, `NeedsAttentionCard.tsx:256`, `VarianceSpikeDetail.tsx:18`, `ItemAnalytics.tsx:133` | Added `formatDate()` to `utils.ts` outputting `MM-DD-YYYY`. Applied in all 6 components |
+| 2 | Newly added transactions buried under 334+ seed entries due to `date DESC` sort | **MED** | `useTransactionFilter.ts:8` | Changed `DEFAULT_SORT_BY` from `'date'` to `'created_at'` — newest additions appear first |
+| 3 | `merchant` field silently dropped on manual entry save | **MED** | `page.tsx:59`, `useManualEntryForm.ts:96` | `handleManualSave` combines `merchant` + `description` into `"Lidl - Chicken"` format before calling `addTransaction` |
+
+### 13.2 New/Modified Files
+
+| File | Change |
+|------|--------|
+| `src/lib/utils.ts` | Added `formatDate(dateStr: string): string` — outputs `MM-DD-YYYY` |
+| `src/modules/finance/hooks/useTransactionFilter.ts` | `DEFAULT_SORT_BY` changed to `'created_at'`; added `'created_at'` sort case |
+| `src/modules/finance/hooks/useTransactionFilter.types.ts` | Added `'created_at'` to `sortBy` union type |
+| `src/modules/finance/hooks/useTransactionFilter.test.ts` | Updated reset test assertion from `'date'` to `'created_at'` |
+| `src/app/page.tsx` | `handleManualSave` merges `merchant` into `description` before saving |
+| `src/modules/finance/components/TransactionRow.tsx` | `{tx.date}` → `{formatDate(tx.date)}` |
+| `src/modules/finance/components/StatementScanner.tsx` | Same |
+| `src/modules/finance/components/ReceiptScanner.tsx` | Same |
+| `src/modules/finance/components/NeedsAttentionCard.tsx` | Same |
+| `src/modules/finance/components/VarianceSpikeDetail.tsx` | Same |
+| `src/modules/finance/components/ItemAnalytics.tsx` | Same |
+
+### 13.3 Coverage
+- **Before Phase 6**: 651 passing, 0 failures
+- **After Phase 6**: 651 passing, 0 failures
+- **Zero regressions**

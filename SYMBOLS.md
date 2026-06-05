@@ -317,3 +317,16 @@
 - `Utility: resolve-outbox.ts`: Resolves tenant and outbox context from webhook payload body (`outboxId`, `pollMessageId`, `sender`). Returns complete context for decision routing. (V-54 extract)
 - `Utility: insert-inbox.ts`: Inserts inbound message audit record via `insert_whatsapp_inbox_v1()` RPC. (V-54 extract)
 - `Utility: decision-router.ts`: Open/Closed Principle registry of `DecisionHandler` implementations. Supports `canHandle()` / `process()` per handler. Handlers register via `router.register(handler)`. No if-else chains. Service contracts inject dependencies via constructor (DIP). (V-54 extract, resolves V-87 + V-85)
+
+## Phase 6: UI Date Format & Sort Fixes
+- `Utility: formatDate(dateStr)` in `src/lib/utils.ts`: Converts ISO date string to `MM-DD-YYYY` format. Uses `new Date(dateStr + 'T12:00:00')` to avoid timezone offset issues. Returns `${month}-${day}-${year}`. Used by 6 components.
+- `Component: TransactionRow.tsx:76`: `{tx.date}` → `{formatDate(tx.date)}` — raw ISO string replaced with MM-DD-YYYY.
+- `Component: StatementScanner.tsx:94`: Same change — statement review now shows MM-DD-YYYY.
+- `Component: ReceiptScanner.tsx:134`: Same change — AI/eKasa receipt review shows MM-DD-YYYY.
+- `Component: NeedsAttentionCard.tsx:256`: `new Date(row.purchase_date).toLocaleDateString()` → `formatDate(row.purchase_date)`.
+- `Component: VarianceSpikeDetail.tsx:18`: `new Date(spike.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })` → `formatDate(spike.date)`.
+- `Component: ItemAnalytics.tsx:133`: Same change — last purchase date format.
+- `Module: src/modules/finance/hooks/useTransactionFilter.ts`: `DEFAULT_SORT_BY` changed from `'date'` to `'created_at'`. Added `'created_at'` sort case comparing `tx.created_at` timestamps. Newly added transactions appear at list top.
+- `Module: src/modules/finance/hooks/useTransactionFilter.types.ts`: `sortBy` union type updated to `'date' | 'amount' | 'vendor' | 'created_at'`.
+- `Test File: src/modules/finance/hooks/useTransactionFilter.test.ts`: Reset action test updated — expects `'created_at'` instead of `'date'`.
+- `Module: src/app/page.tsx:59-66`: `handleManualSave` now combines `merchant` + `description` into `"Lidl - Chicken"` format before calling `addTransaction`. Preserves vendor name that was previously dropped by the RPC.
