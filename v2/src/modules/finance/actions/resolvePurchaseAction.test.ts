@@ -17,9 +17,11 @@ const mockRpc = jest.fn().mockImplementation((name: string) => {
   if (name === 'get_my_tenant') return Promise.resolve({ data: 'tenant-abc', error: null });
   return Promise.resolve({ data: null, error: null });
 });
+const mockGetUser = jest.fn().mockResolvedValue({ data: { user: { id: 'user-abc' } }, error: null });
 jest.mock('@/lib/supabase-server', () => ({
   createClient: jest.fn().mockResolvedValue({
-    rpc: mockRpc
+    rpc: mockRpc,
+    auth: { getUser: mockGetUser }
   })
 }));
 
@@ -32,6 +34,7 @@ const flushPromises = () => new Promise(resolve => setImmediate(resolve));
 describe('resolvePurchaseAction — Event Log Wiring (Contract)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-abc' } }, error: null });
     // Restore per-name routing: get_my_tenant → tenant-abc, everything else → null
     mockRpc.mockImplementation((name: string) => {
       if (name === 'get_my_tenant') return Promise.resolve({ data: 'tenant-abc', error: null });
