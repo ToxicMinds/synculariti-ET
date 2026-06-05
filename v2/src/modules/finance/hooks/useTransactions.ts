@@ -22,7 +22,13 @@ export function useTransactions(tenantId: string | undefined, selectedMonth?: st
 
     fetchTransactions();
 
-    // Set up Realtime Subscription for automatic UI updates when useSync mutates data
+    // Debounced realtime subscription for background reconciliation.
+    // The debounce prevents duplicate fetchTransactions when triggerRefresh
+    // fires nearly simultaneously with the realtime change (which happens on
+    // every mutation because triggerRefresh increments syncToken and the
+    // Postgres channel fires asynchronously shortly after).
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const channel = supabase.channel('transactions-changes')
       .on('postgres_changes', {
         event: '*',
@@ -30,12 +36,17 @@ export function useTransactions(tenantId: string | undefined, selectedMonth?: st
         table: 'transactions',
         filter: `tenant_id=eq.${tenantId}`
       }, () => {
-        fetchTransactions();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          fetchTransactions();
+          debounceTimer = null;
+        }, 2000);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [tenantId, selectedMonth, syncToken]);
 

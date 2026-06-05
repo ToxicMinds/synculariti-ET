@@ -26,9 +26,11 @@ describe('useTransactions — Incremental Cache', () => {
   let mockQuery: any;
   let mockRange: jest.Mock;
   let mockChannel: any;
+  let realtimeCallback: ((payload: any) => void) | null;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    realtimeCallback = null;
 
     mockRange = jest.fn().mockImplementation((start: number) => {
       if (start === 0) return { data: SAMPLE_TXS, error: null };
@@ -45,7 +47,10 @@ describe('useTransactions — Incremental Cache', () => {
     };
 
     mockChannel = {
-      on: jest.fn().mockReturnThis(),
+      on: jest.fn().mockImplementation((_event: string, _config: any, cb?: any) => {
+        if (cb) realtimeCallback = cb;
+        return mockChannel;
+      }),
       subscribe: jest.fn().mockReturnThis(),
     };
 
@@ -95,6 +100,62 @@ describe('useTransactions — Incremental Cache', () => {
     await waitFor(() => {
       expect((mockRange as jest.Mock).mock.calls.length).toBeGreaterThan(callCountBefore);
     });
+  });
+
+  // ── DEBOUNCE — realtime handler debounces to avoid duplicate fetch ──
+
+  it('DEBOUNCE: realtime callback is captured and debounced (2s)', async () => {
+    jest.useFakeTimers();
+
+    renderHook(() => useTransactions(TENANT_ID, '2026-06'));
+
+    // Channel should be created with a realtime listener
+    expect(mockChannel.on).toHaveBeenCalled();
+
+    // Capture the callback
+    expect(realtimeCallback).not.toBeNull();
+
+    // Count range calls so far (initial fetch already happened)
+    const rangeCallsBefore = (mockRange as jest.Mock).mock.calls.length;
+
+    // Invoke the realtime callback — should NOT immediately call fetchTransactions
+    realtimeCallback!({ eventType: 'UPDATE' });
+
+    // No immediate fetch
+    expect((mockRange as jest.Mock).mock.calls.length).toBe(rangeCallsBefore);
+
+    // Fast-forward past the debounce window
+    jest.advanceTimersByTime(2000);
+
+    // Now fetchTransactions should have been called
+    expect((mockRange as jest.Mock).mock.calls.length).toBeGreaterThan(rangeCallsBefore);
+
+    jest.useRealTimers();
+  });
+
+  it('DEBOUNCE: rapid realtime callbacks reset the timer', async () => {
+    jest.useFakeTimers();
+
+    renderHook(() => useTransactions(TENANT_ID, '2026-06'));
+    const rangeCallsBefore = (mockRange as jest.Mock).mock.calls.length;
+
+    // Fire three rapid realtime callbacks (simulates realtime + syncToken racing)
+    realtimeCallback!({ eventType: 'INSERT' });
+    realtimeCallback!({ eventType: 'UPDATE' });
+    realtimeCallback!({ eventType: 'DELETE' });
+
+    // Advance only 1s — debounce should still be pending
+    jest.advanceTimersByTime(1000);
+    expect((mockRange as jest.Mock).mock.calls.length).toBe(rangeCallsBefore);
+
+    // Advance to 2s from last callback
+    jest.advanceTimersByTime(1000);
+    expect((mockRange as jest.Mock).mock.calls.length).toBeGreaterThan(rangeCallsBefore);
+
+    // Only ONE fetch should have happened
+    expect((mockRange as jest.Mock).mock.calls.length).toBe(rangeCallsBefore + 1);
+
+    jest.useRealTimers();
   });
 
   // ── TARGET — new incremental cache contract ──

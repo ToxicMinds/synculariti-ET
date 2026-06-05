@@ -370,6 +370,14 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto;
+}
+
+.tooltip-overlay::before {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  height: 40px;
 }
 
 .tooltip-modal {
