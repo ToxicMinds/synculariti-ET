@@ -3,6 +3,7 @@
 import { getErrorMessage } from '@synculariti/whatsapp-client';
 import { ServerLogger } from '@/lib/logger-server';
 import { createClient } from '@/lib/supabase-server';
+import { recordEventServer } from '@/lib/event-log-server';
 import { completeAction } from '@/modules/whatsapp/lib/complete-action';
 import { fireWebhook } from '@/modules/whatsapp/lib/fire-webhook';
 
@@ -34,6 +35,16 @@ export async function dispatchDecision(
       await ServerLogger.system('INFO', 'WhatsApp', 'Action already completed — skip webhook', { outboxId: actionId });
       return { success: true };
     }
+
+    void recordEventServer({
+      tenantId: result.payload?.tenant_id as string,
+      action: 'whatsapp.decision.completed',
+      whoType: 'system',
+      entityId: actionId,
+      entityType: 'whatsapp_outbox',
+      metadata: { decision },
+      description: `WhatsApp decision completed: ${decision}`,
+    }).catch(() => {});
 
     // Build and dispatch webhook (best-effort after atomic status update)
     const payload = {

@@ -1,4 +1,5 @@
 import type { EventLogRecord } from './event-log-types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ActionDisplay {
   label: string;
@@ -14,6 +15,7 @@ export const ACTION_DISPLAY: Record<string, ActionDisplay> = {
   'invoice.parsed':                 { label: 'Invoice Parsed',    color: 'var(--accent-warn)',   icon: '📄' },
   'expense.created':                { label: 'Expense Created',   color: 'var(--accent-success)', icon: '💸' },
   'category.created':               { label: 'Category Added',    color: 'var(--accent-success)', icon: '🏷️' },
+  'receipt.audited':                { label: 'Receipt Audited',   color: 'var(--accent-warn)',    icon: '🛡️' },
   'purchase_order.received':        { label: 'PO Received',       color: 'var(--accent-success)', icon: '📦' },
   'purchase_order.cancelled':       { label: 'PO Cancelled',      color: 'var(--accent-danger)', icon: '❌' },
   'inventory_item.created':         { label: 'Item Created',      color: 'var(--accent-success)', icon: '🏷️' },
@@ -52,4 +54,33 @@ export function resolveActorName(event: EventLogRecord & { app_users?: { full_na
   if (event.who_type === 'system') return 'System';
   if (event.who_type === 'api_key') return 'API';
   return 'Unknown';
+}
+
+/**
+ * Batch-resolve actor names for a list of event_log records.
+ * Queries app_users for all unique who_id values and attaches
+ * the full_name so resolveActorName can find it.
+ *
+ * DRY: shared by useEventCreation and useEventLog — one pattern, two hooks.
+ */
+export async function enrichEventsWithActorNames(
+  supabase: SupabaseClient,
+  events: EventLogRecord[]
+): Promise<(EventLogRecord & { app_users?: { full_name?: string } })[]> {
+  const whoIds = [...new Set(events.filter(e => e.who_id).map(e => e.who_id))] as string[];
+  if (whoIds.length === 0) {
+    return events;
+  }
+
+  const { data: users } = await supabase
+    .from('app_users')
+    .select('id, full_name')
+    .in('id', whoIds);
+
+  const nameMap = Object.fromEntries((users ?? []).map(u => [u.id, u.full_name]));
+
+  return events.map(e => ({
+    ...e,
+    app_users: e.who_id && nameMap[e.who_id] ? { full_name: nameMap[e.who_id] } : undefined,
+  }));
 }

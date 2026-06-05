@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { EventLogRecord } from '@/lib/event-log-types';
 import { getErrorMessage } from '@/lib/utils';
 import { Logger } from '@/lib/logger';
+import { enrichEventsWithActorNames } from '@/lib/event-log-display';
 
 const BATCH_SIZE = 50;
 
@@ -67,10 +68,10 @@ export function useEventCreation(
           .in('entity_id', chunk)
           .order('created_at', { ascending: true })
       )
-    ).then(results => {
+    ).then(async results => {
       if (cancelled) return;
 
-      const map: Record<string, EventLogRecord> = {};
+      const rawEvents: EventLogRecord[] = [];
       let firstError: string | null = null;
 
       for (const { data, error: qError } of results) {
@@ -79,10 +80,14 @@ export function useEventCreation(
           if (!firstError) firstError = qError.message;
           continue;
         }
-        for (const row of (data ?? []) as EventLogRecord[]) {
-          if (row.entity_id && !map[row.entity_id]) {
-            map[row.entity_id] = row;
-          }
+        if (data) rawEvents.push(...(data as EventLogRecord[]));
+      }
+
+      const enriched = await enrichEventsWithActorNames(supabase, rawEvents);
+      const map: Record<string, EventLogRecord> = {};
+      for (const row of enriched) {
+        if (row.entity_id && !map[row.entity_id]) {
+          map[row.entity_id] = row;
         }
       }
 

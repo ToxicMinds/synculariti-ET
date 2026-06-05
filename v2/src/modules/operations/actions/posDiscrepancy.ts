@@ -66,6 +66,16 @@ export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
         metadata: { decision, adminPhone: managerPhone, amount },
         description: `POS Discrepancy decision processed: ${decision}`,
       }).catch(() => {});
+
+      void recordEventServer({
+        tenantId,
+        action: 'expense.created',
+        whoType: 'system',
+        entityId: undefined,
+        entityType: 'transaction',
+        metadata: { outboxId, amount: -Math.abs(amount), type: 'shrinkage' },
+        description: `POS shrinkage adjustment: €${Math.abs(amount).toFixed(2)}`,
+      }).catch(() => {});
       
       return { success: true, resolution: 'SHRINKAGE_LOGGED' };
     } else if (decision === 'Recount Required') {
@@ -78,6 +88,16 @@ export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
         metadata: { decision, adminPhone: managerPhone, amount },
         description: `POS Discrepancy decision processed: ${decision}`,
       }).catch(() => {});
+
+      void recordEventServer({
+        tenantId,
+        action: 'pos.discrepancy.resolved',
+        whoType: 'system',
+        entityId: outboxId,
+        entityType: 'whatsapp_outbox',
+        metadata: { resolution: 'RECOUNT_REQUIRED', amount, managerPhone },
+        description: `Recount requested for €${Math.abs(amount).toFixed(2)} POS discrepancy`,
+      }).catch(() => {});
       
       return { success: true, resolution: 'RECOUNT_REQUIRED' };
     } else if (decision === 'Deduct from Register') {
@@ -89,6 +109,16 @@ export class DefaultPOSDiscrepancyService implements POSDiscrepancyService {
         entityType: 'whatsapp_outbox',
         metadata: { decision, adminPhone: managerPhone, amount },
         description: `POS Discrepancy decision processed: ${decision}`,
+      }).catch(() => {});
+
+      void recordEventServer({
+        tenantId,
+        action: 'pos.discrepancy.resolved',
+        whoType: 'system',
+        entityId: outboxId,
+        entityType: 'whatsapp_outbox',
+        metadata: { resolution: 'REGISTER_DEDUCTED', amount, managerPhone },
+        description: `Register deducted €${Math.abs(amount).toFixed(2)} for POS discrepancy`,
       }).catch(() => {});
       
       return { success: true, resolution: 'REGISTER_DEDUCTED' };

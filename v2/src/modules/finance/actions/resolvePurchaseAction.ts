@@ -30,12 +30,18 @@ export async function resolvePurchaseAction(
     });
 
     const eventAction = decision === 'RELEASED' ? 'purchase_quarantine.released' : 'purchase_quarantine.rejected';
-    const { data: tenantId } = await supabase.rpc('get_my_tenant');
+    const [tenantResult, userResult] = await Promise.all([
+      supabase.rpc('get_my_tenant'),
+      supabase.auth.getUser(),
+    ]);
+    const tenantId = tenantResult.data as string | null;
+    const whoId = userResult.data?.user?.id;
     if (tenantId) {
       void recordEventServer({
-        tenantId: tenantId as string,
+        tenantId,
         action: eventAction,
         whoType: 'user',
+        whoId,
         entityId: purchaseId,
         entityType: 'purchase',
         description: `Purchase quarantine ${decision.toLowerCase()}`,

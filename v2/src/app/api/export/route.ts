@@ -14,7 +14,7 @@ import { HEADER_CONTENT_TYPE } from '@/lib/constants';
  * authenticated session via get_my_tenant() — never from URL params.
  */
 const handler: SecureHandler = async (req, context) => {
-  const { tenantId } = context.auth || { tenantId: 'fallback' };
+  const { tenantId, user } = context.auth || { tenantId: 'fallback' };
   const supabase = await createClient();
 
   await ServerLogger.system('INFO', 'API', 'Export request started', { tenantId, format: req.url.includes('csv') ? 'csv' : 'json' });
@@ -38,6 +38,7 @@ const handler: SecureHandler = async (req, context) => {
     tenantId,
     action: 'tenant.data_exported',
     whoType: 'user',
+    whoId: user?.id,
     description: `Exported transactions to ${format.toUpperCase()}`,
   }).catch(() => {});
 

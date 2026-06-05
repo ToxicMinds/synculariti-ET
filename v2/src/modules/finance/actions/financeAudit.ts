@@ -52,6 +52,15 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
           p_updates: { vat_detail: { audit_status: 'APPROVED' } },
         });
         if (error) throw new Error(`Failed to approve transaction: ${error.message}`);
+        void recordEventServer({
+          tenantId,
+          action: 'receipt.audited',
+          whoType: 'system',
+          entityId: transactionId,
+          entityType: 'transaction',
+          metadata: { resolution: 'APPROVED', outboxId },
+          description: `Receipt ${transactionId} audit approved via WhatsApp`,
+        }).catch(() => {});
         return { success: true, resolution: 'APPROVED' };
       },
       'Request Re-upload': async () => {
@@ -61,6 +70,15 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
           p_updates: { vat_detail: { audit_status: 'PENDING_REUPLOAD' } },
         });
         if (error) throw new Error(`Failed to update transaction for re-upload: ${error.message}`);
+        void recordEventServer({
+          tenantId,
+          action: 'receipt.audited',
+          whoType: 'system',
+          entityId: transactionId,
+          entityType: 'transaction',
+          metadata: { resolution: 'PENDING_REUPLOAD', outboxId },
+          description: `Receipt ${transactionId} re-upload requested via WhatsApp`,
+        }).catch(() => {});
         return { success: true, resolution: 'PENDING_REUPLOAD' };
       },
       'Reject Expense': async () => {
@@ -69,6 +87,15 @@ export class DefaultFinanceAuditService implements FinanceAuditService {
           p_id: transactionId,
         });
         if (error) throw new Error(`Failed to reject transaction: ${error.message}`);
+        void recordEventServer({
+          tenantId,
+          action: 'transaction.deleted',
+          whoType: 'system',
+          entityId: transactionId,
+          entityType: 'transaction',
+          metadata: { reason: 'audit_rejected', outboxId },
+          description: `Transaction ${transactionId} deleted via audit rejection`,
+        }).catch(() => {});
         return { success: true, resolution: 'REJECTED' };
       },
     };

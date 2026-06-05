@@ -111,6 +111,7 @@ const handler: SecureHandler = async (req, context) => {
         tenantId,
         action: 'bank_sync.session_started',
         whoType: 'user',
+        whoId: user.id,
         metadata: { institutionId: institution_id },
         description: `Started bank sync session with ${institution_id}`,
       }).catch(() => {});

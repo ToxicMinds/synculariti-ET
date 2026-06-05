@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 
+import { recordEvent } from '@/lib/event-log';
 import { getErrorMessage } from '@/lib/utils';
 import type { Session } from '@supabase/supabase-js';
 
@@ -42,6 +43,14 @@ export function useIdentity(session: Session | null) {
   const selectTenant = async (tenantId: string) => {
     try {
       setLoading(true);
+      void recordEvent({
+        action: 'tenant.switched',
+        entityId: tenantId,
+        entityType: 'tenant',
+        description: `Switched to tenant ${tenantId}`,
+        metadata: { previousTenantId: session?.user?.app_metadata?.active_tenant },
+      });
+
       const { error } = await supabase.rpc('switch_tenant', { p_tenant_id: tenantId });
       if (error) throw error;
       

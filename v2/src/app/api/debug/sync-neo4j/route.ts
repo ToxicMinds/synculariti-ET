@@ -4,6 +4,7 @@ import { ServerLogger } from '@/lib/logger-server';
 import { withTestHandler } from '@/lib/withTestHandler';
 import { SecureHandler } from '@/lib/types/api';
 import { getErrorMessage } from '@/lib/utils';
+import { recordEventServer } from '@/lib/event-log-server';
 import { createClient } from '@/lib/supabase-server';
 import { TransactionSyncPayload } from '@/lib/types';
 import { buildSyncPayload } from '@/lib/neo4j-ontology';
@@ -119,6 +120,17 @@ const handler: SecureHandler = async (req, context) => {
       await supabase.rpc('complete_graph_sync_batch_v1', {
         p_ids: eventsToComplete,
       });
+    }
+
+    if (processedCount > 0) {
+      void recordEventServer({
+        tenantId,
+        action: 'graph_sync.completed',
+        whoType: 'system',
+        entityType: 'graph_sync_queue',
+        metadata: { processedCount, outboxIds: eventsToComplete },
+        description: `Graph sync completed: ${processedCount} event(s) processed`,
+      }).catch(() => {});
     }
 
     return NextResponse.json({

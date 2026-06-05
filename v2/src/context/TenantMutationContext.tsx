@@ -4,6 +4,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AppState } from '@/modules/identity/hooks/useTenant';
 import { useTenantData } from './TenantDataContext';
+import { recordEvent } from '@/lib/event-log';
 
 interface TenantMutationContextType {
   updateState: (updates: Partial<AppState>) => Promise<void>;
@@ -21,6 +22,11 @@ export function TenantMutationProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.rpc('update_tenant_config_v1', { p_config: updates });
 
     if (error) throw error;
+
+    void recordEvent({
+      action: 'tenant_config.updated',
+      description: `Updated config: ${Object.keys(updates).join(', ')}`,
+    });
     
     // Update local state by merging
     setTenant(prev => prev ? ({ ...prev, ...updates }) : null);

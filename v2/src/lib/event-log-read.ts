@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import type { EventLogRecord } from './event-log-types';
+import { enrichEventsWithActorNames } from './event-log-display';
 
 interface UseEventLogOptions {
   entityType?: string;
@@ -31,6 +32,7 @@ export function useEventLog(
   useEffect(() => {
     if (!tenantId) return;
 
+    let cancelled = false;
     setLoading(true);
     setError(null);
 
@@ -44,15 +46,23 @@ export function useEventLog(
     if (entityType) query = query.eq('entity_type', entityType);
     if (entityId)   query = query.eq('entity_id', entityId);
 
-    query.then(({ data, error: qError }) => {
+    query.then(async ({ data, error: qError }) => {
+      if (cancelled) return;
+
       if (qError) {
         setError(qError.message);
         Logger.system('ERROR', 'EventLog', 'useEventLog fetch failed', { error: qError.message });
-      } else {
-        setEvents((data ?? []) as EventLogRecord[]);
+        setLoading(false);
+        return;
       }
+
+      const raw = (data ?? []) as EventLogRecord[];
+      const enriched = await enrichEventsWithActorNames(supabase, raw);
+      setEvents(enriched);
       setLoading(false);
     });
+
+    return () => { cancelled = true; };
   }, [tenantId, entityType, entityId, limit, ascending]);
 
   return { events, loading, error };

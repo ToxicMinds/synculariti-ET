@@ -61,6 +61,16 @@ export class DefaultPOApprovalService implements POApprovalService {
         metadata: { decision, adminPhone: managerPhone, poId },
         description: `PO Approval decision processed: ${decision}`,
       }).catch(() => {});
+
+      void recordEventServer({
+        tenantId,
+        action: 'purchase_order.received',
+        whoType: 'system',
+        entityId: poId,
+        entityType: 'purchase_order',
+        metadata: { source: 'whatsapp_approval', outboxId, adminPhone: managerPhone },
+        description: `PO ${poId} approved via WhatsApp`,
+      }).catch(() => {});
       
       return { success: true, newStatus: 'APPROVED' };
     } else if (decision === 'Reject') {
@@ -81,6 +91,16 @@ export class DefaultPOApprovalService implements POApprovalService {
         entityType: 'whatsapp_outbox',
         metadata: { decision, adminPhone: managerPhone, poId },
         description: `PO Approval decision processed: ${decision}`,
+      }).catch(() => {});
+
+      void recordEventServer({
+        tenantId,
+        action: 'purchase_order.cancelled',
+        whoType: 'system',
+        entityId: poId,
+        entityType: 'purchase_order',
+        metadata: { source: 'whatsapp_rejection', outboxId, adminPhone: managerPhone },
+        description: `PO ${poId} rejected via WhatsApp`,
       }).catch(() => {});
       
       return { success: true, newStatus: 'REJECTED' };

@@ -11,7 +11,6 @@ jest.mock('@/lib/supabase', () => ({
 describe('useEventCreation hook', () => {
   let mockSelect: jest.Mock;
   let mockEq1: jest.Mock;
-  let mockEq2: jest.Mock;
   let mockIn: jest.Mock;
   let mockOrder: jest.Mock;
 
@@ -19,17 +18,32 @@ describe('useEventCreation hook', () => {
     jest.clearAllMocks();
     mockSelect = jest.fn();
     mockEq1 = jest.fn();
-    mockEq2 = jest.fn();
     mockIn = jest.fn();
     mockOrder = jest.fn();
 
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: mockSelect
+    // Build a mock query builder that supports two patterns:
+    // 1) event_log:  .select('*').eq().eq().in().order()
+    // 2) app_users:  .select('id, full_name').in() (terminal — must be thenable)
+    // The proxy target is a thenable function so `await builder` resolves to {data:[], error:null}
+    const thenableTarget = Object.assign(
+      () => {},
+      { then: (resolve: (v: unknown) => void) => resolve({ data: [], error: null }) }
+    );
+    const builder: any = new Proxy(thenableTarget, {
+      get(_target, prop) {
+        if (prop === 'select') return mockSelect;
+        if (prop === 'eq') return mockEq1;
+        if (prop === 'in') return mockIn;
+        if (prop === 'order') return mockOrder;
+        if (prop === 'then') return (_target as any).then.bind(_target);
+        return undefined;
+      }
     });
-    mockSelect.mockReturnValue({ eq: mockEq1 });
-    mockEq1.mockReturnValue({ eq: mockEq2 });
-    mockEq2.mockReturnValue({ in: mockIn });
-    mockIn.mockReturnValue({ order: mockOrder });
+    mockSelect.mockReturnValue(builder);
+    mockEq1.mockReturnValue(builder);
+    mockIn.mockReturnValue(builder);
+
+    (supabase.from as jest.Mock).mockReturnValue(builder);
   });
 
   it('should fetch events for entity IDs and structure them in a record', async () => {
@@ -56,7 +70,10 @@ describe('useEventCreation hook', () => {
       }
     ];
 
-    mockOrder.mockResolvedValueOnce({ data: mockEvents, error: null });
+    // mockOrder for the event_log query (second .order() call = app_users query returns empty)
+    mockOrder
+      .mockResolvedValueOnce({ data: mockEvents, error: null })
+      .mockResolvedValue({ data: [], error: null });
 
     const { result } = renderHook(
       ({ tenantId, entityType, entityIds }) => useEventCreation(tenantId, entityType, entityIds),
@@ -88,13 +105,15 @@ describe('useEventCreation hook', () => {
     expect(supabase.from).toHaveBeenCalledWith('event_log');
     expect(mockSelect).toHaveBeenCalledWith('*');
     expect(mockEq1).toHaveBeenCalledWith('tenant_id', 'tenant-123');
-    expect(mockEq2).toHaveBeenCalledWith('entity_type', 'transaction');
+    expect(mockEq1).toHaveBeenCalledWith('entity_type', 'transaction');
     expect(mockIn).toHaveBeenCalledWith('entity_id', ['tx-1', 'tx-2']);
     expect(mockOrder).toHaveBeenCalledWith('created_at', { ascending: true });
   });
 
   it('should handle errors gracefully', async () => {
-    mockOrder.mockResolvedValueOnce({ data: null, error: { message: 'DB error' } });
+    mockOrder
+      .mockResolvedValueOnce({ data: null, error: { message: 'DB error' } })
+      .mockResolvedValue({ data: [], error: null });
 
     const { result } = renderHook(() =>
       useEventCreation('tenant-123', 'transaction', ['tx-1'])

@@ -7,6 +7,7 @@ export const EVENT_ACTIONS = {
   INVOICE_PARSED:                 'invoice.parsed',
   EXPENSE_CREATED:                'expense.created', // Used by posDiscrepancy
   CATEGORY_CREATED:               'category.created',
+  RECEIPT_AUDITED:                'receipt.audited',
   PURCHASE_ORDER_RECEIVED:        'purchase_order.received',
   PURCHASE_ORDER_CANCELLED:       'purchase_order.cancelled',
   INVENTORY_ITEM_CREATED:         'inventory_item.created',
@@ -14,6 +15,7 @@ export const EVENT_ACTIONS = {
   PURCHASE_QUARANTINE_REJECTED:   'purchase_quarantine.rejected',
   PURCHASE_QUARANTINE_AUTO:       'purchase_quarantine.auto_released',
   INGESTION_FAILED:               'ingestion.failed',
+  POS_DISCREPANCY_RESOLVED:       'pos.discrepancy.resolved',
 
   // System & Graph
   GRAPH_SYNC_COMPLETED:           'graph_sync.completed',

@@ -6,6 +6,7 @@ import { SecureHandler } from '@/lib/types/api';
 import { computeFCVReport, type FCVPurchaseRow, type FCVPOSRow } from '@/lib/food-cost-variance';
 import { refreshRecipeCache, enrichStagingRow } from '@/lib/ims-client';
 import { getErrorMessage } from '@/lib/utils';
+import { recordEventServer } from '@/lib/event-log-server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 function defaultPeriod(): { start: string; end: string } {
@@ -100,6 +101,7 @@ const handler: SecureHandler = async (req, context) => {
     );
 
     // Lazy enrichment: backfill theoretical_grams for rows that haven't been processed yet
+    let enrichedCount = 0;
     for (const row of stagingRows) {
       if (row.recipe_found === true || row.recipe_found === false) continue;
       if (row.flag !== 'APPROVED' && row.flag !== undefined) continue;
@@ -117,6 +119,7 @@ const handler: SecureHandler = async (req, context) => {
 
         row.theoretical_grams = enriched.theoretical_grams ?? null;
         row.recipe_found = hasGrams;
+        enrichedCount++;
       } catch (e: unknown) {
         await ServerLogger.system('WARN', 'FCV', 'Staging enrichment failed for individual row', {
           rowId: row.id, error: getErrorMessage(e),
@@ -124,6 +127,17 @@ const handler: SecureHandler = async (req, context) => {
         await supabase.from('pos_transaction_staging').update({ recipe_found: false }).eq('id', row.id);
         row.recipe_found = false;
       }
+    }
+
+    if (enrichedCount > 0) {
+      void recordEventServer({
+        tenantId,
+        action: 'fcv.enriched',
+        whoType: 'system',
+        entityType: 'pos_transaction_staging',
+        metadata: { rowsEnriched: enrichedCount, periodStart: start, periodEnd: end },
+        description: `FCV enrichment: ${enrichedCount} rows backfilled for ${start} → ${end}`,
+      }).catch(() => {});
     }
 
     // Explode theoretical_grams into per-ingredient FCVPOSRow entries
