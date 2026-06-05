@@ -142,7 +142,7 @@ export async function POST(req: Request) {
       tenantId,
       action: 'pin.verified',
       whoType: 'user',
-      whoId: authData.session.user.id,
+      whoId: authData.session.user?.id,
       description: 'Tenant authenticated via PIN',
     }).catch(() => {});
 
