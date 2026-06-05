@@ -23,10 +23,14 @@ export function TenantMutationProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
 
-    void recordEvent({
-      action: 'tenant_config.updated',
-      description: `Updated config: ${Object.keys(updates).join(', ')}`,
-    });
+    // Skip event logging for automated/internal-only config keys to avoid noise
+    const changedKeys = Object.keys(updates);
+    if (!(changedKeys.length === 1 && changedKeys[0] === 'ai_insight')) {
+      void recordEvent({
+        action: 'tenant_config.updated',
+        description: `Updated config: ${changedKeys.join(', ')}`,
+      });
+    }
     
     // Update local state by merging
     setTenant(prev => prev ? ({ ...prev, ...updates }) : null);

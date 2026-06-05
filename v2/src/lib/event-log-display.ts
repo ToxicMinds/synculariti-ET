@@ -53,7 +53,10 @@ export function resolveActorName(event: EventLogRecord & { app_users?: { full_na
   }
   if (event.who_type === 'system') return 'System';
   if (event.who_type === 'api_key') return 'API';
-  return 'Unknown';
+  // who_type='user' with null who_id means the event was logged before migration 47
+  // (which auto-derives auth.uid()). New events will have who_id populated.
+  // Show "System" instead of "Unknown" for these legacy rows.
+  return 'System';
 }
 
 /**

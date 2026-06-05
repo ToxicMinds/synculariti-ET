@@ -62,14 +62,14 @@ describe('EventByline', () => {
     expect(screen.getByText('System')).toBeTruthy();
   });
 
-  test('renders "Unknown" fallback when no names are resolved', () => {
+  test('renders "System" fallback when no names are resolved', () => {
     const event: EventLogRecord = {
-      ...baseEvent,
-      who_id: null,
-      metadata: {}
+      id: '1', tenant_id: 't1', action: 'transaction.created',
+      who_id: null, who_type: 'user', entity_type: 'transaction',
+      entity_id: 'tx-1', description: 'Test event', metadata: {},
+      source: 'client', created_at: new Date().toISOString(),
     };
-
     render(<EventByline event={event} />);
-    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(screen.getByText('System')).toBeTruthy();
   });
 });
