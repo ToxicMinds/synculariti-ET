@@ -71,6 +71,16 @@ export function timingSafeEqual(a: string, b: string): boolean {
 }
 
 /**
+ * Formats an ISO date string as MM-DD-YYYY.
+ */
+export function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${month}-${day}-${d.getFullYear()}`;
+}
+
+/**
  * Formats an ISO date string as a human-readable relative time string.
  * Uses native Intl.RelativeTimeFormat — no date-fns dependency.
  * Examples: "3 hours ago", "yesterday", "2 days ago"

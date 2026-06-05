@@ -5,7 +5,7 @@ import { Transaction } from '../../lib/finance';
 import { CategoryPill } from '@/components/CategoryPill';
 import { EventByline } from '@/components/EventByline';
 import { useSwipeable } from '@/hooks/useSwipeable';
-import { formatCurrency, safeAmount } from '@/lib/utils';
+import { formatCurrency, safeAmount, formatDate } from '@/lib/utils';
 import type { EventLogRecord } from '@/lib/event-log-types';
 
 interface TransactionRowProps {
@@ -73,7 +73,7 @@ export function TransactionRow({ tx, onDelete, onEdit, creationEvent }: Transact
             </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span>{tx.date}</span>
+            <span>{formatDate(tx.date)}</span>
             {tx.who && <><span>·</span><span>{tx.who}</span></>}
             {creationEvent && <><span aria-hidden>·</span><EventByline event={creationEvent} prefix="Added by" /></>}
           </div>

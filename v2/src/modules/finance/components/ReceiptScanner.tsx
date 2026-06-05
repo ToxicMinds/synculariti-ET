@@ -6,7 +6,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { useScannerState, UseScannerStateReturn, ReceiptData } from '../hooks/useScannerState';
-import { formatCurrency, getErrorMessage } from '@/lib/utils';
+import { formatCurrency, getErrorMessage, formatDate } from '@/lib/utils';
 import styles from './ReceiptScanner.module.css';
 
 interface ReceiptScannerProps {
@@ -131,7 +131,7 @@ function ReviewStep({
     <BentoCard title={`Review: ${receipt.store}`}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p className={styles.reviewDate}>Date: {receipt.date}</p>
+          <p className={styles.reviewDate}>Date: {formatDate(receipt.date)}</p>
           {isVerified ? (
             <span className="status-badge status-success" style={{ padding: '4px 8px', fontSize: '0.8rem' }}>Verified eKasa</span>
           ) : (

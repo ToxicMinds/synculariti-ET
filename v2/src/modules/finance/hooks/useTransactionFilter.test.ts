@@ -96,7 +96,7 @@ describe('useTransactionFilter (Phase 2: Contract)', () => {
 
         expect(result.current.categoryFilter).toBe('All');
         expect(result.current.whatFilter).toBe('');
-        expect(result.current.sortBy).toBe('date'); // Defaults back to date
+        expect(result.current.sortBy).toBe('created_at'); // Defaults back to created_at
         expect(result.current.filteredTransactions.length).toBe(4);
     });
 });

@@ -12,7 +12,7 @@ export interface UseTransactionFilterReturn {
   whoFilter: string;
   whatFilter: string;
   viewMode: ViewMode;
-  sortBy: 'date' | 'amount' | 'vendor';
+  sortBy: 'date' | 'amount' | 'vendor' | 'created_at';
   sortOrder: 'asc' | 'desc';
   limit: number;
   offset: number;
@@ -22,7 +22,7 @@ export interface UseTransactionFilterReturn {
   setWhoFilter: (who: string) => void;
   setWhatFilter: (what: string) => void;
   setViewMode: (mode: ViewMode) => void;
-  setSortBy: (sort: 'date' | 'amount' | 'vendor') => void;
+  setSortBy: (sort: 'date' | 'amount' | 'vendor' | 'created_at') => void;
   setSortOrder: (order: 'asc' | 'desc') => void;
   setLimit: (limit: number) => void;
   setOffset: (offset: number) => void;

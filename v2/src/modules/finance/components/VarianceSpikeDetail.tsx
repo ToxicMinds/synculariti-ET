@@ -1,5 +1,5 @@
 import { FCVSpike } from '@/lib/food-cost-variance';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils';
 
 export function VarianceSpikeDetail({ spikes }: { spikes: FCVSpike[] }) {
   const activeSpikes = spikes.filter(s => s.flag !== 'NORMAL');
@@ -15,7 +15,7 @@ export function VarianceSpikeDetail({ spikes }: { spikes: FCVSpike[] }) {
         {activeSpikes.slice(-3).map((spike, i) => (
           <div key={spike.date + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
             <span style={{ color: 'var(--text-secondary)' }}>
-              {new Date(spike.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              {formatDate(spike.date)}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {spike.flag === 'HIGH_VARIANCE' ? (

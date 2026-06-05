@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useStatementScanner, ParsedTransaction } from '../hooks/useStatementScanner';
-import { formatCurrency, safeAmount } from '@/lib/utils';
+import { formatCurrency, safeAmount, formatDate } from '@/lib/utils';
 
 interface StatementScannerProps {
   names: Record<string, string>;
@@ -91,7 +91,7 @@ export function StatementScanner({ names, categories, selectedUser, onSave, onCl
                       {tx.description}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', gap: 8 }}>
-                      <span>{tx.date}</span>
+                      <span>{formatDate(tx.date)}</span>
                       <span>•</span>
                       <span>{tx.category}</span>
                     </div>

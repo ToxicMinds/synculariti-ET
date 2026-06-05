@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { formatCurrency, safeAmount } from '@/lib/utils';
+import { formatCurrency, safeAmount, formatDate } from '@/lib/utils';
 
 interface AggregatedItem {
   name: string;
@@ -130,7 +130,7 @@ export function ItemAnalytics({ tenantId, selectedMonth, isDemo = false }: { ten
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</span>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
-                {item.last_store} • {new Date(item.last_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                {item.last_store} • {formatDate(item.last_date)}
               </span>
               <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 4, color: 'var(--text-muted)' }}>
                 {item.count}x

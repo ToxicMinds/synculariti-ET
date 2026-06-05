@@ -57,10 +57,16 @@ function DashboardContent() {
   };
 
   const handleManualSave = async (entry: ManualEntryPayload) => {
+    const merged = {
+      ...entry,
+      description: entry.merchant && entry.description
+        ? `${entry.merchant} - ${entry.description}`
+        : (entry.description || entry.merchant || ''),
+    };
     if (entry.id) {
-      await updateTransaction(entry.id, entry);
+      await updateTransaction(entry.id, merged);
     } else {
-      await addTransaction(entry);
+      await addTransaction(merged);
     }
     setManualEntry(null);
   };

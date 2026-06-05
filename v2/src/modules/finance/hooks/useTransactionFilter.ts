@@ -5,7 +5,7 @@ import { Transaction } from '../lib/finance';
 import { ViewMode, UseTransactionFilterProps, UseTransactionFilterReturn } from './useTransactionFilter.types';
 import { safeAmount } from '@/lib/utils';
 
-const DEFAULT_SORT_BY = 'date' as const;
+const DEFAULT_SORT_BY = 'created_at' as const;
 const DEFAULT_SORT_ORDER = 'desc' as const;
 const DEFAULT_LIMIT = 50;
 
@@ -14,7 +14,7 @@ export function useTransactionFilter({ transactions }: UseTransactionFilterProps
   const [whoFilter, setWhoFilter] = useState<string>('All');
   const [whatFilter, setWhatFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'vendor'>(DEFAULT_SORT_BY);
+  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'vendor' | 'created_at'>(DEFAULT_SORT_BY);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(DEFAULT_SORT_ORDER);
   const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
   const [offset, setOffset] = useState<number>(0);
@@ -67,6 +67,10 @@ export function useTransactionFilter({ transactions }: UseTransactionFilterProps
         const aVendor = (a.description ?? a.category).toLowerCase();
         const bVendor = (b.description ?? b.category).toLowerCase();
         comparison = aVendor.localeCompare(bVendor);
+      } else if (sortBy === 'created_at') {
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+        comparison = aDate - bDate;
       } else {
         // Default: date
         comparison = new Date(a.date).getTime() - new Date(b.date).getTime();

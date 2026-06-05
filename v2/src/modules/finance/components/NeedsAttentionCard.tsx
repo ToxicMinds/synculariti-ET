@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { getErrorMessage, formatCurrency } from '@/lib/utils';
+import { getErrorMessage, formatCurrency, formatDate } from '@/lib/utils';
 import { resolvePurchaseAction } from '@/modules/finance/actions/resolvePurchaseAction';
 import { EventTimeline } from '@/components/EventTimeline';
 
@@ -253,7 +253,7 @@ export function NeedsAttentionCard({ tenantId, selectedMonth }: NeedsAttentionCa
                     </div>
                     <div className="flex-between">
                       <span className="card-subtitle" style={{ fontSize: 11 }}>
-                        {new Date(row.purchase_date).toLocaleDateString()}
+                        {formatDate(row.purchase_date)}
                       </span>
                       <div className="flex-row gap-2">
                         <button
