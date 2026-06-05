@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Transaction } from '../lib/finance';
 import { useTenantContext } from '@/context/TenantContext';
@@ -98,5 +98,17 @@ export function useTransactions(tenantId: string | undefined, selectedMonth?: st
     setLoading(false);
   };
 
-  return { transactions, loading, fetchTransactions };
+  const patchRemoveTransaction = useCallback((id: string) => {
+    setTransactions(prev => prev.filter(tx => tx.id !== id));
+  }, []);
+
+  const patchAddTransaction = useCallback((tx: Transaction) => {
+    setTransactions(prev => [tx, ...prev]);
+  }, []);
+
+  const patchUpdateTransaction = useCallback((id: string, updates: Partial<Transaction>) => {
+    setTransactions(prev => prev.map(tx => tx.id === id ? { ...tx, ...updates } : tx));
+  }, []);
+
+  return { transactions, loading, fetchTransactions, patchRemoveTransaction, patchAddTransaction, patchUpdateTransaction };
 }

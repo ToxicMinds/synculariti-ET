@@ -30,7 +30,7 @@ function DashboardContent() {
   const currentMonthISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const selectedMonth = searchParams.get('m') || currentMonthISO;
   
-  const { transactions, loading: eLoading } = useTransactions(tenant?.tenant_id, selectedMonth);
+  const { transactions, loading: eLoading, patchRemoveTransaction } = useTransactions(tenant?.tenant_id, selectedMonth);
   const { softDeleteTransaction, saveReceipt, addTransaction, updateTransaction } = useSync(tenant?.tenant_id);
   const [showScanner, setShowScanner] = useState(false);
   const [showStatement, setShowStatement] = useState(false);
@@ -63,6 +63,11 @@ function DashboardContent() {
       await addTransaction(entry);
     }
     setManualEntry(null);
+  };
+
+  const handleDelete = async (id: string) => {
+    patchRemoveTransaction(id);
+    await softDeleteTransaction(id);
   };
 
   if (loading) return (
@@ -181,7 +186,7 @@ function DashboardContent() {
               <div className="scroll-area" style={{ maxHeight: 560 }}>
                 <ExpenseList 
                   transactions={displayTransactions} 
-                  onDelete={softDeleteTransaction} 
+                  onDelete={handleDelete} 
                   onEdit={(tx) => setManualEntry({ ...tx, amount: safeAmount(tx.amount) })}
                 />
               </div>
