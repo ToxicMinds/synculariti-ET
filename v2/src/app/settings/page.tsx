@@ -6,6 +6,7 @@ import { BentoCard } from '@/components/BentoCard';
 import { Logger } from '@/lib/logger';
 import { formatCurrency, getErrorMessage } from '@/lib/utils';
 import Link from 'next/link';
+import { EventFeed } from '@/components/EventFeed';
 
 export default function SettingsPage() {
   const { tenant, updateState, loading } = useTenant();
@@ -212,6 +213,11 @@ export default function SettingsPage() {
               {saving ? 'Synchronizing...' : 'Save All Changes'}
             </button>
           </div>
+        </BentoCard>
+
+        {/* ROW 5: ACTIVITY FEED */}
+        <BentoCard colSpan={12} title="Activity Feed">
+          <EventFeed tenantId={tenant.tenant_id} limit={30} />
         </BentoCard>
 
       </div>

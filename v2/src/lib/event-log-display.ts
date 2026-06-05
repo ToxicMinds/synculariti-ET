@@ -47,6 +47,12 @@ export function getActionDisplay(action: string): ActionDisplay {
 }
 
 export function resolveActorName(event: EventLogRecord & { app_users?: { full_name?: string } }): string {
+  // Pre-resolved name embedded at insert time by record_event_v1 (migration 48+).
+  // This is the primary path — it works for all user-type events regardless of
+  // whether auth.uid() matches an app_users row (they use different UUIDs).
+  if (event.metadata?.actor_name && typeof event.metadata.actor_name === 'string') {
+    return event.metadata.actor_name;
+  }
   if (event.app_users?.full_name) return event.app_users.full_name;
   if (event.metadata?.legacy_actor_name && typeof event.metadata.legacy_actor_name === 'string') {
     return event.metadata.legacy_actor_name;

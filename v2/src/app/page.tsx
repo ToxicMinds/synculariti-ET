@@ -21,7 +21,6 @@ import { ManualEntryModal, ManualEntryPayload } from '@/modules/finance/componen
 import { ParsedTransaction } from '@/modules/finance/hooks/useStatementScanner';
 import { useCategories } from '@/modules/finance/hooks/useCategories';
 import { safeAmount } from '@/lib/utils';
-import { EventFeed } from '@/components/EventFeed';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -200,10 +199,6 @@ function DashboardContent() {
               </BentoCard>
             )}
 
-            {/* ROW 5: ACTIVITY FEED */}
-            <BentoCard colSpan={12} title="Activity Feed">
-              <EventFeed tenantId={tenant.tenant_id} limit={30} />
-            </BentoCard>
           </>
         )}
       </div>
